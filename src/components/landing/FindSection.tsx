@@ -55,7 +55,7 @@ export default function FindSection() {
           {/* ── Photo pleine hauteur — étudiant africain ── */}
           <div className="hidden lg:block -mr-8">
             <img
-              src="https://images.unsplash.com/photo-1524178232363-1fb2b075b655?w=800&q=80"
+              src="https://images.unsplash.com/photo-1568455421248-a1abf5a57c59?w=800&q=80"
               alt="Amphithéâtre JFN"
               className="w-full h-full min-h-[520px] object-cover"
             />

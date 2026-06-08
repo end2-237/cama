@@ -5,7 +5,7 @@ import { ChevronLeft, ChevronRight, Clock, BookOpen } from "lucide-react";
 
 const courses = [
   {
-    img:   "https://images.unsplash.com/photo-1580582932707-520aed937b7b?w=500&q=80",
+    img:   "https://images.unsplash.com/photo-1509062522246-3755977927d7?w=500&q=80",
     level: "L1",
     title: "Introduction à l'Algorithmique",
     school:"École d'Informatique · JFN",
@@ -14,7 +14,7 @@ const courses = [
     color: "bg-cama text-white",
   },
   {
-    img:   "https://images.unsplash.com/photo-1620912189865-1e8a33da5a43?w=500&q=80",
+    img:   "https://images.unsplash.com/photo-1541339907198-e08756dedf3f?w=500&q=80",
     level: "L2",
     title: "Réseaux Informatiques Fondamentaux",
     school:"École d'Informatique · JFN",
@@ -23,7 +23,7 @@ const courses = [
     color: "bg-cama text-white",
   },
   {
-    img:   "https://images.unsplash.com/photo-1577896851231-70ef18881754?w=500&q=80",
+    img:   "https://images.unsplash.com/photo-1572521165329-b197f9ea3da6?w=500&q=80",
     level: "L3",
     title: "Bases de Données Avancées",
     school:"École d'Informatique · JFN",
@@ -32,7 +32,7 @@ const courses = [
     color: "bg-cama-700 text-white",
   },
   {
-    img:   "https://images.unsplash.com/photo-1531482615713-2afd69097998?w=500&q=80",
+    img:   "https://images.unsplash.com/photo-1580582932707-520aed937b7b?w=500&q=80",
     level: "M1",
     title: "Business Intelligence & Data Science",
     school:"École de Gestion · JFN",
@@ -41,7 +41,7 @@ const courses = [
     color: "bg-gold text-white",
   },
   {
-    img:   "https://images.unsplash.com/photo-1509062522246-3755977927d7?w=500&q=80",
+    img:   "https://images.unsplash.com/photo-1531123897727-8f129e1688ce?w=500&q=80",
     level: "M2",
     title: "Intelligence Artificielle Appliquée",
     school:"École d'Informatique · JFN",

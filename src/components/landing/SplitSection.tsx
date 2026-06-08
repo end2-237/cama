@@ -9,7 +9,7 @@ export default function SplitSection() {
           {/* Photo — étudiant africain */}
           <div className="relative min-h-[500px] overflow-hidden">
             <img
-              src="https://images.unsplash.com/photo-1571260899304-425eee4c7efc?w=800&q=80"
+              src="https://images.unsplash.com/photo-1531545514256-b1400bc00f31?w=800&q=80"
               alt="Étudiants africains qui collaborent"
               className="w-full h-full object-cover"
               style={{ borderBottomRightRadius: "8rem" }}
@@ -82,7 +82,7 @@ export default function SplitSection() {
           {/* Photo — étudiante africaine */}
           <div className="relative min-h-[500px] overflow-hidden">
             <img
-              src="https://images.unsplash.com/photo-1595512166451-2b220c20fc08?w=800&q=80"
+              src="https://images.unsplash.com/photo-1488521787991-ed7bbaae773c?w=800&q=80"
               alt="Étudiante africaine avec laptop"
               className="w-full h-full object-cover"
               style={{ borderBottomLeftRadius: "8rem" }}

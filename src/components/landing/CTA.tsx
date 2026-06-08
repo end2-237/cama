@@ -38,7 +38,7 @@ export default function CTA() {
         {/* Photo droite — étudiants africains en salle info */}
         <div className="hidden lg:block min-h-[520px] relative overflow-hidden">
           <img
-            src="https://images.unsplash.com/photo-1596495578065-6e0763fa1178?w=900&q=80"
+            src="https://images.unsplash.com/photo-1523580494863-6f3031224c94?w=900&q=80"
             alt="Étudiants africains en cours"
             className="w-full h-full object-cover"
             style={{ borderBottomLeftRadius: "8rem" }}
