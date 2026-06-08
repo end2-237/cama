@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Eye, EyeOff, Globe, ChevronRight } from "lucide-react";
+import { ArrowLeft, Eye, EyeOff, Globe, ChevronRight, Check } from "lucide-react";
 import AuthPanel from "@/components/auth/AuthPanel";
 
 const ecoles = [
@@ -14,23 +14,25 @@ const ecoles = [
 const niveaux = ["L1", "L2", "L3", "M1", "M2"];
 
 export default function RegisterPage() {
-  const [showPwd,  setShowPwd]  = useState(false);
-  const [step,     setStep]     = useState<1|2>(1);
-  const [role,     setRole]     = useState<"etudiant"|"enseignant">("etudiant");
+  const [showPwd,   setShowPwd]   = useState(false);
+  const [step,      setStep]      = useState<1|2>(1);
+  const [role,      setRole]      = useState<"etudiant"|"enseignant">("etudiant");
+  const [niveau,    setNiveau]    = useState<string>("");
+  const [accepted,  setAccepted]  = useState(false);
 
   return (
     <div className="min-h-screen grid lg:grid-cols-[42%_58%]">
 
-      {/* ── Panel gauche ── */}
+      {/* Panel gauche */}
       <div className="hidden lg:block">
         <AuthPanel />
       </div>
 
-      {/* ── Panel droit ── */}
-      <div className="flex flex-col min-h-screen bg-white">
+      {/* Panel droit */}
+      <div className="flex flex-col min-h-screen bg-white animate-fade-in">
 
         {/* Top bar */}
-        <div className="flex items-center justify-between px-8 py-5 border-b border-border">
+        <div className="flex items-center justify-between px-8 py-5 border-b border-border animate-fade-up">
           <button
             onClick={() => step === 2 ? setStep(1) : undefined}
             className="flex items-center gap-2 text-sm text-muted hover:text-ink transition-colors"
@@ -38,30 +40,38 @@ export default function RegisterPage() {
             {step === 2 ? (
               <><ArrowLeft className="w-4 h-4" /> Étape précédente</>
             ) : (
-              <Link href="/" className="flex items-center gap-2"><ArrowLeft className="w-4 h-4" /> Retour</Link>
+              <Link href="/" className="flex items-center gap-2">
+                <ArrowLeft className="w-4 h-4" /> Retour
+              </Link>
             )}
           </button>
-          <button className="flex items-center gap-1.5 text-sm text-muted hover:text-ink border border-border rounded-full px-3 py-1.5">
+          <button className="flex items-center gap-1.5 text-sm text-muted hover:text-ink border border-border rounded-full px-3 py-1.5 hover:border-cama/30 active:scale-95 transition-all">
             <Globe className="w-3.5 h-3.5" />
             Français
           </button>
         </div>
 
         {/* Stepper */}
-        <div className="px-8 pt-6">
+        <div className="px-8 pt-6 animate-fade-up delay-100">
           <div className="max-w-md mx-auto">
             <div className="flex items-center gap-3 mb-8">
               {[1, 2].map((s) => (
                 <div key={s} className="flex items-center gap-2">
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all duration-200 ${
-                    step >= s ? "bg-cama text-white" : "bg-border text-subtle"
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all duration-300 ${
+                    step > s
+                      ? "bg-green-500 text-white scale-110 shadow-md shadow-green-200"
+                      : step === s
+                      ? "bg-cama text-white animate-pulse-ring"
+                      : "bg-border text-subtle"
                   }`}>
-                    {s}
+                    {step > s ? <Check className="w-4 h-4" /> : s}
                   </div>
-                  <span className={`text-xs font-medium ${step >= s ? "text-cama" : "text-subtle"}`}>
+                  <span className={`text-xs font-medium transition-colors duration-300 ${step >= s ? "text-cama" : "text-subtle"}`}>
                     {s === 1 ? "Informations" : "Profil académique"}
                   </span>
-                  {s < 2 && <ChevronRight className="w-3 h-3 text-subtle" />}
+                  {s < 2 && (
+                    <ChevronRight className={`w-3 h-3 transition-colors duration-300 ${step === 2 ? "text-cama" : "text-subtle"}`} />
+                  )}
                 </div>
               ))}
             </div>
@@ -72,8 +82,9 @@ export default function RegisterPage() {
         <div className="flex-1 flex items-start justify-center px-8 pb-10">
           <div className="w-full max-w-md">
 
+            {/* ── Étape 1 ── */}
             {step === 1 ? (
-              <>
+              <div className="animate-scale-in">
                 <h1 className="text-3xl font-light text-ink mb-1">Créer un compte</h1>
                 <p className="text-muted text-sm mb-7">
                   Vous pourrez accéder à vos cours dès l&apos;inscription validée.
@@ -90,10 +101,10 @@ export default function RegisterPage() {
                       <button
                         key={id}
                         onClick={() => setRole(id)}
-                        className={`p-4 rounded-2xl border-2 text-left transition-all duration-150 ${
+                        className={`p-4 rounded-2xl border-2 text-left transition-all duration-200 ${
                           role === id
-                            ? "border-cama bg-cama-50"
-                            : "border-border hover:border-cama/30"
+                            ? "border-cama bg-cama-50 scale-[1.02] shadow-md shadow-cama/15"
+                            : "border-border hover:border-cama/30 hover:scale-[1.01]"
                         }`}
                       >
                         <p className={`text-sm font-bold ${role === id ? "text-cama" : "text-ink"}`}>{label}</p>
@@ -104,7 +115,7 @@ export default function RegisterPage() {
                 </div>
 
                 {/* Google */}
-                <button className="w-full flex items-center justify-center gap-3 border border-border rounded-xl py-3 text-sm font-medium text-ink hover:bg-surface hover:border-cama/30 transition-all mb-4">
+                <button className="w-full flex items-center justify-center gap-3 border border-border rounded-xl py-3 text-sm font-medium text-ink hover:bg-surface hover:border-cama/30 hover:scale-[1.01] active:scale-95 transition-all duration-200 mb-4">
                   <svg className="w-4 h-4" viewBox="0 0 24 24">
                     <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
                     <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
@@ -120,44 +131,53 @@ export default function RegisterPage() {
                   <div className="flex-1 h-px bg-border" />
                 </div>
 
-                {/* Champs étape 1 */}
+                {/* Champs */}
                 <div className="space-y-4 mb-6">
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="block text-sm font-medium text-ink mb-1.5">Prénom</label>
-                      <input type="text" placeholder="Jean-Paul"
-                        className="w-full border border-border rounded-xl px-4 py-3 text-sm outline-none focus:border-cama focus:ring-2 focus:ring-cama/15 transition-all" />
+                      <input type="text" placeholder="Jean-Paul" className="input-auth" />
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-ink mb-1.5">Nom</label>
-                      <input type="text" placeholder="Mbarga"
-                        className="w-full border border-border rounded-xl px-4 py-3 text-sm outline-none focus:border-cama focus:ring-2 focus:ring-cama/15 transition-all" />
+                      <input type="text" placeholder="Mbarga" className="input-auth" />
                     </div>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-ink mb-1.5">Email</label>
-                    <input type="email" placeholder="votre@email.cm"
-                      className="w-full border border-border rounded-xl px-4 py-3 text-sm outline-none focus:border-cama focus:ring-2 focus:ring-cama/15 transition-all" />
+                    <input type="email" placeholder="votre@email.cm" className="input-auth" />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-ink mb-1.5">Mot de passe</label>
                     <div className="relative">
-                      <input type={showPwd ? "text" : "password"} placeholder="Min. 8 caractères"
-                        className="w-full border border-border rounded-xl px-4 py-3 pr-11 text-sm outline-none focus:border-cama focus:ring-2 focus:ring-cama/15 transition-all" />
-                      <button type="button" onClick={() => setShowPwd(!showPwd)}
-                        className="absolute right-3.5 top-1/2 -translate-y-1/2 text-subtle hover:text-ink">
+                      <input
+                        type={showPwd ? "text" : "password"}
+                        placeholder="Min. 8 caractères"
+                        className="input-auth pr-11"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPwd(!showPwd)}
+                        className="absolute right-3.5 top-1/2 -translate-y-1/2 text-subtle hover:text-cama transition-colors"
+                      >
                         {showPwd ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                       </button>
                     </div>
                   </div>
                 </div>
 
-                <button onClick={() => setStep(2)} className="w-full btn-primary py-3.5 text-base rounded-xl justify-center">
+                <button
+                  onClick={() => setStep(2)}
+                  className="w-full btn-primary py-3.5 text-base rounded-xl justify-center shadow-lg shadow-cama/20 hover:shadow-cama/40 hover:scale-[1.01] transition-all duration-200"
+                >
                   Continuer
+                  <ChevronRight className="w-4 h-4" />
                 </button>
-              </>
+              </div>
+
             ) : (
-              <>
+              /* ── Étape 2 ── */
+              <div className="animate-scale-in">
                 <h1 className="text-3xl font-light text-ink mb-1">Profil académique</h1>
                 <p className="text-muted text-sm mb-7">
                   Ces informations permettent de vous affecter à la bonne filière.
@@ -166,7 +186,7 @@ export default function RegisterPage() {
                 <div className="space-y-4 mb-6">
                   <div>
                     <label className="block text-sm font-medium text-ink mb-1.5">École</label>
-                    <select className="w-full border border-border rounded-xl px-4 py-3 text-sm text-ink outline-none focus:border-cama focus:ring-2 focus:ring-cama/15 transition-all bg-white">
+                    <select className="input-auth bg-white cursor-pointer">
                       <option value="">Sélectionner une école</option>
                       {ecoles.map((e) => <option key={e}>{e}</option>)}
                     </select>
@@ -178,7 +198,15 @@ export default function RegisterPage() {
                         <label className="block text-sm font-medium text-ink mb-1.5">Niveau</label>
                         <div className="grid grid-cols-5 gap-2">
                           {niveaux.map((n) => (
-                            <button key={n} className="py-2.5 rounded-xl text-xs font-bold border-2 border-border text-muted hover:border-cama hover:text-cama transition-all">
+                            <button
+                              key={n}
+                              onClick={() => setNiveau(n)}
+                              className={`py-2.5 rounded-xl text-xs font-bold border-2 transition-all duration-200 ${
+                                niveau === n
+                                  ? "border-cama bg-cama text-white scale-105 shadow-md shadow-cama/25"
+                                  : "border-border text-muted hover:border-cama hover:text-cama hover:scale-105"
+                              }`}
+                            >
                               {n}
                             </button>
                           ))}
@@ -186,8 +214,7 @@ export default function RegisterPage() {
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-ink mb-1.5">Numéro de carte étudiant</label>
-                        <input type="text" placeholder="JFN-2024-XXXX"
-                          className="w-full border border-border rounded-xl px-4 py-3 text-sm outline-none focus:border-cama focus:ring-2 focus:ring-cama/15 transition-all" />
+                        <input type="text" placeholder="JFN-2024-XXXX" className="input-auth" />
                       </div>
                     </>
                   )}
@@ -195,17 +222,25 @@ export default function RegisterPage() {
                   <div>
                     <label className="block text-sm font-medium text-ink mb-1.5">Téléphone (optionnel)</label>
                     <div className="flex gap-2">
-                      <div className="border border-border rounded-xl px-3 py-3 flex items-center gap-1.5 text-sm text-muted flex-shrink-0">
+                      <div className="border border-border rounded-xl px-3 py-3 flex items-center gap-1.5 text-sm text-muted flex-shrink-0 bg-surface">
                         🇨🇲 +237
                       </div>
-                      <input type="tel" placeholder="6XX XXX XXX"
-                        className="flex-1 border border-border rounded-xl px-4 py-3 text-sm outline-none focus:border-cama focus:ring-2 focus:ring-cama/15 transition-all" />
+                      <input type="tel" placeholder="6XX XXX XXX" className="input-auth flex-1" />
                     </div>
                   </div>
 
                   {/* Conditions */}
-                  <label className="flex items-start gap-3 cursor-pointer group">
-                    <div className="w-5 h-5 rounded border-2 border-border group-hover:border-cama mt-0.5 flex-shrink-0 transition-colors" />
+                  <label
+                    className="flex items-start gap-3 cursor-pointer group"
+                    onClick={() => setAccepted(!accepted)}
+                  >
+                    <div className={`w-5 h-5 rounded border-2 mt-0.5 flex-shrink-0 flex items-center justify-center transition-all duration-200 ${
+                      accepted
+                        ? "bg-cama border-cama scale-105"
+                        : "border-border group-hover:border-cama"
+                    }`}>
+                      {accepted && <Check className="w-3 h-3 text-white" />}
+                    </div>
                     <p className="text-xs text-muted leading-relaxed">
                       J&apos;accepte les{" "}
                       <a href="#" className="text-cama underline">conditions d&apos;utilisation</a>{" "}
@@ -216,15 +251,15 @@ export default function RegisterPage() {
                   </label>
                 </div>
 
-                <button className="w-full btn-primary py-3.5 text-base rounded-xl justify-center">
+                <button className="w-full btn-primary py-3.5 text-base rounded-xl justify-center shadow-lg shadow-cama/20 hover:shadow-cama/40 hover:scale-[1.01] transition-all duration-200">
                   Créer mon compte
                 </button>
-              </>
+              </div>
             )}
 
             <p className="text-center text-sm text-muted mt-6">
               Déjà inscrit ?{" "}
-              <Link href="/auth/login" className="text-cama font-bold hover:underline">
+              <Link href="/auth/login" className="text-cama font-bold hover:underline hover:text-cama-700 transition-colors">
                 Se connecter
               </Link>
             </p>
