@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -7,55 +7,55 @@
 @layer base {
   * { box-sizing: border-box; }
   html { scroll-behavior: smooth; }
-  body { @apply antialiased; }
+  body {
+    @apply font-sans text-ink bg-white antialiased;
+    font-weight: 400;
+  }
 }
 
 @layer components {
-  .btn-primary {
-    @apply inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl
-           bg-primary-600 text-white font-semibold text-sm
-           hover:bg-primary-700 active:scale-95
-           transition-all duration-200 shadow-lg;
+  /* Pill buttons — NetAcad style */
+  .btn-green {
+    @apply inline-flex items-center justify-center gap-2
+           px-7 py-3.5 rounded-full
+           bg-green text-white font-bold text-sm
+           hover:bg-green-dark active:scale-95
+           transition-all duration-150 whitespace-nowrap;
   }
-  .btn-outline {
-    @apply inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl
-           border-2 border-white text-white font-semibold text-sm
-           hover:bg-white hover:text-primary-700 active:scale-95
-           transition-all duration-200;
+  .btn-outline-green {
+    @apply inline-flex items-center justify-center gap-2
+           px-7 py-3.5 rounded-full
+           border-2 border-green text-ink font-bold text-sm
+           hover:bg-green-light active:scale-95
+           transition-all duration-150 whitespace-nowrap;
   }
-  .btn-outline-dark {
-    @apply inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl
-           border-2 border-primary-600 text-primary-600 font-semibold text-sm
-           hover:bg-primary-50 active:scale-95
-           transition-all duration-200;
+  .btn-outline-white {
+    @apply inline-flex items-center justify-center gap-2
+           px-7 py-3.5 rounded-full
+           border-2 border-white text-white font-bold text-sm
+           hover:bg-white/10 active:scale-95
+           transition-all duration-150 whitespace-nowrap;
   }
-  .card {
-    @apply bg-white rounded-2xl border border-slate-200 shadow-sm
-           hover:shadow-lg transition-all duration-300;
+
+  /* Green underline on a word — NetAcad signature */
+  .green-underline {
+    @apply relative;
+    text-decoration: underline;
+    text-decoration-color: #49A942;
+    text-decoration-thickness: 3px;
+    text-underline-offset: 6px;
   }
-  .section-title {
-    @apply text-3xl md:text-4xl font-bold text-primary-900 leading-tight;
-  }
-  .section-subtitle {
-    @apply text-lg text-slate-500 leading-relaxed;
+
+  /* Section card */
+  .feature-card {
+    @apply bg-white rounded-2xl border border-border p-6
+           hover:shadow-md transition-shadow duration-200 cursor-default;
   }
 }
 
 @layer utilities {
-  .text-gradient {
-    @apply bg-gradient-to-r from-primary-600 to-accent bg-clip-text text-transparent;
-  }
-  .bg-hero {
-    background: linear-gradient(135deg, #0F172A 0%, #1A3A8F 55%, #1A56DB 100%);
-  }
-  .glass {
-    background: rgba(255,255,255,0.08);
-    backdrop-filter: blur(12px);
-    border: 1px solid rgba(255,255,255,0.15);
-  }
-  .glass-dark {
-    background: rgba(15,23,42,0.7);
-    backdrop-filter: blur(12px);
-    border: 1px solid rgba(255,255,255,0.1);
-  }
+  .section-white  { @apply bg-white; }
+  .section-gray   { @apply bg-surface; }
+  .section-navy   { @apply bg-navy; }
+  .section-dark   { @apply bg-charcoal; }
 }

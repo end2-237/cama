@@ -9,55 +9,31 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        primary: {
-          50:  "#EEF2FF",
-          100: "#E0E7FF",
-          200: "#C7D2FE",
-          400: "#818CF8",
-          600: "#1A56DB",
-          700: "#1A3A8F",
-          800: "#1E2A3A",
-          900: "#0F172A",
+        green: {
+          DEFAULT: "#49A942",
+          dark:    "#3a8a34",
+          light:   "#e8f5e7",
         },
-        accent: {
-          DEFAULT: "#059669",
-          light: "#D1FAE5",
+        navy: {
+          DEFAULT: "#1B2B4B",
+          dark:    "#131f36",
+          light:   "#243660",
         },
-        warning: {
-          DEFAULT: "#D97706",
-          light: "#FEF3C7",
-        },
-        danger: {
-          DEFAULT: "#DC2626",
-          light: "#FEE2E2",
-        },
+        charcoal: "#2C2C2C",
+        ink:      "#1a1a1a",
+        muted:    "#555555",
+        subtle:   "#888888",
+        border:   "#E5E5E5",
+        surface:  "#F5F5F5",
       },
       fontFamily: {
         sans: ["Inter", "ui-sans-serif", "system-ui", "sans-serif"],
       },
-      animation: {
-        "fade-in":     "fadeIn 0.6s ease-out",
-        "slide-up":    "slideUp 0.7s ease-out",
-        "slide-left":  "slideInLeft 0.6s ease-out",
-        "float":       "float 6s ease-in-out infinite",
-      },
-      keyframes: {
-        fadeIn: {
-          "0%":   { opacity: "0" },
-          "100%": { opacity: "1" },
-        },
-        slideUp: {
-          "0%":   { opacity: "0", transform: "translateY(30px)" },
-          "100%": { opacity: "1", transform: "translateY(0)" },
-        },
-        slideInLeft: {
-          "0%":   { opacity: "0", transform: "translateX(-30px)" },
-          "100%": { opacity: "1", transform: "translateX(0)" },
-        },
-        float: {
-          "0%, 100%": { transform: "translateY(0px)" },
-          "50%":      { transform: "translateY(-10px)" },
-        },
+      fontSize: {
+        "display-xl": ["5rem",   { lineHeight: "1.05", fontWeight: "300" }],
+        "display-lg": ["4rem",   { lineHeight: "1.08", fontWeight: "300" }],
+        "display-md": ["3rem",   { lineHeight: "1.1",  fontWeight: "300" }],
+        "display-sm": ["2.25rem",{ lineHeight: "1.15", fontWeight: "300" }],
       },
     },
   },

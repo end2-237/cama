@@ -1,92 +1,99 @@
 import Link from "next/link";
-import { GraduationCap, Mail, MapPin, Phone } from "lucide-react";
+import { Play, Share2, AtSign, Link2, X } from "lucide-react";
 
-const links = {
-  Plateforme: [
-    { label: "Fonctionnalités", href: "#features" },
-    { label: "Modules LMS", href: "#modules" },
-    { label: "Sécurité", href: "#features" },
-    { label: "Performance", href: "#features" },
-  ],
-  Acteurs: [
-    { label: "Administrateurs", href: "#roles" },
-    { label: "Enseignants", href: "#roles" },
-    { label: "Étudiants", href: "#roles" },
-    { label: "Jury", href: "#roles" },
-  ],
-  Accès: [
-    { label: "Connexion", href: "/auth/login" },
-    { label: "Inscription", href: "/auth/register" },
-  ],
-};
+const links = [
+  ["Catalogue des cours",  "/auth/register"],
+  ["Trouver une filière",   "#filieres"],
+  ["Ressources étudiants", "/auth/register"],
+  ["Enseigner avec CAMA",  "/auth/register"],
+  ["Devenir partenaire",   "/auth/register"],
+  ["Support technique",    "/auth/register"],
+  ["À propos de JFN",      "/auth/register"],
+];
+
+const socials = [
+  { icon: Play,   href: "#", label: "YouTube" },
+  { icon: Share2, href: "#", label: "Facebook" },
+  { icon: AtSign, href: "#", label: "Instagram" },
+  { icon: Link2,  href: "#", label: "LinkedIn" },
+  { icon: X,      href: "#", label: "X (Twitter)" },
+];
+
+const legal = [
+  "Conditions d'utilisation",
+  "Politique de confidentialité",
+  "Cookies",
+  "Protection des données",
+  "Accessibilité",
+];
 
 export default function Footer() {
   return (
-    <footer className="bg-primary-900 text-white">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-        <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-10 mb-12">
+    <footer style={{ backgroundColor: "#2C2C2C" }} className="text-white">
+      {/* Footnotes */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-10 pb-6 border-b border-white/10">
+        <ol className="list-decimal list-inside space-y-1">
+          {[
+            "Basé sur les retours des étudiants inscrits sur CAMA, année académique 2024-2025.",
+            "Données issues du suivi de progression sur la plateforme entre septembre et décembre 2024.",
+          ].map((note, i) => (
+            <li key={i} className="text-xs text-white/40 italic">{note}</li>
+          ))}
+        </ol>
+      </div>
+
+      {/* Main footer */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 mb-6">
           {/* Brand */}
-          <div className="lg:col-span-2">
-            <div className="flex items-center gap-2.5 mb-4">
-              <div className="w-9 h-9 rounded-xl bg-primary-600 flex items-center justify-center">
-                <GraduationCap className="w-5 h-5 text-white" />
-              </div>
-              <div>
-                <span className="text-white font-bold text-lg">CAMA</span>
-                <span className="text-primary-400 text-xs block tracking-widest uppercase">JFN Platform</span>
-              </div>
-            </div>
-            <p className="text-white/50 text-sm leading-relaxed mb-6 max-w-xs">
-              Plateforme LMS sécurisée et optimisée bas-débit pour la gestion
-              complète du parcours académique de l&apos;Institut JFN, Cameroun.
-            </p>
-            <div className="space-y-2">
-              {[
-                { icon: MapPin, text: "Yaoundé, Cameroun" },
-                { icon: Mail,   text: "contact@jfn.cm" },
-                { icon: Phone,  text: "+237 6XX XXX XXX" },
-              ].map(({ icon: Icon, text }) => (
-                <div key={text} className="flex items-center gap-2 text-white/40 text-sm">
-                  <Icon className="w-3.5 h-3.5 flex-shrink-0" />
-                  <span>{text}</span>
-                </div>
-              ))}
-            </div>
+          <div>
+            <p className="text-white font-light text-sm">Institut</p>
+            <p className="text-white font-bold text-lg">JFN · <span style={{ color: "#49A942" }}>CAMA</span></p>
           </div>
 
-          {/* Link columns */}
-          {Object.entries(links).map(([section, items]) => (
-            <div key={section}>
-              <h4 className="text-white font-semibold text-sm mb-4 uppercase tracking-wider">
-                {section}
-              </h4>
-              <ul className="space-y-2.5">
-                {items.map(({ label, href }) => (
-                  <li key={label}>
-                    <Link
-                      href={href}
-                      className="text-white/40 text-sm hover:text-white transition-colors duration-150"
-                    >
-                      {label}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
+          {/* Socials */}
+          <div className="flex items-center gap-3">
+            {socials.map(({ icon: Icon, href, label }) => (
+              <a
+                key={label}
+                href={href}
+                aria-label={label}
+                className="w-10 h-10 rounded-full border border-white/30 flex items-center justify-center text-white/60 hover:text-white hover:border-white transition-all"
+              >
+                <Icon className="w-4 h-4" />
+              </a>
+            ))}
+          </div>
         </div>
 
-        {/* Bottom */}
-        <div className="border-t border-white/10 pt-8 flex flex-col sm:flex-row justify-between items-center gap-4">
-          <p className="text-white/30 text-sm">
-            © {new Date().getFullYear()} CAMA — Institut JFN. Tous droits réservés.
+        {/* Divider */}
+        <div className="border-t border-white/10 mb-8" />
+
+        {/* Links */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 mb-10">
+          {links.map(([label, href]) => (
+            <Link
+              key={label}
+              href={href}
+              className="text-sm text-white/50 hover:text-white transition-colors"
+            >
+              {label}
+            </Link>
+          ))}
+        </div>
+      </div>
+
+      {/* Bottom bar */}
+      <div className="border-t border-white/10">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col sm:flex-row justify-between items-center gap-3">
+          <p className="text-xs text-white/40">
+            © {new Date().getFullYear()} Institut JFN · CAMA. Tous droits réservés.
           </p>
-          <div className="flex items-center gap-4">
-            <span className="text-white/20 text-sm">Stack :</span>
-            {["Next.js 14", "TypeScript", "Prisma", "Tailwind"].map((tech) => (
-              <span key={tech} className="text-white/30 text-xs bg-white/5 px-2 py-1 rounded">
-                {tech}
-              </span>
+          <div className="flex flex-wrap gap-4">
+            {legal.map((l) => (
+              <a key={l} href="#" className="text-xs font-bold text-white/40 hover:text-white transition-colors">
+                {l}
+              </a>
             ))}
           </div>
         </div>

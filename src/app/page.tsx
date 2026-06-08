@@ -1,23 +1,27 @@
-import Navbar       from "@/components/landing/Navbar";
-import Hero         from "@/components/landing/Hero";
-import StatsBar     from "@/components/landing/StatsBar";
-import Features     from "@/components/landing/Features";
-import Modules      from "@/components/landing/Modules";
-import LowBandwidth from "@/components/landing/LowBandwidth";
-import Roles        from "@/components/landing/Roles";
-import CTA          from "@/components/landing/CTA";
-import Footer       from "@/components/landing/Footer";
+import Navbar          from "@/components/landing/Navbar";
+import Hero            from "@/components/landing/Hero";
+import StatsBar        from "@/components/landing/StatsBar";
+import Filieres        from "@/components/landing/Filieres";
+import CoursesCarousel from "@/components/landing/CoursesCarousel";
+import FindSection     from "@/components/landing/FindSection";
+import WhyCAMA         from "@/components/landing/WhyCAMA";
+import SplitSection    from "@/components/landing/SplitSection";
+import Testimonials    from "@/components/landing/Testimonials";
+import CTA             from "@/components/landing/CTA";
+import Footer          from "@/components/landing/Footer";
 
 export default function HomePage() {
   return (
-    <main>
+    <main className="pt-16">
       <Navbar />
       <Hero />
       <StatsBar />
-      <Features />
-      <Modules />
-      <LowBandwidth />
-      <Roles />
+      <Filieres />
+      <CoursesCarousel />
+      <FindSection />
+      <WhyCAMA />
+      <SplitSection />
+      <Testimonials />
       <CTA />
       <Footer />
     </main>
