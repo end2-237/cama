@@ -6,18 +6,18 @@ import {
 import Link from "next/link";
 
 const filieres = [
-  { icon: Monitor,      label: "Informatique",           school: "École Informatique" },
-  { icon: Network,      label: "Réseaux & Télécom",       school: "École Informatique" },
-  { icon: Database,     label: "Bases de Données",        school: "École Informatique" },
-  { icon: Code2,        label: "Génie Logiciel",          school: "École Informatique" },
-  { icon: BarChart3,    label: "Gestion & Finance",       school: "École Gestion" },
-  { icon: Microscope,   label: "Sciences Biologiques",    school: "École Sciences" },
-  { icon: BookOpen,     label: "Lettres & SHS",           school: "École Sciences" },
-  { icon: Briefcase,    label: "Management",              school: "École Gestion" },
-  { icon: Calculator,   label: "Mathématiques",           school: "École Sciences" },
-  { icon: Globe,        label: "Relations Internationales", school: "École Gestion" },
-  { icon: Cpu,          label: "Intelligence Artificielle", school: "École Informatique" },
-  { icon: FlaskConical, label: "Chimie & Sciences",       school: "École Sciences" },
+  { icon: Monitor,      label: "Informatique",           school: "École Informatique", slug: "informatique" },
+  { icon: Network,      label: "Réseaux & Télécom",       school: "École Informatique", slug: "reseaux-telecom" },
+  { icon: Database,     label: "Bases de Données",        school: "École Informatique", slug: "bases-de-donnees" },
+  { icon: Code2,        label: "Génie Logiciel",          school: "École Informatique", slug: "genie-logiciel" },
+  { icon: BarChart3,    label: "Gestion & Finance",       school: "École Gestion",      slug: "gestion-finance" },
+  { icon: Microscope,   label: "Sciences Biologiques",    school: "École Sciences",     slug: "sciences-biologiques" },
+  { icon: BookOpen,     label: "Lettres & SHS",           school: "École Sciences",     slug: "lettres-shs" },
+  { icon: Briefcase,    label: "Management",              school: "École Gestion",      slug: "management" },
+  { icon: Calculator,   label: "Mathématiques",           school: "École Sciences",     slug: "mathematiques" },
+  { icon: Globe,        label: "Relations Internationales", school: "École Gestion",    slug: "relations-internationales" },
+  { icon: Cpu,          label: "Intelligence Artificielle", school: "École Informatique", slug: "intelligence-artificielle" },
+  { icon: FlaskConical, label: "Chimie & Sciences",       school: "École Sciences",     slug: "chimie-sciences" },
 ];
 
 export default function Filieres() {
@@ -63,10 +63,10 @@ export default function Filieres() {
 
         {/* ── Grid filières — avec hover indigo (plus notre couleur) ── */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 mb-10">
-          {filieres.map(({ icon: Icon, label, school }) => (
-            <a
+          {filieres.map(({ icon: Icon, label, school, slug }) => (
+            <Link
               key={label}
-              href="/auth/register"
+              href={`/parcours/${slug}`}
               className="feature-card flex items-center gap-4 group border-l-4 border-transparent hover:border-cama"
             >
               <div className="w-10 h-10 flex-shrink-0 flex items-center justify-center rounded-xl bg-cama-50 group-hover:bg-cama group-hover:text-white transition-all duration-200">
@@ -76,7 +76,7 @@ export default function Filieres() {
                 <p className="text-sm font-bold text-ink group-hover:text-cama transition-colors leading-snug">{label}</p>
                 <p className="text-[10px] text-subtle truncate">{school}</p>
               </div>
-            </a>
+            </Link>
           ))}
         </div>
 
