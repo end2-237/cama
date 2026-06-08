@@ -7,102 +7,138 @@ export default function Hero() {
       className="bg-white overflow-hidden relative"
       style={{ height: "calc(100vh - 64px)" }}
     >
-      {/* ── Motif global fond blanc gauche — lignes angulaires kente ── */}
-      <svg className="absolute inset-0 w-full h-full pointer-events-none -z-10" aria-hidden>
-        <defs>
-          {/* Motif 1 : vagues angulaires kente */}
-          <pattern id="kenteWave" x="0" y="0" width="80" height="40" patternUnits="userSpaceOnUse">
-            <polyline
-              points="0,20 10,10 20,20 30,10 40,20 50,10 60,20 70,10 80,20"
-              fill="none" stroke="#4F46E5" strokeWidth="0.8" opacity="0.07"
-            />
-            <polyline
-              points="0,35 10,25 20,35 30,25 40,35 50,25 60,35 70,25 80,35"
-              fill="none" stroke="#F59E0B" strokeWidth="0.6" opacity="0.05"
-            />
-          </pattern>
 
-          {/* Motif 2 : grille de losanges Adinkra */}
-          <pattern id="adinkraDiamond" x="0" y="0" width="40" height="40" patternUnits="userSpaceOnUse">
-            <rect x="20" y="2" width="12" height="12" fill="none"
-              stroke="#4F46E5" strokeWidth="0.7" opacity="0.08" transform="rotate(45 26 8)" />
-          </pattern>
-
-          {/* Motif 3 : grille de points rythmiques */}
-          <pattern id="dotGrid" x="0" y="0" width="24" height="24" patternUnits="userSpaceOnUse">
-            <circle cx="2" cy="2" r="1.2" fill="#4F46E5" opacity="0.07" />
-          </pattern>
-
-          {/* Motif 4 : cercles concentriques Adinkra — coin top-right */}
-          <pattern id="concentric" x="0" y="0" width="60" height="60" patternUnits="userSpaceOnUse">
-            <circle cx="30" cy="30" r="10" fill="none" stroke="#F59E0B" strokeWidth="0.6" opacity="0.08"/>
-            <circle cx="30" cy="30" r="20" fill="none" stroke="#F59E0B" strokeWidth="0.4" opacity="0.05"/>
-            <circle cx="30" cy="30" r="28" fill="none" stroke="#4F46E5" strokeWidth="0.4" opacity="0.04"/>
-          </pattern>
-
-          {/* Motif 5 : chevrons — tissu wax */}
-          <pattern id="waxChevron" x="0" y="0" width="32" height="16" patternUnits="userSpaceOnUse">
-            <polyline points="0,8 8,0 16,8 24,0 32,8" fill="none" stroke="#4F46E5" strokeWidth="0.7" opacity="0.06"/>
-            <polyline points="0,16 8,8 16,16 24,8 32,16" fill="none" stroke="#F59E0B" strokeWidth="0.5" opacity="0.04"/>
-          </pattern>
-        </defs>
-
-        {/* Fond gauche : vagues kente sur toute la hauteur */}
-        <rect x="0" y="0" width="55%" height="100%" fill="url(#kenteWave)" />
-
-        {/* Fond gauche : grille de points en superposition */}
-        <rect x="0" y="0" width="55%" height="100%" fill="url(#dotGrid)" />
-
-        {/* Coin bas-gauche : cercles concentriques Adinkra */}
-        <g opacity="0.6">
-          <circle cx="0"   cy="100%" r="120" fill="none" stroke="#F59E0B" strokeWidth="1" opacity="0.06"/>
-          <circle cx="0"   cy="100%" r="80"  fill="none" stroke="#F59E0B" strokeWidth="0.8" opacity="0.08"/>
-          <circle cx="0"   cy="100%" r="40"  fill="none" stroke="#4F46E5" strokeWidth="0.8" opacity="0.1"/>
-        </g>
-
-        {/* Coin top-left : arc Adinkra Gye Nyame */}
-        <g opacity="0.5">
-          <circle cx="0" cy="0" r="160" fill="none" stroke="#4F46E5" strokeWidth="0.8" opacity="0.05"/>
-          <circle cx="0" cy="0" r="100" fill="none" stroke="#4F46E5" strokeWidth="0.6" opacity="0.06"/>
-          <circle cx="0" cy="0" r="50"  fill="none" stroke="#F59E0B" strokeWidth="0.6" opacity="0.07"/>
-        </g>
-      </svg>
-
-      {/* Bloc diagonal droit */}
-      <div className="absolute top-0 right-0 w-[52%] h-full bg-cama-50 -z-10"
-        style={{ clipPath: "polygon(14% 0, 100% 0, 100% 100%, 0% 100%)" }} />
-
-      {/* Motifs sur le bloc diagonal droit */}
+      {/* ══════════════════════════════════════════
+          MOTIFS DE FOND — Afrique Académique
+          Inspiré NetAcad mais univers CAMA/JFN
+      ══════════════════════════════════════════ */}
       <svg
-        className="absolute top-0 right-0 w-[52%] h-full pointer-events-none -z-10"
+        className="absolute inset-0 w-full h-full pointer-events-none"
+        style={{ zIndex: 0 }}
         aria-hidden
-        preserveAspectRatio="xMidYMid slice"
-        style={{ clipPath: "polygon(14% 0, 100% 0, 100% 100%, 0% 100%)" }}
       >
         <defs>
-          <pattern id="waxRight" x="0" y="0" width="32" height="16" patternUnits="userSpaceOnUse">
-            <polyline points="0,8 8,0 16,8 24,0 32,8"   fill="none" stroke="#4F46E5" strokeWidth="1" opacity="0.10"/>
-            <polyline points="0,16 8,8 16,16 24,8 32,16" fill="none" stroke="#F59E0B" strokeWidth="0.7" opacity="0.07"/>
+
+          {/* ── Vagues kente angulaires ── */}
+          <pattern id="kw" x="0" y="0" width="80" height="40" patternUnits="userSpaceOnUse">
+            <polyline
+              points="0,20 10,10 20,20 30,10 40,20 50,10 60,20 70,10 80,20"
+              fill="none" stroke="#4F46E5" strokeWidth="1.2"
+            />
+            <polyline
+              points="0,36 10,26 20,36 30,26 40,36 50,26 60,36 70,26 80,36"
+              fill="none" stroke="#F59E0B" strokeWidth="0.9"
+            />
           </pattern>
-          <pattern id="diamondRight" x="0" y="0" width="28" height="28" patternUnits="userSpaceOnUse">
-            <rect x="14" y="2" width="10" height="10" fill="none"
-              stroke="#4F46E5" strokeWidth="0.8" opacity="0.12" transform="rotate(45 19 7)" />
+
+          {/* ── Chevrons wax (tissu africain imprimé) ── */}
+          <pattern id="wax" x="0" y="0" width="40" height="20" patternUnits="userSpaceOnUse">
+            <polyline points="0,10 10,0 20,10 30,0 40,10" fill="none" stroke="#4F46E5" strokeWidth="1.1"/>
+            <polyline points="0,20 10,10 20,20 30,10 40,20" fill="none" stroke="#F59E0B" strokeWidth="0.8"/>
           </pattern>
+
+          {/* ── Losanges Adinkra ── */}
+          <pattern id="dia" x="0" y="0" width="36" height="36" patternUnits="userSpaceOnUse">
+            <rect x="8" y="8" width="20" height="20" fill="none"
+              stroke="#4F46E5" strokeWidth="1" transform="rotate(45 18 18)"/>
+            <circle cx="18" cy="18" r="2" fill="#F59E0B"/>
+          </pattern>
+
+          {/* ── Points bogolan ── */}
+          <pattern id="dots" x="0" y="0" width="20" height="20" patternUnits="userSpaceOnUse">
+            <circle cx="2" cy="2" r="1.5" fill="#4F46E5"/>
+          </pattern>
+
+          {/* ── Croix Adinkra (Nyame Dua) ── */}
+          <pattern id="cross" x="0" y="0" width="48" height="48" patternUnits="userSpaceOnUse">
+            <line x1="24" y1="10" x2="24" y2="38" stroke="#F59E0B" strokeWidth="1.2"/>
+            <line x1="10" y1="24" x2="38" y2="24" stroke="#F59E0B" strokeWidth="1.2"/>
+            <circle cx="24" cy="24" r="3" fill="none" stroke="#4F46E5" strokeWidth="1"/>
+          </pattern>
+
         </defs>
-        <rect width="100%" height="100%" fill="url(#waxRight)" />
-        <rect width="100%" height="100%" fill="url(#diamondRight)" />
 
-        {/* Grand arc coin bas-droite */}
-        <circle cx="100%" cy="100%" r="260" fill="none" stroke="#4F46E5" strokeWidth="1" opacity="0.08"/>
-        <circle cx="100%" cy="100%" r="180" fill="none" stroke="#F59E0B" strokeWidth="0.8" opacity="0.1"/>
-        <circle cx="100%" cy="100%" r="100" fill="none" stroke="#4F46E5" strokeWidth="0.7" opacity="0.12"/>
+        {/* ── Zone gauche : vagues kente en fond léger ── */}
+        <rect x="0" y="0" width="54%" height="100%" fill="url(#kw)" opacity="0.09"/>
 
-        {/* Ligne diagonale signature Adinkra top-right */}
-        <line x1="60%" y1="0" x2="100%" y2="40%" stroke="#F59E0B" strokeWidth="1" opacity="0.1" strokeDasharray="6 10"/>
-        <line x1="75%" y1="0" x2="100%" y2="25%" stroke="#4F46E5" strokeWidth="0.8" opacity="0.08" strokeDasharray="4 12"/>
+        {/* ── Zone gauche : points bogolan superposés ── */}
+        <rect x="0" y="0" width="54%" height="100%" fill="url(#dots)" opacity="0.07"/>
+
+        {/* ── Arcs concentriques coin top-left — Gye Nyame ── */}
+        <g opacity="1">
+          <circle cx="-20" cy="-20" r="180" fill="none" stroke="#4F46E5" strokeWidth="1.5" opacity="0.07"/>
+          <circle cx="-20" cy="-20" r="120" fill="none" stroke="#4F46E5" strokeWidth="1.2" opacity="0.10"/>
+          <circle cx="-20" cy="-20" r="70"  fill="none" stroke="#F59E0B" strokeWidth="1.2" opacity="0.12"/>
+          <circle cx="-20" cy="-20" r="30"  fill="none" stroke="#F59E0B" strokeWidth="1"   opacity="0.14"/>
+        </g>
+
+        {/* ── Arcs concentriques coin bas-gauche ── */}
+        <g opacity="1">
+          <circle cx="-10" cy="110%" r="220" fill="none" stroke="#F59E0B" strokeWidth="1.5" opacity="0.06"/>
+          <circle cx="-10" cy="110%" r="150" fill="none" stroke="#F59E0B" strokeWidth="1.2" opacity="0.09"/>
+          <circle cx="-10" cy="110%" r="90"  fill="none" stroke="#4F46E5" strokeWidth="1"   opacity="0.10"/>
+        </g>
+
+        {/* ── Ligne ondulée longue centre-haut — respiration ── */}
+        <path
+          d="M 0 80 C 120 40, 240 130, 360 80 S 600 30, 720 80 S 960 130, 1100 80"
+          fill="none" stroke="#4F46E5" strokeWidth="1.5" opacity="0.08" strokeDasharray="8 14"
+        />
+        <path
+          d="M 0 140 C 100 100, 200 180, 340 140 S 560 90, 700 140 S 950 190, 1100 140"
+          fill="none" stroke="#F59E0B" strokeWidth="1" opacity="0.07" strokeDasharray="5 18"
+        />
       </svg>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-full">
+      {/* ══════════════════════════════════════════
+          BLOC DIAGONAL DROIT
+      ══════════════════════════════════════════ */}
+      <div
+        className="absolute top-0 right-0 w-[52%] h-full bg-cama-50"
+        style={{ clipPath: "polygon(14% 0, 100% 0, 100% 100%, 0% 100%)", zIndex: 0 }}
+      />
+
+      {/* Motifs sur bloc diagonal */}
+      <svg
+        className="absolute top-0 right-0 w-[52%] h-full pointer-events-none"
+        style={{ clipPath: "polygon(14% 0, 100% 0, 100% 100%, 0% 100%)", zIndex: 0 }}
+        aria-hidden
+      >
+        <defs>
+          <pattern id="waxR" x="0" y="0" width="40" height="20" patternUnits="userSpaceOnUse">
+            <polyline points="0,10 10,0 20,10 30,0 40,10" fill="none" stroke="#4F46E5" strokeWidth="1.3"/>
+            <polyline points="0,20 10,10 20,20 30,10 40,20" fill="none" stroke="#F59E0B" strokeWidth="1"/>
+          </pattern>
+          <pattern id="diaR" x="0" y="0" width="40" height="40" patternUnits="userSpaceOnUse">
+            <rect x="10" y="10" width="20" height="20" fill="none"
+              stroke="#4F46E5" strokeWidth="1.2" transform="rotate(45 20 20)"/>
+          </pattern>
+        </defs>
+
+        {/* Chevrons wax */}
+        <rect width="100%" height="100%" fill="url(#waxR)" opacity="0.13"/>
+        {/* Losanges Adinkra */}
+        <rect width="100%" height="100%" fill="url(#diaR)" opacity="0.10"/>
+
+        {/* Grand arc coin bas-droit */}
+        <circle cx="100%" cy="100%" r="320" fill="none" stroke="#4F46E5" strokeWidth="2" opacity="0.10"/>
+        <circle cx="100%" cy="100%" r="220" fill="none" stroke="#F59E0B" strokeWidth="1.5" opacity="0.12"/>
+        <circle cx="100%" cy="100%" r="130" fill="none" stroke="#4F46E5" strokeWidth="1.2" opacity="0.15"/>
+        <circle cx="100%" cy="100%" r="60"  fill="none" stroke="#F59E0B" strokeWidth="1"   opacity="0.18"/>
+
+        {/* Lignes diagonales tiretées JFN */}
+        <line x1="50%" y1="0" x2="100%" y2="50%"
+          stroke="#F59E0B" strokeWidth="1.2" opacity="0.15" strokeDasharray="8 16"/>
+        <line x1="70%" y1="0" x2="100%" y2="30%"
+          stroke="#4F46E5" strokeWidth="1" opacity="0.12" strokeDasharray="5 20"/>
+        <line x1="30%" y1="0" x2="100%" y2="70%"
+          stroke="#4F46E5" strokeWidth="0.8" opacity="0.08" strokeDasharray="10 20"/>
+      </svg>
+
+      {/* ══════════════════════════════════════════
+          CONTENU
+      ══════════════════════════════════════════ */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-full" style={{ position: "relative", zIndex: 10 }}>
         <div className="grid lg:grid-cols-2 gap-0 h-full">
 
           {/* Texte gauche */}
@@ -204,7 +240,7 @@ export default function Hero() {
       </div>
 
       {/* Vague bas */}
-      <div className="absolute bottom-0 inset-x-0 pointer-events-none">
+      <div className="absolute bottom-0 inset-x-0 pointer-events-none" style={{ zIndex: 10 }}>
         <svg viewBox="0 0 1440 28" className="w-full" preserveAspectRatio="none">
           <path d="M0,14 C240,28 480,0 720,14 C960,28 1200,0 1440,14 L1440,28 L0,28 Z" fill="#F9FAFB"/>
         </svg>
