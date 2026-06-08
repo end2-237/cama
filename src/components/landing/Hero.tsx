@@ -13,11 +13,11 @@ export default function Hero() {
       <div className="absolute top-0 right-0 w-[52%] h-full kente-pattern -z-10"
         style={{ clipPath: "polygon(14% 0, 100% 0, 100% 100%, 0% 100%)" }} />
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-full flex items-center" style={{ paddingTop: "64px" }}>
-        <div className="grid lg:grid-cols-2 gap-0 w-full items-center" style={{ height: "calc(100% - 64px)" }}>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-full flex items-start" style={{ paddingTop: "80px" }}>
+        <div className="grid lg:grid-cols-2 gap-0 w-full items-start" style={{ height: "calc(100% - 80px)" }}>
 
           {/* Texte gauche */}
-          <div className="flex flex-col justify-center h-full pr-0 lg:pr-10 relative z-10 py-4">
+          <div className="flex flex-col justify-start h-full pr-0 lg:pr-10 relative z-10 pt-4 pb-4">
 
             {/* Annonce */}
             <div className="inline-flex items-center gap-2 bg-white border border-border rounded-xl px-3 py-2 mb-3 max-w-xs shadow-sm self-start">
@@ -71,7 +71,7 @@ export default function Hero() {
           </div>
 
           {/* Photos droite */}
-          <div className="hidden lg:flex flex-col gap-2.5 pl-6 h-full justify-center relative z-10 py-4">
+          <div className="hidden lg:flex flex-col gap-2.5 pl-6 h-full justify-start relative z-10 pt-4 pb-4">
 
             {/* Grande photo */}
             <div className="relative rounded-2xl overflow-hidden shadow-2xl" style={{ flex: "1 1 0", minHeight: 0 }}>
