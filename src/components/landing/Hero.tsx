@@ -5,7 +5,7 @@ export default function Hero() {
   return (
     <section
       className="bg-white overflow-hidden relative"
-      style={{ height: "100vh", minHeight: "600px" }}
+      style={{ height: "calc(100vh - 64px)" }}
     >
       {/* Bloc diagonal */}
       <div className="absolute top-0 right-0 w-[52%] h-full bg-cama-50 -z-10"
@@ -13,24 +13,24 @@ export default function Hero() {
       <div className="absolute top-0 right-0 w-[52%] h-full kente-pattern -z-10"
         style={{ clipPath: "polygon(14% 0, 100% 0, 100% 100%, 0% 100%)" }} />
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-full flex items-start" style={{ paddingTop: "80px" }}>
-        <div className="grid lg:grid-cols-2 gap-0 w-full items-start" style={{ height: "calc(100% - 80px)" }}>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-full">
+        <div className="grid lg:grid-cols-2 gap-0 h-full">
 
           {/* Texte gauche */}
-          <div className="flex flex-col justify-start h-full pr-0 lg:pr-10 relative z-10 pt-4 pb-4">
+          <div className="flex flex-col justify-center pr-0 lg:pr-10 relative z-10 gap-3">
 
             {/* Annonce */}
-            <div className="inline-flex items-center gap-2 bg-white border border-border rounded-xl px-3 py-2 mb-3 max-w-xs shadow-sm self-start">
+            <div className="inline-flex items-center gap-2 bg-white border border-border rounded-xl px-3 py-2 max-w-xs shadow-sm self-start">
               <Flame className="w-3.5 h-3.5 text-gold flex-shrink-0" />
-              <p className="text-xs text-ink">
+              <p className="text-xs text-ink leading-snug">
                 <strong>Rentrée 2024–2025</strong> —{" "}
                 <a href="#features" className="text-cama underline">Accéder à CAMA</a>
               </p>
             </div>
 
-            {/* H1 — réduit pour tenir dans le viewport */}
-            <h1 className="font-light text-ink leading-[1.05] mb-3 tracking-tight"
-              style={{ fontSize: "clamp(2.4rem, 5vw, 3.8rem)" }}>
+            {/* H1 */}
+            <h1 className="font-light text-ink leading-[1.05] tracking-tight"
+              style={{ fontSize: "clamp(2.2rem, 4.5vw, 3.6rem)" }}>
               Construisez
               <br />
               votre{" "}
@@ -39,13 +39,13 @@ export default function Hero() {
               Ici, à JFN.
             </h1>
 
-            <p className="text-sm text-muted leading-relaxed mb-4 max-w-sm">
+            <p className="text-sm text-muted leading-relaxed max-w-sm">
               Cours en ligne, examens sécurisés par IA et suivi académique
               complet — conçu pour les réalités du Cameroun.
             </p>
 
             {/* CTAs */}
-            <div className="flex flex-wrap gap-3 mb-4">
+            <div className="flex flex-wrap gap-3">
               <Link href="/auth/register" className="btn-primary gap-2 text-sm px-6 py-3">
                 Commencer maintenant
                 <ArrowRight className="w-4 h-4" />
@@ -71,7 +71,7 @@ export default function Hero() {
           </div>
 
           {/* Photos droite */}
-          <div className="hidden lg:flex flex-col gap-2.5 pl-6 h-full justify-start relative z-10 pt-4 pb-4">
+          <div className="hidden lg:flex flex-col gap-2 pl-5 h-full justify-center relative z-10 py-4">
 
             {/* Grande photo */}
             <div className="relative rounded-2xl overflow-hidden shadow-2xl" style={{ flex: "1 1 0", minHeight: 0 }}>
@@ -90,15 +90,15 @@ export default function Hero() {
             </div>
 
             {/* Deux petites */}
-            <div className="grid grid-cols-2 gap-2.5 flex-shrink-0 h-36">
-              <div className="rounded-2xl overflow-hidden shadow-lg">
+            <div className="grid grid-cols-2 gap-2 flex-shrink-0" style={{ height: "32%" }}>
+              <div className="rounded-xl overflow-hidden shadow-lg">
                 <img
                   src="https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=400&q=80"
                   alt="Étudiants collaborant"
                   className="w-full h-full object-cover"
                 />
               </div>
-              <div className="rounded-2xl overflow-hidden shadow-lg relative">
+              <div className="rounded-xl overflow-hidden shadow-lg relative">
                 <img
                   src="https://images.unsplash.com/photo-1523240795612-9a054b0db644?w=400&q=80"
                   alt="Groupe d'étudiants"
@@ -109,15 +109,15 @@ export default function Hero() {
                 </div>
               </div>
             </div>
-
           </div>
+
         </div>
       </div>
 
       {/* Vague bas */}
       <div className="absolute bottom-0 inset-x-0 pointer-events-none">
-        <svg viewBox="0 0 1440 32" className="w-full" preserveAspectRatio="none">
-          <path d="M0,16 C240,32 480,0 720,16 C960,32 1200,0 1440,16 L1440,32 L0,32 Z" fill="#F9FAFB"/>
+        <svg viewBox="0 0 1440 28" className="w-full" preserveAspectRatio="none">
+          <path d="M0,14 C240,28 480,0 720,14 C960,28 1200,0 1440,14 L1440,28 L0,28 Z" fill="#F9FAFB"/>
         </svg>
       </div>
     </section>
