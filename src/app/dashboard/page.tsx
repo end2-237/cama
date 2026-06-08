@@ -8,6 +8,7 @@ import Banner from "@/components/dashboard/Banner";
 import StudentView from "@/components/dashboard/StudentView";
 import TeacherView from "@/components/dashboard/TeacherView";
 import AdminView from "@/components/dashboard/AdminView";
+import Footer from "@/components/landing/Footer";
 
 const tabsMap: Record<string, string[]> = {
   etudiant:   ["Mes Cours", "Calendrier", "Résultats"],
@@ -56,6 +57,7 @@ export default function DashboardPage() {
           {user.role === "enseignant" && <TeacherView />}
           {user.role === "admin"      && <AdminView />}
         </main>
+        <Footer />
       </div>
     </>
   );
