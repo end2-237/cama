@@ -1,38 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/context/AuthContext";
 import DashNav from "@/components/dashboard/DashNav";
 import Banner from "@/components/dashboard/Banner";
 import StudentView from "@/components/dashboard/StudentView";
 import TeacherView from "@/components/dashboard/TeacherView";
 import AdminView from "@/components/dashboard/AdminView";
-
-const profiles = [
-  {
-    id:       "etudiant"   as const,
-    name:     "Jean-Paul Mbarga",
-    role:     "Étudiant · L2",
-    avatar:   "https://images.unsplash.com/photo-1531123897727-8f129e1688ce?w=80&q=80",
-    initials: "JP",
-    color:    "bg-cama",
-  },
-  {
-    id:       "enseignant" as const,
-    name:     "Prof. Amina Bello",
-    role:     "Enseignante",
-    avatar:   "https://images.unsplash.com/photo-1531545514256-b1400bc00f31?w=80&q=80",
-    initials: "AB",
-    color:    "bg-gold",
-  },
-  {
-    id:       "admin"      as const,
-    name:     "Serge Nkamgang",
-    role:     "Administrateur",
-    avatar:   "",
-    initials: "SN",
-    color:    "bg-cama-900",
-  },
-];
 
 const tabsMap: Record<string, string[]> = {
   etudiant:   ["Mes Cours", "Calendrier", "Résultats"],
@@ -40,37 +15,46 @@ const tabsMap: Record<string, string[]> = {
   admin:      ["Tableau de bord", "Utilisateurs", "Paramètres"],
 };
 
+/* Stocke le tab actif par rôle sans useState global */
+import { useState } from "react";
+
 export default function DashboardPage() {
-  const [profileId, setProfileId] = useState<"etudiant"|"enseignant"|"admin">("etudiant");
-  const [activeTab, setActiveTab] = useState("Mes Cours");
+  const { user, loading } = useAuth();
+  const router = useRouter();
 
-  const profile = profiles.find((p) => p.id === profileId)!;
-  const tabs    = tabsMap[profileId];
+  const tabs = user ? tabsMap[user.role] : [];
+  const [activeTab, setActiveTab] = useState("");
 
-  const handleSwitch = (id: typeof profileId) => {
-    setProfileId(id);
-    setActiveTab(tabsMap[id][0]);
-  };
+  /* Initialise le tab actif au premier chargement du bon rôle */
+  useEffect(() => {
+    if (user) setActiveTab(tabsMap[user.role][0]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.role]);
+
+  useEffect(() => {
+    if (!loading && !user) router.replace("/auth/login");
+  }, [loading, user, router]);
+
+  if (loading || !user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="w-8 h-8 rounded-full border-4 border-cama border-t-transparent animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <>
       <Banner />
 
-      {/* Compense la bannière (48px) + navbar (64px) */}
-      <div className="pt-[112px]">
-        <DashNav
-          profile={profile}
-          profiles={profiles}
-          onSwitch={handleSwitch}
-          activeTab={activeTab}
-          onTab={setActiveTab}
-          tabs={tabs}
-        />
+      {/* Banner 48px + Navbar 64px */}
+      <div className="pt-[112px] min-h-screen bg-[#F9FAFB]">
+        <DashNav tabs={tabs} activeTab={activeTab} onTab={setActiveTab} />
 
-        <main className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          {profileId === "etudiant"   && <StudentView />}
-          {profileId === "enseignant" && <TeacherView />}
-          {profileId === "admin"      && <AdminView />}
+        <main className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-8 animate-fade-up">
+          {user.role === "etudiant"   && <StudentView />}
+          {user.role === "enseignant" && <TeacherView />}
+          {user.role === "admin"      && <AdminView />}
         </main>
       </div>
     </>
