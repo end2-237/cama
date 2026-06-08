@@ -12,8 +12,8 @@ const navLinks = [
 ];
 
 export default function Navbar() {
-  const [scrolled, setScrolled]   = useState(false);
-  const [menuOpen, setMenuOpen]   = useState(false);
+  const [scrolled,  setScrolled]  = useState(false);
+  const [menuOpen,  setMenuOpen]  = useState(false);
 
   useEffect(() => {
     const fn = () => setScrolled(window.scrollY > 4);
@@ -22,26 +22,23 @@ export default function Navbar() {
   }, []);
 
   return (
-    <header
-      className={`fixed top-0 inset-x-0 z-50 bg-white transition-shadow duration-200 ${
-        scrolled ? "shadow-md" : "border-b border-border"
-      }`}
-    >
+    <header className={`fixed top-0 inset-x-0 z-50 bg-white transition-shadow duration-200 ${scrolled ? "shadow-md" : "border-b border-border"}`}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center h-16 gap-4">
 
-          {/* Logo */}
-          <Link href="/" className="flex-shrink-0 mr-4">
+          {/* Logo — avec petite barre or */}
+          <Link href="/" className="flex-shrink-0 mr-4 flex items-center gap-3">
+            <div className="w-1.5 h-8 rounded-full bg-gradient-to-b from-cama to-gold" />
             <div className="leading-tight">
-              <span className="block text-ink text-xs font-normal">Institut</span>
-              <span className="block text-ink text-base font-bold leading-none tracking-tight">
-                JFN · <span className="text-green">CAMA</span>
+              <span className="block text-ink text-[10px] font-semibold uppercase tracking-widest text-muted">Institut JFN</span>
+              <span className="block text-ink text-lg font-bold leading-none tracking-tight">
+                CA<span className="text-cama">MA</span>
               </span>
             </div>
           </Link>
 
           {/* Explore pill */}
-          <button className="hidden md:flex items-center gap-2 border border-ink rounded-full px-4 py-1.5 text-sm font-medium text-ink hover:bg-surface transition-colors">
+          <button className="hidden md:flex items-center gap-2 border border-ink/30 rounded-full px-4 py-1.5 text-sm font-medium text-ink hover:bg-surface transition-colors">
             <Grid3x3 className="w-4 h-4" />
             Explorer
             <ChevronDown className="w-3.5 h-3.5" />
@@ -57,17 +54,11 @@ export default function Navbar() {
             />
           </div>
 
-          {/* Spacer */}
           <div className="flex-1" />
 
-          {/* Desktop right nav */}
           <nav className="hidden md:flex items-center gap-6">
             {navLinks.map((l) => (
-              <a
-                key={l.href}
-                href={l.href}
-                className="text-sm font-medium text-muted hover:text-ink transition-colors"
-              >
+              <a key={l.href} href={l.href} className="text-sm font-medium text-muted hover:text-ink transition-colors">
                 {l.label}
               </a>
             ))}
@@ -80,40 +71,28 @@ export default function Navbar() {
             <button className="p-2 text-muted hover:text-ink transition-colors">
               <HelpCircle className="w-5 h-5" />
             </button>
-            <Link
-              href="/auth/login"
-              className="border-2 border-ink text-ink font-bold text-sm px-5 py-2 rounded-full hover:bg-surface transition-colors"
-            >
+            <Link href="/auth/login" className="border-2 border-ink text-ink font-bold text-sm px-5 py-2 rounded-full hover:bg-surface transition-colors">
               Connexion
             </Link>
           </div>
 
-          {/* Mobile hamburger */}
-          <button
-            className="md:hidden ml-auto p-2 text-ink"
-            onClick={() => setMenuOpen(!menuOpen)}
-          >
+          <button className="md:hidden ml-auto p-2 text-ink" onClick={() => setMenuOpen(!menuOpen)}>
             {menuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </button>
         </div>
       </div>
 
-      {/* Mobile menu */}
       {menuOpen && (
         <div className="md:hidden bg-white border-t border-border px-4 pb-4 pt-2 flex flex-col gap-1">
           {navLinks.map((l) => (
-            <a
-              key={l.href}
-              href={l.href}
-              onClick={() => setMenuOpen(false)}
-              className="py-3 text-sm font-medium text-muted border-b border-border last:border-0"
-            >
+            <a key={l.href} href={l.href} onClick={() => setMenuOpen(false)}
+              className="py-3 text-sm font-medium text-muted border-b border-border last:border-0">
               {l.label}
             </a>
           ))}
           <div className="pt-3 flex flex-col gap-2">
-            <Link href="/auth/login"  className="btn-outline-green text-center">Connexion</Link>
-            <Link href="/auth/register" className="btn-green text-center">Commencer</Link>
+            <Link href="/auth/login"    className="btn-outline text-center">Connexion</Link>
+            <Link href="/auth/register" className="btn-primary text-center">Commencer</Link>
           </div>
         </div>
       )}

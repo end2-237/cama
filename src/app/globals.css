@@ -7,55 +7,102 @@
 @layer base {
   * { box-sizing: border-box; }
   html { scroll-behavior: smooth; }
-  body {
-    @apply font-sans text-ink bg-white antialiased;
-    font-weight: 400;
-  }
+  body { @apply font-sans text-ink bg-white antialiased; }
 }
 
 @layer components {
-  /* Pill buttons — NetAcad style */
-  .btn-green {
+  /* ─── Boutons pill CAMA ─── */
+  .btn-primary {
     @apply inline-flex items-center justify-center gap-2
-           px-7 py-3.5 rounded-full
-           bg-green text-white font-bold text-sm
-           hover:bg-green-dark active:scale-95
+           px-7 py-3.5 rounded-full font-bold text-sm
+           bg-cama text-white
+           hover:bg-cama-700 active:scale-95
            transition-all duration-150 whitespace-nowrap;
   }
-  .btn-outline-green {
+  .btn-outline {
     @apply inline-flex items-center justify-center gap-2
-           px-7 py-3.5 rounded-full
-           border-2 border-green text-ink font-bold text-sm
-           hover:bg-green-light active:scale-95
+           px-7 py-3.5 rounded-full font-bold text-sm
+           border-2 border-cama text-cama
+           hover:bg-cama-50 active:scale-95
            transition-all duration-150 whitespace-nowrap;
   }
   .btn-outline-white {
     @apply inline-flex items-center justify-center gap-2
-           px-7 py-3.5 rounded-full
-           border-2 border-white text-white font-bold text-sm
-           hover:bg-white/10 active:scale-95
+           px-7 py-3.5 rounded-full font-bold text-sm
+           border-2 border-white text-white
+           hover:bg-white/15 active:scale-95
+           transition-all duration-150 whitespace-nowrap;
+  }
+  .btn-gold {
+    @apply inline-flex items-center justify-center gap-2
+           px-7 py-3.5 rounded-full font-bold text-sm
+           bg-gold text-white
+           hover:bg-gold-dark active:scale-95
            transition-all duration-150 whitespace-nowrap;
   }
 
-  /* Green underline on a word — NetAcad signature */
-  .green-underline {
-    @apply relative;
+  /* ─── Soulignement or (signature CAMA) ─── */
+  .gold-underline {
     text-decoration: underline;
-    text-decoration-color: #49A942;
+    text-decoration-color: #F59E0B;
     text-decoration-thickness: 3px;
     text-underline-offset: 6px;
   }
 
-  /* Section card */
+  /* ─── Soulignement indigo ─── */
+  .cama-underline {
+    text-decoration: underline;
+    text-decoration-color: #4F46E5;
+    text-decoration-thickness: 3px;
+    text-underline-offset: 6px;
+  }
+
+  /* ─── Card filière / feature ─── */
   .feature-card {
     @apply bg-white rounded-2xl border border-border p-6
-           hover:shadow-md transition-shadow duration-200 cursor-default;
+           hover:shadow-md hover:border-cama/30
+           transition-all duration-200 cursor-default;
+  }
+
+  /* ─── Badge ─── */
+  .badge {
+    @apply inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold;
   }
 }
 
 @layer utilities {
-  .section-white  { @apply bg-white; }
-  .section-gray   { @apply bg-surface; }
-  .section-navy   { @apply bg-navy; }
-  .section-dark   { @apply bg-charcoal; }
+  /* ─── Motif kente géométrique (décoration) ─── */
+  .kente-pattern {
+    background-image:
+      repeating-linear-gradient(
+        90deg,
+        transparent,
+        transparent 20px,
+        rgba(79,70,229,0.06) 20px,
+        rgba(79,70,229,0.06) 22px
+      ),
+      repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 20px,
+        rgba(245,158,11,0.05) 20px,
+        rgba(245,158,11,0.05) 22px
+      );
+  }
+
+  /* ─── Vague SVG inline ─── */
+  .wave-bottom {
+    clip-path: ellipse(120% 100% at 50% 0%);
+  }
+
+  /* ─── Dégradé texte indigo → or ─── */
+  .text-gradient {
+    background: linear-gradient(135deg, #4F46E5 0%, #F59E0B 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .section-surface { @apply bg-surface; }
+  .section-navy    { @apply bg-cama-900; }
 }

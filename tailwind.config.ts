@@ -9,31 +9,35 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        green: {
-          DEFAULT: "#49A942",
-          dark:    "#3a8a34",
-          light:   "#e8f5e7",
+        /* — Indigo profond : couleur principale CAMA — */
+        cama: {
+          50:  "#EEF2FF",
+          100: "#E0E7FF",
+          200: "#C7D2FE",
+          300: "#A5B4FC",
+          400: "#818CF8",
+          500: "#6366F1",
+          DEFAULT: "#4F46E5",   /* indigo */
+          700: "#4338CA",
+          800: "#3730A3",
+          900: "#1E1B4B",
         },
-        navy: {
-          DEFAULT: "#1B2B4B",
-          dark:    "#131f36",
-          light:   "#243660",
+        /* — Or chaud : accent africain — */
+        gold: {
+          light:   "#FEF3C7",
+          DEFAULT: "#F59E0B",
+          dark:    "#D97706",
         },
-        charcoal: "#2C2C2C",
-        ink:      "#1a1a1a",
-        muted:    "#555555",
-        subtle:   "#888888",
-        border:   "#E5E5E5",
-        surface:  "#F5F5F5",
+        /* — Neutres — */
+        ink:     "#111827",
+        muted:   "#4B5563",
+        subtle:  "#9CA3AF",
+        border:  "#E5E7EB",
+        surface: "#F9FAFB",
+        charcoal:"#1F2937",
       },
       fontFamily: {
         sans: ["Inter", "ui-sans-serif", "system-ui", "sans-serif"],
-      },
-      fontSize: {
-        "display-xl": ["5rem",   { lineHeight: "1.05", fontWeight: "300" }],
-        "display-lg": ["4rem",   { lineHeight: "1.08", fontWeight: "300" }],
-        "display-md": ["3rem",   { lineHeight: "1.1",  fontWeight: "300" }],
-        "display-sm": ["2.25rem",{ lineHeight: "1.15", fontWeight: "300" }],
       },
     },
   },
