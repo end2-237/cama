@@ -1,4 +1,4 @@
-export type Role = "etudiant" | "enseignant" | "admin";
+export type Role = "etudiant" | "enseignant" | "admin" | "jury";
 
 export interface User {
   id:       string;
@@ -42,6 +42,20 @@ const USERS: (User & { password: string })[] = [
     level:       "",
     initials:    "AB",
     avatarColor: "bg-gold",
+  },
+  {
+    id:          "u4",
+    name:        "Dr. Marie Essomba",
+    firstName:   "Marie",
+    lastName:    "Essomba",
+    email:       "marie.essomba@jfn.cm",
+    password:    "jury123",
+    role:        "jury",
+    roleLabel:   "Jury",
+    school:      "Institut JFN",
+    level:       "",
+    initials:    "ME",
+    avatarColor: "bg-charcoal",
   },
   {
     id:          "u3",
