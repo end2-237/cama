@@ -147,9 +147,9 @@ export default function Navbar() {
             <button className="p-2 text-muted hover:text-ink transition-colors">
               <Globe className="w-5 h-5" />
             </button>
-            <button className="p-2 text-muted hover:text-ink transition-colors">
+            <Link href="/guide" className="p-2 text-muted hover:text-ink transition-colors" title="Guide CAMA">
               <HelpCircle className="w-5 h-5" />
-            </button>
+            </Link>
             <Link href="/auth/login" className="border-2 border-ink text-ink font-bold text-sm px-5 py-2 rounded-full hover:bg-surface transition-colors">
               Connexion
             </Link>

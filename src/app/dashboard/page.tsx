@@ -10,6 +10,9 @@ import TeacherView from "@/components/dashboard/TeacherView";
 import AdminView from "@/components/dashboard/AdminView";
 import JuryView from "@/components/dashboard/JuryView";
 import Footer from "@/components/landing/Footer";
+import AIAssistant from "@/components/AIAssistant";
+import WelcomeModal from "@/components/WelcomeModal";
+import OnboardingTour from "@/components/OnboardingTour";
 
 const tabsMap: Record<string, string[]> = {
   etudiant:   ["Mes Cours", "Examens", "Résultats"],
@@ -58,6 +61,11 @@ export default function DashboardPage() {
         </main>
         <Footer />
       </div>
+
+      {/* Global overlays & assistant */}
+      <WelcomeModal />
+      <OnboardingTour />
+      <AIAssistant />
     </>
   );
 }

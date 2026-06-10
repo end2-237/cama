@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Play, Share2, AtSign, Link2, X } from "lucide-react";
 
 const links = [
+  ["Guide CAMA",               "/guide"],
   ["Catalogue des cours",     "/auth/register"],
   ["Trouver une filière",      "#filieres"],
   ["Ressources étudiants",    "/auth/register"],
@@ -9,7 +10,6 @@ const links = [
   ["Devenir partenaire",      "/auth/register"],
   ["Support technique",       "/auth/register"],
   ["À propos de JFN",         "/auth/register"],
-  ["Mentions légales",        "/auth/register"],
 ];
 
 const socials = [
