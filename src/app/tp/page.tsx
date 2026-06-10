@@ -108,7 +108,6 @@ const STATUS_LABEL: Record<VMStatus, string> = {
   starting: "Démarrage…",
   error:    "Erreur",
 };
-const CONN_LABEL: Record<ConnMode, string> = { vnc: "VNC (graphique)", ssh: "SSH (terminal)", rdp: "RDP (Bureau distant)" };
 const CONN_COLOR: Record<ConnMode, string> = {
   vnc: "bg-purple-100 text-purple-700",
   ssh: "bg-green-50 text-green-700",
