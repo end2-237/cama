@@ -7,6 +7,7 @@ import {
   Play, Square, RefreshCw, Copy, CheckCheck, ChevronRight,
   Globe, Lock, Cpu, HardDrive, MemoryStick, Clock,
   AlertTriangle, Info, Zap, BookOpen, Download, ShieldCheck,
+  Layers, Search, Bell, HelpCircle, KeyRound, Activity,
 } from "lucide-react";
 
 /* ── Types ── */
@@ -147,28 +148,91 @@ export default function TPPage() {
       {/* Top bar */}
       <header className="bg-white border-b border-border sticky top-0 z-40">
         <div className="max-w-[1200px] mx-auto px-4 sm:px-6 flex items-center gap-3 h-12">
+
+          {/* Retour + identité */}
           <Link href="/dashboard" className="flex items-center gap-2 text-sm text-muted hover:text-ink transition-colors flex-shrink-0">
-            <ArrowLeft className="w-4 h-4" /> Dashboard
+            <ArrowLeft className="w-4 h-4" />
+            <span className="hidden sm:block">Dashboard</span>
           </Link>
-          <div className="w-px h-5 bg-border" />
-          <Terminal className="w-4 h-4 text-cama flex-shrink-0" />
-          <span className="text-sm font-bold text-ink">TP &amp; Machines virtuelles</span>
-          <div className="flex-1" />
-          {/* onglets */}
-          <nav className="flex items-center gap-0 border border-border overflow-hidden">
-            {(["vm", "remote"] as const).map((t) => (
-              <button key={t} onClick={() => setActiveTab(t)}
-                className={`px-4 py-1.5 text-xs font-bold transition-colors border-r border-border last:border-r-0 ${
-                  activeTab === t ? "bg-cama text-white" : "bg-white text-muted hover:text-ink"
+          <div className="w-px h-5 bg-border flex-shrink-0" />
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <div className="w-7 h-7 bg-ink flex items-center justify-center">
+              <Terminal className="w-3.5 h-3.5 text-green-400" />
+            </div>
+            <div className="hidden sm:block leading-tight">
+              <p className="text-[11px] font-black text-ink leading-none">TP Labs</p>
+              <p className="text-[9px] text-subtle leading-none">Institut JFN</p>
+            </div>
+          </div>
+          <div className="w-px h-5 bg-border flex-shrink-0 hidden md:block" />
+
+          {/* Onglets principaux */}
+          <nav className="hidden md:flex items-center h-12">
+            {([
+              { id: "vm",     icon: Monitor,  label: "Machines virtuelles" },
+              { id: "remote", icon: Server,   label: "Machines distantes" },
+            ] as const).map((t) => (
+              <button key={t.id} onClick={() => setActiveTab(t.id)}
+                className={`flex items-center gap-1.5 px-4 h-full text-xs font-bold border-b-2 transition-all whitespace-nowrap ${
+                  activeTab === t.id
+                    ? "border-cama text-cama"
+                    : "border-transparent text-muted hover:text-ink"
                 }`}>
-                {t === "vm" ? "Machines virtuelles" : "Machines distantes"}
+                <t.icon className="w-3.5 h-3.5" />
+                {t.label}
               </button>
             ))}
           </nav>
-          <div className="flex items-center gap-1.5 ml-2">
-            <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-            <span className="text-[10px] font-bold text-green-700">Hyperviseur actif</span>
+
+          {/* Recherche */}
+          <div className="hidden lg:flex flex-1 max-w-[220px] items-center gap-2 bg-surface px-3 py-1.5 border border-border focus-within:border-cama transition-colors ml-1">
+            <Search className="w-3.5 h-3.5 text-subtle flex-shrink-0" />
+            <input type="text" placeholder="Chercher une VM..."
+              className="bg-transparent text-xs text-ink placeholder-subtle outline-none w-full" />
           </div>
+
+          <div className="flex-1" />
+
+          {/* Statut hyperviseur */}
+          <div className="hidden sm:flex items-center gap-1.5 px-3 py-1 border border-green-200 bg-green-50">
+            <Activity className="w-3 h-3 text-green-600" />
+            <span className="text-[10px] font-bold text-green-700">Hyperviseur actif</span>
+            <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+          </div>
+
+          {/* Icônes actions */}
+          <div className="flex items-center gap-0.5 ml-1">
+            <button title="Mes crédits TP"
+              className="flex items-center gap-1 px-2 py-1.5 text-muted hover:text-cama hover:bg-surface transition-colors text-[10px] font-bold">
+              <Layers className="w-3.5 h-3.5" />
+              <span className="hidden lg:block">Crédits</span>
+            </button>
+            <button title="Clé SSH enregistrée"
+              className="p-1.5 text-muted hover:text-cama hover:bg-surface transition-colors">
+              <KeyRound className="w-4 h-4" />
+            </button>
+            <button title="Notifications" className="relative p-1.5 text-muted hover:text-cama hover:bg-surface transition-colors">
+              <Bell className="w-4 h-4" />
+              <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-red-500" />
+            </button>
+            <Link href="/guide" title="Aide connexion"
+              className="p-1.5 text-muted hover:text-cama hover:bg-surface transition-colors">
+              <HelpCircle className="w-4 h-4" />
+            </Link>
+          </div>
+
+          {/* Onglets mobile */}
+          <div className="flex md:hidden gap-px border border-border overflow-hidden ml-1">
+            {(["vm", "remote"] as const).map((t) => (
+              <button key={t} onClick={() => setActiveTab(t)}
+                className={`px-3 py-1.5 text-[10px] font-bold transition-colors ${
+                  activeTab === t ? "bg-cama text-white" : "bg-white text-muted"
+                }`}>
+                {t === "vm" ? "VMs" : "Dist."}
+              </button>
+            ))}
+          </div>
+
         </div>
       </header>
 
