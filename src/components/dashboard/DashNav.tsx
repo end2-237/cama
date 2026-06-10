@@ -68,6 +68,12 @@ export default function DashNav({ activeTab, onTab, tabs }: DashNavProps) {
             <input
               type="text"
               placeholder="Rechercher cours, ressources..."
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  const v = (e.target as HTMLInputElement).value.trim();
+                  router.push(v ? `/recherche?q=${encodeURIComponent(v)}` : "/recherche");
+                }
+              }}
               className="bg-transparent text-sm text-ink placeholder-subtle outline-none w-full"
             />
           </div>
