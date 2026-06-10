@@ -5,7 +5,7 @@ import {
   BookOpen, Clock, ChevronRight, Play, Radio, ShieldCheck,
   FileText, Video, MonitorPlay, Bot, CheckCircle2, TrendingUp,
   Star, Award, GraduationCap, QrCode, AlertCircle, Calendar,
-  Newspaper, ExternalLink, Headphones, Film, BookMarked,
+  Newspaper, ExternalLink, Headphones, Film, BookMarked, Terminal,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useDB } from "@/hooks/useDB";
@@ -306,6 +306,13 @@ function CoursesTab() {
         <div className="flex items-center gap-2 mb-3 pb-2 border-b border-border">
           <BookOpen className="w-5 h-5 text-ink" strokeWidth={1.5} />
           <h1 className="text-xl font-light text-ink">Mes Cours</h1>
+          <div className="flex-1" />
+          <Link href="/tp"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-ink text-white text-[11px] font-bold hover:bg-cama transition-colors group">
+            <Terminal className="w-3.5 h-3.5 group-hover:text-gold transition-colors" />
+            TP &amp; Machines virtuelles
+            <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse ml-0.5" />
+          </Link>
         </div>
 
         {/* Live en cours */}
