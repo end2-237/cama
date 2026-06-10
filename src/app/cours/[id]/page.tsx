@@ -8,7 +8,7 @@ import {
   Lock, Download, ChevronDown, ChevronRight, Play, Pause, Volume2,
   Headphones, AlignLeft, Send, Sparkles, CheckCircle2, MessageSquare,
   Wifi, X, User, Phone, AudioLines, Mic, MicOff, PhoneOff,
-  BookMarked, Clock, Star, TrendingUp, Bell, Share2,
+  BookMarked, Clock, Star, Bell, Share2,
   Bookmark, Award, Zap, BarChart2, Target, Users,
   Pencil, ThumbsUp, RotateCcw, ExternalLink, Hash, StickyNote,
 } from "lucide-react";
@@ -171,24 +171,6 @@ export default function CoursePlayer() {
 
         {/* ── Sidebar chapitres ── */}
         <aside className="bg-white border-r border-border lg:sticky lg:top-12 lg:max-h-[calc(100vh-48px)] lg:overflow-y-auto">
-
-          {/* Carte cours */}
-          <div className="px-4 py-3 border-b border-border"
-            style={{ background: "linear-gradient(135deg, #1E1B4B 0%, #4F46E5 100%)" }}>
-            <div className="flex items-center gap-2 mb-2">
-              <span className="text-[9px] font-black text-gold uppercase tracking-widest bg-white/10 px-1.5 py-0.5">{ue?.code}</span>
-              <span className="text-[9px] text-white/50">{ue?.ects} ECTS</span>
-            </div>
-            <p className="text-xs font-bold text-white leading-snug line-clamp-2 mb-2">{course.title}</p>
-            {/* Mini barre progression */}
-            <div className="flex items-center gap-2">
-              <div className="flex-1 h-1 bg-white/20">
-                <div className="h-full bg-gold transition-all duration-500" style={{ width: `${pct}%` }} />
-              </div>
-              <span className="text-[9px] font-bold text-gold">{pct}%</span>
-            </div>
-            <p className="text-[9px] text-white/40 mt-1">{doneCount}/{chapters.length} chapitres · {ue?.semestre}</p>
-          </div>
 
           {/* Prochain live */}
           {db.lives.some((l) => l.courseId === course.id && l.status === "planifie") && (
@@ -382,28 +364,6 @@ export default function CoursePlayer() {
 
         {/* ── Sidebar droite ── */}
         <div className="flex flex-col lg:sticky lg:top-12" style={{ height: "calc(100vh - 48px)" }}>
-
-          {/* Mémo & évaluation du chapitre */}
-          <div className="bg-white border-b border-border px-4 py-3 flex-shrink-0">
-            <p className="text-[9px] font-black text-subtle uppercase tracking-widest mb-2 flex items-center gap-1">
-              <TrendingUp className="w-3 h-3 text-cama" /> Ma progression
-            </p>
-            <div className="flex items-center gap-3 mb-2">
-              <div className="flex-1 h-1.5 bg-surface overflow-hidden">
-                <div className="h-full bg-gradient-to-r from-cama to-gold transition-all duration-700" style={{ width: `${pct}%` }} />
-              </div>
-              <span className="text-xs font-bold text-cama flex-shrink-0">{pct}%</span>
-            </div>
-            <div className="flex gap-1 flex-wrap">
-              {chapters.map((c, i) => (
-                <button key={c.id} onClick={() => setChapIdx(i)} title={c.title}
-                  className={`w-5 h-2 transition-colors ${
-                    doneIds.has(c.id) ? "bg-green-500" : i === chapIdx ? "bg-cama" : "bg-border hover:bg-cama/40"
-                  }`} />
-              ))}
-            </div>
-            <p className="text-[9px] text-subtle mt-1.5">{doneCount}/{chapters.length} · {chapters.length - doneCount} restants</p>
-          </div>
 
           {/* Évaluer ce chapitre */}
           <div className="bg-white border-b border-border px-4 py-3 flex-shrink-0">
