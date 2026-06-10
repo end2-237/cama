@@ -236,13 +236,13 @@ export default function TPPage() {
         </div>
       </header>
 
-      <div className="max-w-[1200px] mx-auto px-4 sm:px-6 py-6 grid lg:grid-cols-[1fr_340px] gap-4 items-start">
+      <div className="max-w-[1200px] mx-auto grid lg:grid-cols-[1fr_340px] gap-0 items-start border-x border-border bg-white">
 
         {/* ══ COLONNE PRINCIPALE ══ */}
-        <div>
+        <div className="border-r border-border min-h-[calc(100vh-48px)]">
 
           {/* Info banner */}
-          <div className="flex items-start gap-3 p-3 border border-cama/30 bg-cama/5 mb-4">
+          <div className="flex items-start gap-3 p-3 bg-cama/5 border-b border-border">
             <Info className="w-4 h-4 text-cama flex-shrink-0 mt-0.5" />
             <p className="text-[11px] text-ink leading-relaxed">
               Les VMs sont des environnements isolés fournis par l&apos;Institut JFN. Elles sont réinitialisées après chaque séance TP.
@@ -252,7 +252,7 @@ export default function TPPage() {
 
           {/* ── VMs ── */}
           {activeTab === "vm" && (
-            <div className="space-y-0 border border-border bg-white divide-y divide-border">
+            <div className="divide-y divide-border">
               {VMS.map((vm) => {
                 const st = vmStates[vm.id];
                 return (
@@ -325,7 +325,7 @@ export default function TPPage() {
 
           {/* ── Machines distantes ── */}
           {activeTab === "remote" && (
-            <div className="space-y-0 border border-border bg-white divide-y divide-border">
+            <div className="divide-y divide-border">
               {REMOTE_MACHINES.map((rm) => (
                 <div key={rm.id} className="p-4 hover:bg-surface transition-colors">
                   <div className="flex items-start gap-3">
@@ -367,11 +367,11 @@ export default function TPPage() {
           )}
         </div>
 
-        {/* ══ SIDEBAR DROITE ══ */}
-        <div className="space-y-0 lg:sticky lg:top-12">
+        {/* ══ SIDEBAR DROITE STICKY ══ */}
+        <aside className="lg:sticky lg:top-12 lg:h-[calc(100vh-48px)] lg:overflow-y-auto divide-y divide-border">
 
           {/* Panneau connexion VNC/SSH/RDP */}
-          <div className="bg-white border border-border mb-px">
+          <div className="bg-white">
             <div className="flex items-center gap-2 px-4 py-3 border-b border-border bg-ink">
               <Terminal className="w-4 h-4 text-green-400" />
               <p className="text-xs font-bold text-white">Connexion rapide</p>
@@ -450,7 +450,7 @@ export default function TPPage() {
           </div>
 
           {/* Crédits TP */}
-          <div className="bg-white border border-border border-t-0 px-4 py-3">
+          <div className="bg-white px-4 py-3">
             <p className="text-[9px] font-black text-subtle uppercase tracking-widest mb-3 flex items-center gap-1"><Clock className="w-3 h-3" /> Mes crédits TP</p>
             <div className="space-y-2">
               {[
@@ -472,7 +472,7 @@ export default function TPPage() {
           </div>
 
           {/* Sécurité */}
-          <div className="bg-white border border-border border-t-0 px-4 py-3">
+          <div className="bg-white px-4 py-3">
             <p className="text-[9px] font-black text-subtle uppercase tracking-widest mb-2 flex items-center gap-1"><Lock className="w-3 h-3" /> Sécurité &amp; Accès</p>
             <div className="space-y-1.5">
               {[
@@ -490,7 +490,7 @@ export default function TPPage() {
           </div>
 
           {/* Ressources */}
-          <div className="bg-white border border-border border-t-0 px-4 py-3">
+          <div className="bg-white px-4 py-3">
             <p className="text-[9px] font-black text-subtle uppercase tracking-widest mb-2 flex items-center gap-1"><BookOpen className="w-3 h-3" /> Ressources TP</p>
             <div className="space-y-0.5">
               {[
@@ -506,7 +506,66 @@ export default function TPPage() {
               ))}
             </div>
           </div>
-        </div>
+
+          {/* Sessions actives */}
+          <div className="bg-white px-4 py-3">
+            <p className="text-[9px] font-black text-subtle uppercase tracking-widest mb-2 flex items-center gap-1"><Activity className="w-3 h-3" /> Sessions actives</p>
+            <div className="space-y-2">
+              {Object.entries(vmStates).filter(([, s]) => s === "running").map(([id]) => {
+                const vm = VMS.find((v) => v.id === id)!;
+                return (
+                  <div key={id} className="flex items-center gap-2.5 border border-green-200 bg-green-50/50 p-2">
+                    <span className="text-base flex-shrink-0">{vm.osIcon}</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[10px] font-bold text-ink truncate">{vm.name}</p>
+                      <p className="text-[9px] text-green-700 font-mono">{vm.ip} · connectée</p>
+                    </div>
+                    <button onClick={() => toggleVM(id)} title="Arrêter"
+                      className="p-1 text-red-500 hover:bg-red-50 transition-colors flex-shrink-0">
+                      <Square className="w-3 h-3" />
+                    </button>
+                  </div>
+                );
+              })}
+              {Object.values(vmStates).every((s) => s !== "running") && (
+                <p className="text-[10px] text-subtle text-center py-1">Aucune session active.</p>
+              )}
+            </div>
+          </div>
+
+          {/* Prochaines séances TP */}
+          <div className="bg-white px-4 py-3">
+            <p className="text-[9px] font-black text-subtle uppercase tracking-widest mb-2 flex items-center gap-1"><Clock className="w-3 h-3" /> Prochaines séances TP</p>
+            <div className="space-y-2">
+              {[
+                { date: "Jeu. 12 juin · 8h",  label: "TP Réseaux — OSPF",   room: "Lab B2 + distanciel", color: "border-cama" },
+                { date: "Ven. 13 juin · 14h", label: "TP Web — API REST",   room: "100% distanciel",     color: "border-gold" },
+                { date: "Mar. 17 juin · 10h", label: "TP AD & PowerShell",  room: "Lab B1 + distanciel", color: "border-purple-400" },
+              ].map((s, i) => (
+                <div key={i} className={`border-l-2 ${s.color} pl-2.5`}>
+                  <p className="text-[9px] text-subtle font-bold">{s.date}</p>
+                  <p className="text-[11px] font-bold text-ink leading-tight">{s.label}</p>
+                  <p className="text-[9px] text-muted">{s.room}</p>
+                </div>
+              ))}
+            </div>
+            <Link href="/calendrier" className="text-[9px] font-bold text-cama hover:underline mt-2 inline-flex items-center gap-0.5">
+              Calendrier complet <ChevronRight className="w-2.5 h-2.5" />
+            </Link>
+          </div>
+
+          {/* Journal d'activité */}
+          <div className="bg-ink px-4 py-3">
+            <p className="text-[9px] font-black text-white/40 uppercase tracking-widest mb-2 flex items-center gap-1"><Terminal className="w-3 h-3" /> Journal d&apos;activité</p>
+            <div className="font-mono text-[9px] space-y-1 leading-relaxed">
+              <p className="text-green-400">[13:02] vm-linux-1 démarrée (snapshot TP4)</p>
+              <p className="text-white/60">[13:03] Connexion SSH depuis 154.72.x.x</p>
+              <p className="text-white/60">[13:18] Sauvegarde auto → NAS /rendus/INF301</p>
+              <p className="text-gold">[13:40] Quota stockage à 40 % — pensez à nettoyer</p>
+              <p className="text-white/60">[14:05] vm-ubuntu-web : VS Code Server ouvert</p>
+            </div>
+          </div>
+        </aside>
       </div>
     </div>
   );
