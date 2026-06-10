@@ -8,7 +8,8 @@ import {
   BookOpen, CheckCircle2, TrendingUp, QrCode, CalendarDays,
   CalendarClock, HelpCircle, MessagesSquare, Bot, FileText,
   Pencil, Globe, Wifi, Bell, Lock, ChevronRight, Building2,
-  Clock, Radio,
+  Clock, Radio, LayoutDashboard, Star, Zap, UserCheck, AlarmClock,
+  BadgeCheck, BarChart2, Hash,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useDB } from "@/hooks/useDB";
@@ -112,13 +113,133 @@ export default function ProfilePage() {
         </div>
       </section>
 
-      <main className="max-w-[1100px] mx-auto grid lg:grid-cols-[1fr_320px] gap-0 items-start">
+      <main className="max-w-[1400px] mx-auto grid lg:grid-cols-[220px_1fr_300px] gap-0 items-start">
+
+        {/* ══ SIDEBAR GAUCHE STICKY ══ */}
+        <aside className="hidden lg:block bg-white border-r border-border lg:sticky lg:top-12 lg:h-[calc(100vh-48px)] lg:overflow-y-auto">
+
+          {/* Nav sections */}
+          <div className="px-3 py-4 border-b border-border">
+            <p className="text-[9px] font-black text-subtle uppercase tracking-widest mb-2">Navigation</p>
+            <div className="space-y-0.5">
+              {[
+                { icon: BarChart2,   label: "Progression",        href: "#stats" },
+                { icon: GraduationCap, label: "Mon cursus",       href: "#cursus" },
+                { icon: BookOpen,    label: "Mes cours",           href: "#cours" },
+                { icon: Award,       label: "Résultats",           href: "#resultats" },
+                { icon: ShieldCheck, label: "Intégrité",           href: "#integrite" },
+              ].map((n) => (
+                <a key={n.label} href={n.href}
+                  className="flex items-center gap-2.5 px-2 py-1.5 hover:bg-cama-50/40 hover:text-cama transition-colors group text-muted">
+                  <n.icon className="w-3.5 h-3.5 flex-shrink-0 group-hover:text-cama" />
+                  <span className="text-xs font-semibold">{n.label}</span>
+                </a>
+              ))}
+            </div>
+          </div>
+
+          {/* Niveau académique chain */}
+          <div className="px-3 py-4 border-b border-border">
+            <p className="text-[9px] font-black text-subtle uppercase tracking-widest mb-3">Progression L·M·D</p>
+            <div className="space-y-2">
+              {[
+                { code: "L1", label: "Licence 1", done: true },
+                { code: "L2", label: "Licence 2", active: true },
+                { code: "L3", label: "Licence 3", done: false },
+                { code: "M1", label: "Master 1",  done: false },
+                { code: "M2", label: "Master 2",  done: false },
+              ].map((lvl) => (
+                <div key={lvl.code} className="flex items-center gap-2">
+                  <div className={`w-7 h-7 flex items-center justify-center text-[9px] font-black flex-shrink-0 border ${
+                    lvl.done   ? "bg-green-600 border-green-600 text-white" :
+                    lvl.active ? "bg-cama border-cama text-white" :
+                    "bg-white border-border text-subtle"
+                  }`}>
+                    {lvl.done ? <BadgeCheck className="w-3.5 h-3.5" /> : lvl.code}
+                  </div>
+                  <div className="min-w-0">
+                    <p className={`text-[11px] font-bold leading-none ${lvl.active ? "text-cama" : lvl.done ? "text-green-600" : "text-subtle"}`}>{lvl.label}</p>
+                    <p className="text-[9px] text-subtle">{lvl.done ? "Validé" : lvl.active ? "En cours" : "À venir"}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Prochains événements */}
+          <div className="px-3 py-4 border-b border-border">
+            <p className="text-[9px] font-black text-subtle uppercase tracking-widest mb-3 flex items-center gap-1">
+              <AlarmClock className="w-3 h-3" /> À venir
+            </p>
+            <div className="space-y-2">
+              {[
+                { date: "12 juin", label: "Examen Algo S4",       color: "bg-red-500" },
+                { date: "14 juin", label: "TP Réseau — campus",   color: "bg-gold" },
+                { date: "20 juin", label: "Délibérations S4",     color: "bg-purple-500" },
+                { date: "5 juil.", label: "Cérémonie diplômes",   color: "bg-cama" },
+              ].map((e, i) => (
+                <div key={i} className="flex items-start gap-2">
+                  <div className={`w-1 h-1 rounded-full mt-1.5 flex-shrink-0 ${e.color}`} />
+                  <div>
+                    <p className="text-[10px] font-bold text-ink leading-tight">{e.label}</p>
+                    <p className="text-[9px] text-subtle">{e.date}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <Link href="/calendrier" className="text-[9px] font-bold text-cama hover:underline mt-2 inline-flex items-center gap-0.5">
+              Voir le calendrier <ChevronRight className="w-2.5 h-2.5" />
+            </Link>
+          </div>
+
+          {/* Confiance par la preuve */}
+          <div className="px-3 py-4 border-b border-border">
+            <p className="text-[9px] font-black text-subtle uppercase tracking-widest mb-3 flex items-center gap-1">
+              <Star className="w-3 h-3 text-gold-dark" /> Confiance par la preuve
+            </p>
+            <div className="space-y-1.5">
+              {[
+                { label: "Identité vérifiée", ok: true },
+                { label: "Email confirmé",    ok: true },
+                { label: "Photo de profil",   ok: false },
+                { label: "Relevé certifié",   ok: true },
+                { label: "Mode hybride actif",ok: true },
+              ].map((c, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <div className={`w-3.5 h-3.5 flex items-center justify-center flex-shrink-0 ${c.ok ? "text-green-600" : "text-border"}`}>
+                    <CheckCircle2 className="w-3 h-3" />
+                  </div>
+                  <p className={`text-[10px] font-semibold ${c.ok ? "text-ink" : "text-subtle line-through"}`}>{c.label}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Actions rapides */}
+          <div className="px-3 py-4">
+            <p className="text-[9px] font-black text-subtle uppercase tracking-widest mb-2">Raccourcis</p>
+            <div className="space-y-0.5">
+              {[
+                { icon: LayoutDashboard, label: "Dashboard",       href: "/dashboard" },
+                { icon: Zap,             label: "Cours en live",   href: "/live/demo" },
+                { icon: UserCheck,       label: "Forum de classe", href: "#" },
+                { icon: Hash,            label: "Réglages",        href: "#preferences" },
+              ].map((r) => (
+                <Link key={r.label} href={r.href}
+                  className="flex items-center gap-2.5 px-2 py-1.5 hover:bg-cama-50/40 hover:text-cama transition-colors group text-muted">
+                  <r.icon className="w-3.5 h-3.5 flex-shrink-0 group-hover:text-cama" />
+                  <span className="text-xs font-semibold">{r.label}</span>
+                </Link>
+              ))}
+            </div>
+          </div>
+        </aside>
 
         {/* ══ COLONNE PRINCIPALE ══ */}
         <div className="border-r border-border bg-white min-h-full">
 
           {/* Stats */}
-          <div className="grid grid-cols-4 divide-x divide-border border-b border-border">
+          <div id="stats" className="grid grid-cols-4 divide-x divide-border border-b border-border">
             {[
               { icon: TrendingUp,   value: `${pct}%`, label: "Progression", color: "text-cama" },
               { icon: CheckCircle2, value: String(doneIds.size), label: "Chapitres validés", color: "text-green-600" },
@@ -134,7 +255,7 @@ export default function ProfilePage() {
           </div>
 
           {/* Cursus */}
-          <section className="px-5 py-4 border-b border-border">
+          <section id="cursus" className="px-5 py-4 border-b border-border">
             <h2 className="text-[10px] font-black text-ink uppercase tracking-widest mb-3 flex items-center gap-1.5">
               <GraduationCap className="w-3.5 h-3.5 text-cama" /> Mon cursus
             </h2>
@@ -157,7 +278,7 @@ export default function ProfilePage() {
           </section>
 
           {/* Mes cours */}
-          <section className="px-5 py-4 border-b border-border">
+          <section id="cours" className="px-5 py-4 border-b border-border">
             <h2 className="text-[10px] font-black text-ink uppercase tracking-widest mb-3 flex items-center gap-1.5">
               <BookOpen className="w-3.5 h-3.5 text-cama" /> Mes cours en cours
             </h2>
@@ -187,7 +308,7 @@ export default function ProfilePage() {
           </section>
 
           {/* Résultats */}
-          <section className="px-5 py-4 border-b border-border">
+          <section id="resultats" className="px-5 py-4 border-b border-border">
             <h2 className="text-[10px] font-black text-ink uppercase tracking-widest mb-3 flex items-center gap-1.5">
               <Award className="w-3.5 h-3.5 text-cama" /> Derniers résultats
             </h2>
@@ -212,7 +333,7 @@ export default function ProfilePage() {
           </section>
 
           {/* Intégrité académique */}
-          <section className="px-5 py-4">
+          <section id="integrite" className="px-5 py-4">
             <h2 className="text-[10px] font-black text-ink uppercase tracking-widest mb-3 flex items-center gap-1.5">
               <ShieldCheck className="w-3.5 h-3.5 text-cama" /> Intégrité académique
             </h2>
@@ -300,7 +421,7 @@ export default function ProfilePage() {
           </section>
 
           {/* Préférences */}
-          <section className="px-4 py-4 border-b border-border">
+          <section id="preferences" className="px-4 py-4 border-b border-border">
             <h2 className="text-[10px] font-black text-ink uppercase tracking-widest mb-3">Préférences</h2>
             <div className="space-y-3">
               <Toggle icon={Wifi} label="Économie de données" sub="240p par défaut, images compressées" on={dataSaver} setOn={setDataSaver} />
