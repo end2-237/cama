@@ -42,7 +42,7 @@ export default function DashNav({ activeTab, onTab, tabs }: DashNavProps) {
     <>
     <header className="fixed top-[48px] inset-x-0 z-50 bg-white border-b border-border shadow-sm">
       <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center h-16 gap-4">
+        <div className="flex items-center h-16 gap-2">
 
           {/* Logo */}
           <Link href="/" className="flex-shrink-0 mr-2 flex items-center gap-3">
@@ -55,24 +55,26 @@ export default function DashNav({ activeTab, onTab, tabs }: DashNavProps) {
             </div>
           </Link>
 
-          {/* Explore */}
-          <button className="hidden xl:flex items-center gap-2 border border-ink/30 rounded-full px-4 py-1.5 text-sm font-medium text-ink hover:bg-surface hover:border-cama/40 transition-all active:scale-95">
-            <Grid3x3 className="w-4 h-4" />
-            Explorer
-            <ChevronDown className="w-3.5 h-3.5" />
+          {/* Explore — icône, texte au survol */}
+          <button className="hidden xl:flex items-center gap-0 border border-ink/25 rounded-full px-2.5 py-2 text-[13px] font-medium text-ink hover:bg-surface hover:border-cama/40 transition-all active:scale-95 group/exp"
+            title="Explorer">
+            <Grid3x3 className="w-4 h-4 flex-shrink-0" />
+            <span className="max-w-0 opacity-0 group-hover/exp:max-w-[80px] group-hover/exp:opacity-100 group-hover/exp:ml-1.5 overflow-hidden whitespace-nowrap transition-all duration-300">Explorer</span>
+            <ChevronDown className="w-3 h-3 max-w-0 opacity-0 group-hover/exp:max-w-[16px] group-hover/exp:opacity-100 group-hover/exp:ml-1 transition-all duration-300" />
           </button>
 
-          {/* CAMA Search — barre unique qui ouvre le moteur */}
+          {/* CAMA Search — compacte, se déploie au survol */}
           <button
             onClick={() => router.push("/recherche")}
-            className="hidden md:flex flex-1 max-w-sm items-center gap-2.5 bg-surface rounded-full px-4 py-2 border border-border hover:border-cama/50 hover:shadow-sm transition-all group text-left"
-            title="Ouvrir CAMA Search">
+            className="hidden md:flex items-center bg-surface rounded-full px-2.5 py-2 border border-border hover:border-cama/50 hover:shadow-sm transition-all duration-300 group/sch text-left max-w-[40px] hover:max-w-[260px] overflow-hidden"
+            title="Ouvrir CAMA Search (recherche globale)">
             <Search className="w-4 h-4 text-cama flex-shrink-0" />
-            <span className="text-sm text-subtle group-hover:text-muted transition-colors flex-1 truncate">
+            <span className="text-[13px] text-subtle whitespace-nowrap opacity-0 group-hover/sch:opacity-100 ml-2.5 transition-opacity duration-300">
               Rechercher sur <span className="font-bold text-ink">CA<span className="text-cama">MA</span></span>…
             </span>
-            <kbd className="hidden lg:block text-[9px] font-mono text-subtle bg-white border border-border px-1.5 py-0.5 rounded">⏎</kbd>
           </button>
+
+          <div className="flex-1 min-w-0" />
 
           {/* Tabs */}
           <nav className="hidden md:flex items-center h-16">
@@ -80,7 +82,7 @@ export default function DashNav({ activeTab, onTab, tabs }: DashNavProps) {
               <button
                 key={t}
                 onClick={() => onTab(t)}
-                className={`px-4 h-full text-sm font-semibold border-b-2 transition-all duration-200 whitespace-nowrap ${
+                className={`px-3 h-full text-[13px] font-semibold border-b-2 transition-all duration-200 whitespace-nowrap ${
                   activeTab === t
                     ? "border-cama text-cama"
                     : "border-transparent text-muted hover:text-ink"
@@ -130,11 +132,12 @@ export default function DashNav({ activeTab, onTab, tabs }: DashNavProps) {
             <div className="relative">
               <button
                 onClick={() => setCommOpen(!commOpen)}
-                className={`relative flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all ml-1 ${
+                className={`relative flex items-center px-2.5 py-2 rounded-full text-xs font-bold transition-all group/adm ${
                   commOpen ? "bg-cama text-white" : "bg-cama/10 text-cama hover:bg-cama/20 border border-cama/20"
-                }`}>
-                <Megaphone className="w-4 h-4" />
-                <span className="hidden lg:block">Administration</span>
+                }`}
+                title="Communication Administration">
+                <Megaphone className="w-4 h-4 flex-shrink-0" />
+                <span className="hidden lg:block max-w-0 opacity-0 group-hover/adm:max-w-[110px] group-hover/adm:opacity-100 group-hover/adm:ml-1.5 overflow-hidden whitespace-nowrap transition-all duration-300">Administration</span>
                 <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center border-2 border-white">4</span>
               </button>
 
@@ -179,17 +182,18 @@ export default function DashNav({ activeTab, onTab, tabs }: DashNavProps) {
           <div className="relative">
             <button
               onClick={() => setProfileOpen(!profileOpen)}
-              className="flex items-center gap-2.5 pl-2 pr-3 py-1.5 rounded-full border border-border hover:border-cama/30 hover:bg-surface transition-all group"
+              className="flex items-center pl-1 pr-2 py-1 rounded-full border border-border hover:border-cama/30 hover:bg-surface transition-all duration-300 group/pro"
+              title={`${user.firstName} — ${user.roleLabel}`}
             >
               {/* Avatar cercle avec initiales */}
-              <div className={`w-9 h-9 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0 ${user.avatarColor}`}>
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0 ${user.avatarColor}`}>
                 {user.initials}
               </div>
-              <div className="hidden md:block text-left">
-                <p className="text-sm font-bold text-ink leading-none">{user.firstName}</p>
-                <p className="text-[11px] text-muted capitalize leading-none mt-0.5">{user.roleLabel}</p>
+              <div className="hidden md:block text-left max-w-0 opacity-0 group-hover/pro:max-w-[120px] group-hover/pro:opacity-100 group-hover/pro:ml-2 overflow-hidden whitespace-nowrap transition-all duration-300">
+                <p className="text-[13px] font-bold text-ink leading-none">{user.firstName}</p>
+                <p className="text-[10px] text-muted capitalize leading-none mt-0.5">{user.roleLabel}</p>
               </div>
-              <ChevronDown className={`w-3.5 h-3.5 text-subtle transition-transform duration-200 ${profileOpen ? "rotate-180" : ""}`} />
+              <ChevronDown className={`w-3.5 h-3.5 text-subtle ml-1 transition-transform duration-200 ${profileOpen ? "rotate-180" : ""}`} />
             </button>
 
             {/* Dropdown profil */}
