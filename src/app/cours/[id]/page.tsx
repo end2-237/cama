@@ -167,7 +167,7 @@ export default function CoursePlayer() {
       <div className="max-w-[1400px] mx-auto grid lg:grid-cols-[260px_1fr_280px] gap-0 items-start">
 
         {/* ── Sidebar chapitres ── */}
-        <aside className="bg-white border-r border-border overflow-hidden lg:sticky lg:top-12">
+        <aside className="bg-white border-r border-border lg:sticky lg:top-12 lg:max-h-[calc(100vh-48px)] lg:overflow-y-auto">
           <div className="px-4 py-2.5 border-b-2 border-ink">
             <p className="text-[10px] font-black text-ink uppercase tracking-widest">Chapitres</p>
           </div>
@@ -288,7 +288,7 @@ function ProfChat({ courseTitle }: { courseTitle: string }) {
   }
 
   return (
-    <aside className="bg-white overflow-hidden lg:sticky lg:top-12 flex flex-col" style={{ maxHeight: "calc(100vh - 48px)" }}>
+    <aside className="bg-white overflow-hidden lg:sticky lg:top-12 flex flex-col" style={{ height: "calc(100vh - 48px)" }}>
       {/* Header */}
       <div className="px-4 py-3 border-b border-border bg-gradient-to-r from-cama/5 to-indigo-50 flex items-center gap-3">
         <div className="relative flex-shrink-0">
