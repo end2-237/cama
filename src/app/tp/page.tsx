@@ -236,7 +236,7 @@ export default function TPPage() {
         </div>
       </header>
 
-      <div className="max-w-[1200px] mx-auto grid lg:grid-cols-[1fr_340px] gap-0 items-start border-x border-border bg-white">
+      <div className="max-w-[1400px] mx-auto grid lg:grid-cols-[1fr_320px_260px] gap-0 items-start border-x border-border bg-white">
 
         {/* ══ COLONNE PRINCIPALE ══ */}
         <div className="border-r border-border min-h-[calc(100vh-48px)]">
@@ -367,8 +367,8 @@ export default function TPPage() {
           )}
         </div>
 
-        {/* ══ SIDEBAR DROITE STICKY ══ */}
-        <aside className="lg:sticky lg:top-12 lg:h-[calc(100vh-48px)] lg:overflow-y-auto divide-y divide-border">
+        {/* ══ SIDEBAR DROITE 1 STICKY ══ */}
+        <aside className="lg:sticky lg:top-12 lg:h-[calc(100vh-48px)] lg:overflow-y-auto divide-y divide-border border-r border-border">
 
           {/* Panneau connexion VNC/SSH/RDP */}
           <div className="bg-white">
@@ -564,6 +564,107 @@ export default function TPPage() {
               <p className="text-gold">[13:40] Quota stockage à 40 % — pensez à nettoyer</p>
               <p className="text-white/60">[14:05] vm-ubuntu-web : VS Code Server ouvert</p>
             </div>
+          </div>
+        </aside>
+
+        {/* ══ SIDEBAR DROITE 2 STICKY ══ */}
+        <aside className="hidden lg:block lg:sticky lg:top-12 lg:h-[calc(100vh-48px)] lg:overflow-y-auto divide-y divide-border">
+
+          {/* État du cluster */}
+          <div className="bg-white px-3 py-3">
+            <p className="text-[9px] font-black text-subtle uppercase tracking-widest mb-2 flex items-center gap-1"><Server className="w-3 h-3" /> État du cluster JFN</p>
+            <div className="space-y-2">
+              {[
+                { label: "CPU global",     pct: 42, color: "bg-green-500" },
+                { label: "Mémoire",        pct: 67, color: "bg-gold" },
+                { label: "Stockage SAN",   pct: 38, color: "bg-green-500" },
+                { label: "Bande passante", pct: 81, color: "bg-red-400" },
+              ].map((r) => (
+                <div key={r.label}>
+                  <div className="flex justify-between text-[9px] mb-0.5">
+                    <span className="text-muted font-semibold">{r.label}</span>
+                    <span className="text-ink font-bold">{r.pct}%</span>
+                  </div>
+                  <div className="h-1 bg-surface">
+                    <div className={`h-full ${r.color}`} style={{ width: `${r.pct}%` }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+            <p className="text-[9px] text-subtle mt-2">14 VMs actives · 96 étudiants connectés</p>
+          </div>
+
+          {/* Modèles de VM */}
+          <div className="bg-white px-3 py-3">
+            <p className="text-[9px] font-black text-subtle uppercase tracking-widest mb-2 flex items-center gap-1"><Layers className="w-3 h-3" /> Modèles disponibles</p>
+            <div className="space-y-0.5">
+              {[
+                { icon: "🐧", label: "Debian 12 minimal",    spec: "1 vCPU · 1 Go" },
+                { icon: "🟠", label: "Ubuntu Desktop 24.04", spec: "2 vCPU · 4 Go" },
+                { icon: "🪟", label: "Windows 11 Edu",       spec: "4 vCPU · 8 Go" },
+                { icon: "🐳", label: "Docker Lab",           spec: "2 vCPU · 2 Go" },
+                { icon: "🤖", label: "ML Lab (Jupyter)",     spec: "4 vCPU · 8 Go" },
+              ].map((m) => (
+                <button key={m.label}
+                  className="w-full flex items-center gap-2 px-1.5 py-1.5 hover:bg-cama-50/40 transition-colors text-left group">
+                  <span className="text-sm flex-shrink-0">{m.icon}</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[10px] font-bold text-ink group-hover:text-cama transition-colors truncate">{m.label}</p>
+                    <p className="text-[9px] text-subtle">{m.spec}</p>
+                  </div>
+                  <Play className="w-3 h-3 text-subtle group-hover:text-cama transition-colors flex-shrink-0" />
+                </button>
+              ))}
+            </div>
+            <p className="text-[9px] text-subtle mt-1.5">Déployée en ~90 s sur le cluster.</p>
+          </div>
+
+          {/* Raccourcis clavier */}
+          <div className="bg-white px-3 py-3">
+            <p className="text-[9px] font-black text-subtle uppercase tracking-widest mb-2 flex items-center gap-1"><KeyRound className="w-3 h-3" /> Raccourcis console</p>
+            <div className="space-y-1.5">
+              {[
+                { keys: "Ctrl+Alt+Suppr", desc: "Envoyer à la VM" },
+                { keys: "Ctrl+Alt+F",     desc: "Plein écran" },
+                { keys: "Ctrl+Alt+C",     desc: "Presse-papier partagé" },
+                { keys: "Ctrl+Alt+R",     desc: "Reconnexion rapide" },
+              ].map((k) => (
+                <div key={k.keys} className="flex items-center gap-2">
+                  <kbd className="text-[8px] font-mono font-bold bg-surface border border-border px-1.5 py-0.5 text-ink flex-shrink-0">{k.keys}</kbd>
+                  <span className="text-[9px] text-muted">{k.desc}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Entraide TP */}
+          <div className="bg-white px-3 py-3">
+            <p className="text-[9px] font-black text-subtle uppercase tracking-widest mb-2 flex items-center gap-1"><Wifi className="w-3 h-3" /> Entraide en direct</p>
+            <div className="space-y-2">
+              {[
+                { who: "Aïcha M.", txt: "Quelqu'un a réussi l'exo 3 OSPF ?", time: "il y a 4 min" },
+                { who: "Brice T.", txt: "Vérifiez le subnet sur eth1 👍",     time: "il y a 2 min" },
+                { who: "Tuteur — Karim", txt: "Permanence visio à 15h pour le TP réseau.", time: "il y a 1 min" },
+              ].map((m, i) => (
+                <div key={i} className="border-l-2 border-border pl-2">
+                  <p className="text-[9px] font-bold text-cama">{m.who}</p>
+                  <p className="text-[10px] text-ink leading-snug">{m.txt}</p>
+                  <p className="text-[8px] text-subtle">{m.time}</p>
+                </div>
+              ))}
+            </div>
+            <button className="w-full mt-2 py-1.5 text-[10px] font-bold bg-ink text-white hover:bg-cama transition-colors">
+              Rejoindre le canal TP
+            </button>
+          </div>
+
+          {/* Astuce du jour */}
+          <div className="px-3 py-3" style={{ background: "linear-gradient(135deg, #1E1B4B, #312E81)" }}>
+            <p className="text-[9px] font-black text-gold uppercase tracking-widest mb-1.5 flex items-center gap-1"><Zap className="w-3 h-3" /> Astuce du jour</p>
+            <p className="text-[10px] text-white/80 leading-relaxed">
+              Utilisez <code className="font-mono text-green-400">tmux</code> dans vos sessions SSH : si votre connexion coupe,
+              votre travail continue côté serveur et vous le retrouvez avec <code className="font-mono text-green-400">tmux attach</code>.
+            </p>
           </div>
         </aside>
       </div>
