@@ -7,7 +7,7 @@ import {
   ArrowLeft, FileText, Video, MonitorPlay, Radio, Bot, Check,
   Lock, Download, ChevronDown, ChevronRight, Play, Pause, Volume2,
   Headphones, AlignLeft, Send, Sparkles, CheckCircle2, MessageSquare,
-  Wifi, X, User, Phone,
+  Wifi, X, User, Phone, AudioLines, Mic, MicOff, PhoneOff,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useDB } from "@/hooks/useDB";
@@ -164,10 +164,10 @@ export default function CoursePlayer() {
         </div>
       </section>
 
-      <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-4 grid lg:grid-cols-[260px_1fr_280px] gap-4 items-start">
+      <div className="max-w-[1400px] mx-auto grid lg:grid-cols-[260px_1fr_280px] gap-0 items-start">
 
         {/* ── Sidebar chapitres ── */}
-        <aside className="bg-white border border-border overflow-hidden lg:sticky lg:top-16">
+        <aside className="bg-white border-r border-border overflow-hidden lg:sticky lg:top-12">
           <div className="px-4 py-2.5 border-b-2 border-ink">
             <p className="text-[10px] font-black text-ink uppercase tracking-widest">Chapitres</p>
           </div>
@@ -208,7 +208,7 @@ export default function CoursePlayer() {
 
         {/* ── Contenu central ── */}
         <div className="min-w-0">
-          <div className="bg-white border border-border p-6 animate-fade-up" key={`${chapter?.id}-${activeMode}`}>
+          <div className="bg-white border-r border-border p-6 animate-fade-up" key={`${chapter?.id}-${activeMode}`}>
             <p className="text-[10px] font-black text-cama uppercase tracking-widest mb-1">Chapitre {chapter?.order}</p>
             <h2 className="text-2xl font-light text-ink mb-6">{chapter?.title}</h2>
 
@@ -288,7 +288,7 @@ function ProfChat({ courseTitle }: { courseTitle: string }) {
   }
 
   return (
-    <aside className="bg-white border border-border overflow-hidden lg:sticky lg:top-16 flex flex-col" style={{ maxHeight: "calc(100vh - 80px)" }}>
+    <aside className="bg-white overflow-hidden lg:sticky lg:top-12 flex flex-col" style={{ maxHeight: "calc(100vh - 48px)" }}>
       {/* Header */}
       <div className="px-4 py-3 border-b border-border bg-gradient-to-r from-cama/5 to-indigo-50 flex items-center gap-3">
         <div className="relative flex-shrink-0">
@@ -626,6 +626,7 @@ function ProfIA({ chapter, courseTitle }: { chapter: DBChapter; courseTitle: str
   ]);
   const [input, setInput] = useState("");
   const [typing, setTyping] = useState(false);
+  const [voiceMode, setVoiceMode] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth" }); }, [msgs, typing]);
@@ -690,9 +691,16 @@ function ProfIA({ chapter, courseTitle }: { chapter: DBChapter; courseTitle: str
 
   return (
     <div className="max-w-2xl">
-      <div className="flex items-center gap-2 bg-cama-50 border border-cama/15 rounded-xl px-4 py-2.5 mb-4">
-        <Bot className="w-4 h-4 text-cama" />
-        <p className="text-xs text-cama font-medium">Réponses ancrées sur les ressources du cours · inactif pendant les examens · échanges texte ultra-légers</p>
+      {voiceMode && <VoiceLive chapterTitle={chapter.title} onClose={() => setVoiceMode(false)} />}
+
+      <div className="flex items-center gap-2 bg-cama-50 border border-cama/15 px-4 py-2 mb-4">
+        <Bot className="w-4 h-4 text-cama flex-shrink-0" />
+        <p className="text-xs text-cama font-medium flex-1">Réponses ancrées sur les ressources du cours · inactif pendant les examens · échanges texte ultra-légers</p>
+        <button onClick={() => setVoiceMode(true)}
+          className="flex items-center gap-1.5 text-xs font-bold text-white px-3 py-1.5 flex-shrink-0 hover:opacity-90 transition-opacity"
+          style={{ background: "linear-gradient(135deg, #4F46E5, #1E1B4B)" }}>
+          <AudioLines className="w-3.5 h-3.5 text-gold" /> Mode vocal live
+        </button>
       </div>
       <div className="border border-border rounded-2xl overflow-hidden">
         <div className="h-80 overflow-y-auto p-4 space-y-3 bg-surface">
@@ -789,6 +797,144 @@ function ForumPanel({ ueId }: { ueId: string }) {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+/* ════ PROF IA — MODE VOCAL LIVE (plein écran, style Gemini Live) ════ */
+const VOICE_SCRIPT = [
+  { state: "speaking",  text: "Bonjour Jean-Paul ! Je suis votre Prof IA en mode vocal. De quoi voulez-vous parler dans ce chapitre ?", dur: 5200 },
+  { state: "listening", text: "« Explique-moi la complexité algorithmique simplement »", dur: 4200 },
+  { state: "thinking",  text: "", dur: 1800 },
+  { state: "speaking",  text: "Imaginez que vous cherchez un nom dans l'annuaire de Yaoundé. Page par page, c'est O(n) : lent. En l'ouvrant au milieu et en éliminant la moitié à chaque fois, c'est O(log n) : rapide. La complexité, c'est ça — compter les étapes selon la taille du problème.", dur: 11000 },
+  { state: "listening", text: "« Et pourquoi O(n²) est mauvais ? »", dur: 3600 },
+  { state: "thinking",  text: "", dur: 1500 },
+  { state: "speaking",  text: "Pour n = 1000 éléments, un algorithme O(n²) fait un million d'opérations contre mille pour un O(n). Sur un téléphone d'entrée de gamme, la différence se sent immédiatement. C'est exactement le point-clé de votre chapitre.", dur: 9500 },
+] as const;
+
+function VoiceLive({ chapterTitle, onClose }: { chapterTitle: string; onClose: () => void }) {
+  const [step, setStep] = useState(0);
+  const [muted, setMuted] = useState(false);
+  const [elapsed, setElapsed] = useState(0);
+
+  /* Plein écran natif à l'ouverture */
+  useEffect(() => {
+    document.documentElement.requestFullscreen?.().catch(() => {});
+    return () => { if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {}); };
+  }, []);
+
+  /* Chrono */
+  useEffect(() => {
+    const t = setInterval(() => setElapsed((e) => e + 1), 1000);
+    return () => clearInterval(t);
+  }, []);
+
+  /* Déroulé du scénario vocal */
+  useEffect(() => {
+    const cur = VOICE_SCRIPT[step % VOICE_SCRIPT.length];
+    const t = setTimeout(() => setStep((s) => s + 1), cur.dur);
+    return () => clearTimeout(t);
+  }, [step]);
+
+  const cur = VOICE_SCRIPT[step % VOICE_SCRIPT.length];
+  const fmt = (s: number) => `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
+
+  const stateLabel = { speaking: "Prof IA parle…", listening: "Je vous écoute…", thinking: "Réflexion…" }[cur.state];
+
+  return (
+    <div className="fixed inset-0 z-[400] flex flex-col items-center justify-between overflow-hidden"
+      style={{ background: "radial-gradient(ellipse at 50% 35%, #312E81 0%, #1E1B4B 55%, #0d0b2b 100%)" }}>
+
+      {/* Header */}
+      <div className="w-full flex items-center justify-between px-6 py-4">
+        <div>
+          <p className="text-white font-bold text-sm flex items-center gap-2">
+            <Bot className="w-4 h-4 text-gold" /> Prof IA — Vocal live
+          </p>
+          <p className="text-white/40 text-[11px]">{chapterTitle} · ancré sur les ressources du cours</p>
+        </div>
+        <div className="flex items-center gap-2 text-white/50 text-xs font-mono">
+          <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" /> {fmt(elapsed)}
+        </div>
+      </div>
+
+      {/* Orbe central animé */}
+      <div className="flex flex-col items-center gap-8">
+        <div className="relative w-52 h-52 flex items-center justify-center">
+          {/* Anneaux pulsants */}
+          {cur.state === "speaking" && [0, 1, 2].map((i) => (
+            <div key={i} className="absolute inset-0 rounded-full border-2 border-gold/30 animate-ping"
+              style={{ animationDuration: "2.2s", animationDelay: `${i * 0.5}s` }} />
+          ))}
+          {cur.state === "listening" && (
+            <div className="absolute -inset-3 rounded-full border-2 border-green-400/40 animate-pulse" />
+          )}
+          {/* Orbe */}
+          <div className={`w-40 h-40 rounded-full transition-all duration-700 flex items-center justify-center ${
+            cur.state === "speaking" ? "scale-110" : cur.state === "thinking" ? "scale-90" : "scale-100"}`}
+            style={{
+              background: cur.state === "listening"
+                ? "radial-gradient(circle at 35% 30%, #4ade80, #16a34a 60%, #14532d)"
+                : "radial-gradient(circle at 35% 30%, #818CF8, #4F46E5 55%, #1E1B4B)",
+              boxShadow: cur.state === "speaking"
+                ? "0 0 90px rgba(245,158,11,.45), 0 0 40px rgba(99,102,241,.6)"
+                : "0 0 60px rgba(99,102,241,.45)",
+            }}>
+            {/* Barres audio quand l'IA parle */}
+            {cur.state === "speaking" ? (
+              <div className="flex items-center gap-1.5">
+                {[0, 1, 2, 3, 4].map((i) => (
+                  <div key={i} className="w-2 bg-white/90 rounded-full animate-pulse"
+                    style={{ height: `${18 + ((i * 13) % 30)}px`, animationDuration: ".6s", animationDelay: `${i * 110}ms` }} />
+                ))}
+              </div>
+            ) : cur.state === "listening" ? (
+              <Mic className="w-12 h-12 text-white/90" />
+            ) : (
+              <div className="flex gap-1.5">
+                {[0, 1, 2].map((i) => (
+                  <span key={i} className="w-2.5 h-2.5 rounded-full bg-white/80 animate-bounce" style={{ animationDelay: `${i * 0.15}s` }} />
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* État + sous-titres */}
+        <div className="text-center px-6 max-w-xl">
+          <p className={`text-xs font-bold uppercase tracking-widest mb-3 ${
+            cur.state === "listening" ? "text-green-400" : cur.state === "speaking" ? "text-gold" : "text-white/50"}`}>
+            {stateLabel}
+          </p>
+          {cur.text && (
+            <p className={`leading-relaxed animate-fade-up ${
+              cur.state === "listening" ? "text-white/60 italic text-sm" : "text-white text-base"}`} key={step}>
+              {cur.text}
+            </p>
+          )}
+        </div>
+      </div>
+
+      {/* Contrôles */}
+      <div className="flex items-center gap-4 pb-10">
+        <button onClick={() => setMuted(!muted)}
+          className={`w-14 h-14 rounded-full flex items-center justify-center transition-all ${
+            muted ? "bg-red-500 text-white" : "bg-white/10 text-white hover:bg-white/20 border border-white/15"}`}
+          title={muted ? "Réactiver le micro" : "Couper le micro"}>
+          {muted ? <MicOff className="w-6 h-6" /> : <Mic className="w-6 h-6" />}
+        </button>
+        <button onClick={onClose}
+          className="h-14 px-8 rounded-full bg-red-500 text-white flex items-center gap-2.5 font-bold hover:bg-red-600 transition-colors">
+          <PhoneOff className="w-5 h-5" /> Terminer
+        </button>
+        <button onClick={onClose}
+          className="w-14 h-14 rounded-full bg-white/10 text-white hover:bg-white/20 border border-white/15 flex items-center justify-center transition-all"
+          title="Revenir au chat texte">
+          <MessageSquare className="w-5 h-5" />
+        </button>
+      </div>
+
+      <p className="absolute bottom-3 text-[10px] text-white/25">Prototype — synthèse et reconnaissance vocales simulées · ~0,2 Mo/min en production</p>
     </div>
   );
 }
