@@ -7,7 +7,7 @@ import {
   ArrowLeft, FileText, Video, MonitorPlay, Radio, Bot, Check,
   Lock, Download, ChevronDown, ChevronRight, Play, Pause, Volume2,
   Headphones, AlignLeft, Send, Sparkles, CheckCircle2, MessageSquare,
-  Wifi, X,
+  Wifi, X, User, Phone,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useDB } from "@/hooks/useDB";
@@ -93,7 +93,7 @@ export default function CoursePlayer() {
         </div>
       </header>
 
-      <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-6 grid lg:grid-cols-[280px_1fr] gap-6 items-start">
+      <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-6 grid lg:grid-cols-[260px_1fr_280px] gap-5 items-start">
 
         {/* ── Sidebar chapitres ── */}
         <aside className="bg-white rounded-2xl border border-border overflow-hidden lg:sticky lg:top-20">
@@ -135,7 +135,7 @@ export default function CoursePlayer() {
           <ForumPanel ueId={course.ueId} />
         </aside>
 
-        {/* ── Contenu ── */}
+        {/* ── Contenu central ── */}
         <div className="min-w-0">
           {/* Tabs modes */}
           <div className="flex gap-2 mb-4 flex-wrap">
@@ -190,8 +190,135 @@ export default function CoursePlayer() {
             </div>
           </div>
         </div>
+
+        {/* ── Sidebar droite : Chat Prof ── */}
+        <ProfChat courseTitle={course.title} />
       </div>
     </div>
+  );
+}
+
+/* ════ CHAT PROF (enseignant réel) ════ */
+type ChatMsg = { from: "prof" | "moi"; text: string };
+
+const PROF_INIT: ChatMsg[] = [
+  { from: "prof", text: "Bonjour ! Je suis disponible pour vos questions sur ce cours. N'hésitez pas. 👋" },
+];
+
+const PROF_REPLIES = [
+  "Bonne question ! Je regarderai ça dès que possible et reviendrai vers vous.",
+  "Oui, exactement. Relisez la section 2.3 du cours natif, c'est bien expliqué là-dedans.",
+  "Je comprends la confusion. En pratique, la différence est surtout visible quand n > 1000.",
+  "Vous pouvez poster ça aussi dans le forum UE pour que les autres étudiants en profitent !",
+  "Excellente remarque. J'en parlerai lors du prochain live pour tout le groupe.",
+];
+
+function ProfChat({ courseTitle }: { courseTitle: string }) {
+  const [msgs, setMsgs] = useState<ChatMsg[]>(PROF_INIT);
+  const [input, setInput] = useState("");
+  const [typing, setTyping] = useState(false);
+  const [online] = useState(true);
+  const endRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth" }); }, [msgs, typing]);
+
+  function send() {
+    const q = input.trim();
+    if (!q) return;
+    setInput("");
+    setMsgs((m) => [...m, { from: "moi" as ChatMsg["from"], text: q }]);
+    setTyping(true);
+    const delay = 1200 + Math.random() * 1000;
+    setTimeout(() => {
+      setTyping(false);
+      setMsgs((m) => [...m, { from: "prof" as ChatMsg["from"], text: PROF_REPLIES[Math.floor(Math.random() * PROF_REPLIES.length)] }]);
+    }, delay);
+  }
+
+  return (
+    <aside className="bg-white rounded-2xl border border-border overflow-hidden lg:sticky lg:top-20 flex flex-col" style={{ maxHeight: "calc(100vh - 96px)" }}>
+      {/* Header */}
+      <div className="px-4 py-3 border-b border-border bg-gradient-to-r from-cama/5 to-indigo-50 flex items-center gap-3">
+        <div className="relative flex-shrink-0">
+          <div className="w-9 h-9 rounded-full bg-cama flex items-center justify-center text-white text-sm font-bold">AB</div>
+          {online && <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-green-400 border-2 border-white" />}
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-xs font-bold text-ink leading-tight">Pr. Amina Bello</p>
+          <p className="text-[10px] text-muted">Enseignante · {courseTitle}</p>
+        </div>
+        <div className="flex items-center gap-1">
+          <button className="p-1.5 rounded-lg hover:bg-surface transition-colors" title="Appel vocal (bientôt)">
+            <Phone className="w-3.5 h-3.5 text-subtle" />
+          </button>
+          <button className="p-1.5 rounded-lg hover:bg-surface transition-colors" title="Profil enseignant">
+            <User className="w-3.5 h-3.5 text-subtle" />
+          </button>
+        </div>
+      </div>
+
+      {/* Info disponibilité */}
+      <div className="px-3 py-2 bg-green-50 border-b border-green-100 flex items-center gap-2">
+        <span className="w-1.5 h-1.5 rounded-full bg-green-500 flex-shrink-0 animate-pulse" />
+        <p className="text-[10px] text-green-700 font-medium">En ligne · répond généralement en quelques minutes</p>
+      </div>
+
+      {/* Messages */}
+      <div className="flex-1 overflow-y-auto p-3 space-y-3 bg-[#F9FAFB]" style={{ minHeight: 0 }}>
+        {msgs.map((m, i) => (
+          <div key={i} className={`flex ${m.from === "moi" ? "justify-end" : "justify-start"}`}>
+            {m.from === "prof" && (
+              <div className="w-6 h-6 rounded-full bg-cama flex items-center justify-center mr-2 flex-shrink-0 mt-0.5 text-[9px] font-bold text-white">AB</div>
+            )}
+            <div className={`max-w-[82%] rounded-2xl px-3 py-2 text-xs leading-relaxed ${
+              m.from === "moi"
+                ? "bg-cama text-white rounded-tr-sm"
+                : "bg-white border border-border text-ink rounded-tl-sm"
+            }`}>
+              {m.text}
+            </div>
+          </div>
+        ))}
+        {typing && (
+          <div className="flex justify-start">
+            <div className="w-6 h-6 rounded-full bg-cama flex items-center justify-center mr-2 flex-shrink-0 mt-0.5 text-[9px] font-bold text-white">AB</div>
+            <div className="bg-white border border-border rounded-2xl rounded-tl-sm px-4 py-3 flex items-center gap-1">
+              {[0, 1, 2].map((k) => (
+                <span key={k} className="w-1.5 h-1.5 rounded-full bg-subtle animate-bounce" style={{ animationDelay: `${k * 150}ms` }} />
+              ))}
+            </div>
+          </div>
+        )}
+        <div ref={endRef} />
+      </div>
+
+      {/* Questions rapides */}
+      <div className="px-3 pt-2 flex flex-col gap-1.5 bg-white border-t border-border">
+        {["Je n'ai pas compris l'exemple", "Pouvez-vous donner plus d'exercices ?"].map((s) => (
+          <button key={s} onClick={() => { setInput(s); }}
+            className="text-[10px] text-cama border border-cama/20 rounded-full px-2.5 py-1.5 hover:bg-cama/8 transition-colors text-left font-medium">
+            {s}
+          </button>
+        ))}
+      </div>
+
+      {/* Input */}
+      <div className="p-3 bg-white flex items-center gap-2">
+        <input
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && send()}
+          placeholder="Écrire au professeur…"
+          className="flex-1 text-xs bg-[#F9FAFB] border border-border rounded-xl px-3 py-2.5 outline-none focus:border-cama transition-colors"
+        />
+        <button
+          onClick={send}
+          disabled={!input.trim()}
+          className="w-8 h-8 rounded-xl bg-cama hover:bg-cama-700 disabled:opacity-40 flex items-center justify-center transition-colors flex-shrink-0">
+          <Send className="w-3.5 h-3.5 text-white" />
+        </button>
+      </div>
+    </aside>
   );
 }
 

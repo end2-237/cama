@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   Grid3x3, Search, ChevronDown, Globe, HelpCircle,
-  Bell, LogOut, User, Settings,
+  Bell, LogOut, User, Settings, Megaphone, X, FileText, Radio, AlertCircle,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 
@@ -19,6 +19,14 @@ export default function DashNav({ activeTab, onTab, tabs }: DashNavProps) {
   const { user, logout } = useAuth();
   const router = useRouter();
   const [profileOpen, setProfileOpen] = useState(false);
+  const [commOpen, setCommOpen] = useState(false);
+
+  const ADMIN_COMMS = [
+    { icon: Megaphone, type: "Circulaire", color: "text-cama bg-cama/10", title: "Fermeture administrative — 14 juillet", body: "Les services administratifs seront fermés le 14 juillet. Les demandes urgentes sont à envoyer avant le 12 juillet.", time: "Il y a 1 jour" },
+    { icon: AlertCircle, type: "Urgent", color: "text-red-500 bg-red-50", title: "Mise à jour des photos de carte étudiante", body: "Tous les étudiants doivent mettre à jour leur photo au secrétariat avant le 20 juin pour l'impression des nouvelles cartes.", time: "Il y a 2 jours" },
+    { icon: FileText, type: "Note de service", color: "text-amber-600 bg-amber-50", title: "Calendrier des délibérations S4", body: "Les résultats du semestre 4 seront délibérés le 25 juin à 9h en salle A12. Présence non obligatoire pour les étudiants.", time: "Il y a 3 jours" },
+    { icon: Radio, type: "Événement", color: "text-green-600 bg-green-50", title: "Cérémonie de remise des diplômes", body: "La cérémonie annuelle de remise des diplômes est programmée le 5 juillet à l'amphithéâtre principal. Invitation à venir chercher au secrétariat.", time: "Il y a 5 jours" },
+  ];
 
   const handleLogout = () => {
     logout();
@@ -85,13 +93,62 @@ export default function DashNav({ activeTab, onTab, tabs }: DashNavProps) {
               <Globe className="w-5 h-5" />
               <span className="text-xs font-semibold hidden lg:block">FR</span>
             </button>
-            <button className="p-2 text-muted hover:text-ink transition-colors rounded-lg hover:bg-surface">
+            <Link href="/guide" className="p-2 text-muted hover:text-ink transition-colors rounded-lg hover:bg-surface">
               <HelpCircle className="w-5 h-5" />
-            </button>
+            </Link>
             <button className="relative p-2 text-muted hover:text-ink transition-colors rounded-lg hover:bg-surface">
               <Bell className="w-5 h-5" />
               <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-green-500 border-2 border-white" />
             </button>
+
+            {/* Communication Administration */}
+            <div className="relative">
+              <button
+                onClick={() => setCommOpen(!commOpen)}
+                className={`relative flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all ml-1 ${
+                  commOpen ? "bg-cama text-white" : "bg-cama/10 text-cama hover:bg-cama/20 border border-cama/20"
+                }`}>
+                <Megaphone className="w-4 h-4" />
+                <span className="hidden lg:block">Administration</span>
+                <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center border-2 border-white">4</span>
+              </button>
+
+              {commOpen && (
+                <div className="absolute right-0 top-full mt-2 w-96 bg-white rounded-2xl border border-border shadow-2xl overflow-hidden animate-scale-in z-50">
+                  <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-cama/5">
+                    <div className="flex items-center gap-2">
+                      <Megaphone className="w-4 h-4 text-cama" />
+                      <p className="text-sm font-bold text-ink">Communication Administration</p>
+                    </div>
+                    <button onClick={() => setCommOpen(false)} className="p-1 hover:bg-surface rounded-lg transition-colors">
+                      <X className="w-4 h-4 text-subtle" />
+                    </button>
+                  </div>
+                  <div className="divide-y divide-border max-h-[380px] overflow-y-auto">
+                    {ADMIN_COMMS.map((c, i) => (
+                      <div key={i} className="p-4 hover:bg-surface transition-colors cursor-pointer">
+                        <div className="flex items-start gap-3">
+                          <div className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 ${c.color.split(" ")[1]}`}>
+                            <c.icon className={`w-4 h-4 ${c.color.split(" ")[0]}`} />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center justify-between gap-2 mb-0.5">
+                              <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${c.color.split(" ")[1]} ${c.color.split(" ")[0]}`}>{c.type}</span>
+                              <span className="text-[9px] text-subtle flex-shrink-0">{c.time}</span>
+                            </div>
+                            <p className="text-xs font-bold text-ink leading-snug">{c.title}</p>
+                            <p className="text-[11px] text-muted leading-relaxed mt-0.5 line-clamp-2">{c.body}</p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="p-3 border-t border-border bg-surface">
+                    <button className="w-full text-xs text-cama font-bold hover:underline">Voir toutes les communications →</button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Profil — style NetAcad : icône + nom + rôle */}
