@@ -11,6 +11,7 @@ import {
   BookMarked, Clock, Star, Bell, Share2,
   Bookmark, Award, Zap, BarChart2, Target, Users,
   Pencil, ThumbsUp, RotateCcw, ExternalLink, Hash, StickyNote,
+  Search, Filter, ChevronUp, BookOpen, X as XIcon,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useDB } from "@/hooks/useDB";
@@ -34,6 +35,7 @@ export default function CoursePlayer() {
 
   const [chapIdx, setChapIdx] = useState(0);
   const [mode, setMode] = useState<Mode>("natif");
+  const [searchOpen, setSearchOpen] = useState(false);
 
   useEffect(() => {
     if (!loading && !user) router.replace("/auth/login");
@@ -76,7 +78,14 @@ export default function CoursePlayer() {
   const doneCount = chapters.filter((c) => doneIds.has(c.id)).length;
 
   return (
-    <div className="min-h-screen bg-surface">
+    <div className="min-h-screen bg-surface" onKeyDown={(e) => { if ((e.ctrlKey || e.metaKey) && e.key === "k") { e.preventDefault(); setSearchOpen(true); } }}>
+      {searchOpen && (
+        <CourseSearch
+          chapters={chapters}
+          onClose={() => setSearchOpen(false)}
+          onJump={(i) => { setChapIdx(i); setSearchOpen(false); }}
+        />
+      )}
       {/* Top bar */}
       <header className="bg-white border-b border-border sticky top-0 z-40">
         <div className="max-w-[1400px] mx-auto px-4 sm:px-6 flex items-center gap-4 h-12">
@@ -129,19 +138,29 @@ export default function CoursePlayer() {
             </div>
           </div>
 
-          {/* Stat progression */}
-          <div className="flex items-center gap-4">
-            <div className="text-right">
-              <p className="text-3xl font-black text-gold leading-none">{pct}%</p>
-              <p className="text-[10px] text-white/60 mt-1">{doneCount}/{chapters.length} chapitres validés</p>
+          {/* Droite hero : progression + bouton recherche */}
+          <div className="flex flex-col items-end gap-3">
+            <div className="flex items-center gap-4">
+              <div className="text-right">
+                <p className="text-3xl font-black text-gold leading-none">{pct}%</p>
+                <p className="text-[10px] text-white/60 mt-1">{doneCount}/{chapters.length} chapitres validés</p>
+              </div>
+              <div className="w-14 h-14 relative">
+                <svg className="w-full h-full -rotate-90" viewBox="0 0 36 36">
+                  <circle cx="18" cy="18" r="15.9" fill="none" stroke="rgba(255,255,255,.15)" strokeWidth="3" />
+                  <circle cx="18" cy="18" r="15.9" fill="none" stroke="#F59E0B" strokeWidth="3"
+                    strokeDasharray={`${pct} 100`} strokeLinecap="round" />
+                </svg>
+              </div>
             </div>
-            <div className="w-14 h-14 relative">
-              <svg className="w-full h-full -rotate-90" viewBox="0 0 36 36">
-                <circle cx="18" cy="18" r="15.9" fill="none" stroke="rgba(255,255,255,.15)" strokeWidth="3" />
-                <circle cx="18" cy="18" r="15.9" fill="none" stroke="#F59E0B" strokeWidth="3"
-                  strokeDasharray={`${pct} 100`} strokeLinecap="round" />
-              </svg>
-            </div>
+            {/* Bouton moteur de recherche */}
+            <button
+              onClick={() => setSearchOpen(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 border border-white/20 hover:border-white/40 transition-all text-white text-xs font-bold backdrop-blur-sm">
+              <Search className="w-3.5 h-3.5 text-gold" />
+              Rechercher dans le cours
+              <kbd className="text-[9px] font-mono bg-white/10 px-1.5 py-0.5 ml-1">Ctrl K</kbd>
+            </button>
           </div>
         </div>
 
@@ -393,6 +412,177 @@ export default function CoursePlayer() {
 
           {/* Chat prof — prend le reste */}
           <ProfChat courseTitle={course.title} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ════ MOTEUR DE RECHERCHE DU COURS ════ */
+type SearchResult = {
+  chapIdx: number;
+  chapTitle: string;
+  kind: string;
+  snippet: string;
+  score: number;
+};
+
+function CourseSearch({ chapters, onClose, onJump }: {
+  chapters: DBChapter[];
+  onClose: () => void;
+  onJump: (i: number) => void;
+}) {
+  const [q, setQ] = useState("");
+  const [filter, setFilter] = useState<"tout" | "natif" | "pdf" | "video">("tout");
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => { inputRef.current?.focus(); }, []);
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [onClose]);
+
+  const results = useMemo<SearchResult[]>(() => {
+    const term = q.trim().toLowerCase();
+    if (!term) return [];
+    const out: SearchResult[] = [];
+    chapters.forEach((c, i) => {
+      if (filter === "natif" && !c.natif) return;
+      if (filter === "pdf"   && !c.pdf)   return;
+      if (filter === "video" && !c.video) return;
+
+      /* Titre chapitre */
+      if (c.title.toLowerCase().includes(term)) {
+        out.push({ chapIdx: i, chapTitle: c.title, kind: "Titre", snippet: c.title, score: 3 });
+      }
+      /* Blocs natifs */
+      c.natif?.blocks.forEach((b) => {
+        const text = b.type === "definition" ? `${b.terme} : ${b.text}` : b.type === "quiz" ? b.question : "text" in b ? (b as { text: string }).text : "";
+        if (text.toLowerCase().includes(term)) {
+          const idx = text.toLowerCase().indexOf(term);
+          const snippet = text.slice(Math.max(0, idx - 40), idx + 80).replace(/\n/g, " ");
+          out.push({ chapIdx: i, chapTitle: c.title, kind: b.type === "quiz" ? "Quiz" : b.type === "definition" ? "Définition" : "Cours natif", snippet, score: 2 });
+        }
+      });
+      /* Transcription vidéo */
+      if (c.video?.transcript?.toLowerCase().includes(term)) {
+        const t = c.video.transcript;
+        const idx = t.toLowerCase().indexOf(term);
+        out.push({ chapIdx: i, chapTitle: c.title, kind: "Transcription vidéo", snippet: t.slice(Math.max(0, idx - 40), idx + 80), score: 1 });
+      }
+      /* PDF nom */
+      if (c.pdf?.name.toLowerCase().includes(term)) {
+        out.push({ chapIdx: i, chapTitle: c.title, kind: "Support PDF", snippet: c.pdf.name, score: 1 });
+      }
+    });
+    return out.sort((a, b) => b.score - a.score).slice(0, 12);
+  }, [q, filter, chapters]);
+
+  const highlight = (text: string) => {
+    const term = q.trim();
+    if (!term) return text;
+    const parts = text.split(new RegExp(`(${term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})`, "gi"));
+    return parts.map((p, i) =>
+      p.toLowerCase() === term.toLowerCase()
+        ? <mark key={i} className="bg-gold/40 text-ink font-bold">{p}</mark>
+        : p
+    );
+  };
+
+  const KIND_COLOR: Record<string, string> = {
+    "Titre": "bg-cama text-white",
+    "Quiz": "bg-gold/20 text-gold-dark",
+    "Définition": "bg-purple-100 text-purple-700",
+    "Cours natif": "bg-green-50 text-green-700",
+    "Transcription vidéo": "bg-blue-50 text-blue-700",
+    "Support PDF": "bg-red-50 text-red-600",
+  };
+
+  return (
+    <div className="fixed inset-0 z-[300] flex items-start justify-center pt-[10vh] px-4"
+      style={{ background: "rgba(15,14,40,0.75)", backdropFilter: "blur(4px)" }}
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="w-full max-w-2xl bg-white shadow-2xl overflow-hidden animate-scale-in">
+
+        {/* Barre de recherche */}
+        <div className="flex items-center gap-3 px-4 py-3 border-b border-border">
+          <Search className="w-5 h-5 text-cama flex-shrink-0" />
+          <input
+            ref={inputRef}
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Rechercher dans tous les chapitres, définitions, quiz, PDF…"
+            className="flex-1 text-sm text-ink placeholder-subtle outline-none bg-transparent"
+          />
+          {q && (
+            <button onClick={() => setQ("")} className="text-subtle hover:text-ink transition-colors flex-shrink-0">
+              <XIcon className="w-4 h-4" />
+            </button>
+          )}
+          <kbd onClick={onClose} className="text-[10px] font-mono bg-surface border border-border px-2 py-1 text-subtle cursor-pointer hover:text-ink transition-colors flex-shrink-0">Esc</kbd>
+        </div>
+
+        {/* Filtres */}
+        <div className="flex items-center gap-0 border-b border-border px-4 py-2 overflow-x-auto">
+          <Filter className="w-3.5 h-3.5 text-subtle mr-2 flex-shrink-0" />
+          {(["tout", "natif", "pdf", "video"] as const).map((f) => (
+            <button key={f} onClick={() => setFilter(f)}
+              className={`px-3 py-1 text-[11px] font-bold mr-1 transition-colors flex-shrink-0 ${
+                filter === f ? "bg-cama text-white" : "bg-surface text-muted hover:text-ink"
+              }`}>
+              {f === "tout" ? "Tout le cours" : f === "natif" ? "Cours natif" : f === "pdf" ? "PDF" : "Vidéo"}
+            </button>
+          ))}
+          {q && <span className="ml-auto text-[10px] text-subtle flex-shrink-0">{results.length} résultat{results.length > 1 ? "s" : ""}</span>}
+        </div>
+
+        {/* Résultats */}
+        <div className="max-h-[55vh] overflow-y-auto divide-y divide-border">
+          {!q && (
+            <div className="px-5 py-8 text-center">
+              <BookOpen className="w-10 h-10 text-border mx-auto mb-3" />
+              <p className="text-sm font-bold text-ink mb-1">Recherche dans le cours</p>
+              <p className="text-xs text-muted">Titres de chapitres, définitions, cours natif, quiz, transcriptions, PDF</p>
+              <div className="flex items-center justify-center gap-2 mt-4 flex-wrap">
+                {["complexité", "arbre binaire", "hachage", "quiz", "résumé"].map((s) => (
+                  <button key={s} onClick={() => setQ(s)}
+                    className="text-[11px] text-cama border border-cama/20 px-3 py-1.5 hover:bg-cama/5 transition-colors">
+                    {s}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          {q && results.length === 0 && (
+            <div className="px-5 py-8 text-center">
+              <p className="text-sm font-bold text-ink mb-1">Aucun résultat pour « {q} »</p>
+              <p className="text-xs text-muted">Essayez un autre terme ou changez le filtre.</p>
+            </div>
+          )}
+          {results.map((r, i) => (
+            <button key={i} onClick={() => onJump(r.chapIdx)}
+              className="w-full flex items-start gap-3 px-5 py-3 hover:bg-cama/5 transition-colors text-left group">
+              <div className="flex-shrink-0 mt-0.5">
+                <span className={`text-[9px] font-black px-1.5 py-0.5 ${KIND_COLOR[r.kind] || "bg-surface text-subtle"}`}>
+                  {r.kind}
+                </span>
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-[10px] font-bold text-cama mb-0.5">{r.chapTitle}</p>
+                <p className="text-xs text-ink leading-relaxed line-clamp-2">{highlight(r.snippet)}</p>
+              </div>
+              <ChevronUp className="w-3.5 h-3.5 text-subtle rotate-90 flex-shrink-0 mt-0.5 group-hover:text-cama transition-colors" />
+            </button>
+          ))}
+        </div>
+
+        {/* Footer */}
+        <div className="px-5 py-2.5 border-t border-border bg-surface flex items-center justify-between">
+          <p className="text-[10px] text-subtle">Recherche dans les ressources de ce cours uniquement · IA désactivée</p>
+          <div className="flex items-center gap-2 text-[9px] text-subtle">
+            <kbd className="bg-white border border-border px-1.5 py-0.5 font-mono">↵</kbd> Accéder au chapitre
+          </div>
         </div>
       </div>
     </div>
