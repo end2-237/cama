@@ -1,14 +1,17 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import {
   BookOpen, Clock, ChevronRight, Play, Radio, ShieldCheck,
   FileText, Video, MonitorPlay, Bot, CheckCircle2, TrendingUp,
   Star, Award, GraduationCap, QrCode, AlertCircle, Calendar,
   Newspaper, ExternalLink, Headphones, Film, BookMarked, Terminal,
+  Info,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useDB } from "@/hooks/useDB";
+import CourseDetailDrawer from "@/components/CourseDetailDrawer";
 import { COURS_INTERMEDIAIRES, formatFcfa } from "@/lib/parcours";
 
 /* Visuels des cours hors cursus (par slug) */
@@ -282,6 +285,7 @@ function NewsFeed() {
 function CoursesTab() {
   const { db } = useDB();
   const { user } = useAuth();
+  const [detailId, setDetailId] = useState<string | null>(null);
   if (!db || !user) return null;
 
   const courses = db.courses.filter((c) => c.published);
@@ -379,8 +383,16 @@ function CoursesTab() {
                     <span className="text-[10px] text-subtle">{done}/{total}</span>
                   </div>
                 </div>
-                <div className="self-center w-7 h-7 bg-cama text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
-                  <Play className="w-3 h-3 fill-white ml-0.5" />
+                <div className="self-center flex items-center gap-1.5 flex-shrink-0">
+                  <button
+                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); setDetailId(c.id); }}
+                    className="flex items-center gap-1 px-2.5 py-1.5 text-[10px] font-bold text-muted border border-border hover:border-cama/40 hover:text-cama hover:bg-white transition-all"
+                    title="Voir la fiche détaillée du cours">
+                    <Info className="w-3 h-3" /> Détails
+                  </button>
+                  <div className="w-7 h-7 bg-cama text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Play className="w-3 h-3 fill-white ml-0.5" />
+                  </div>
                 </div>
               </Link>
             );
@@ -467,6 +479,9 @@ function CoursesTab() {
           <p className="text-white/60 text-xs leading-relaxed">Questions, exercices, résumés — ancré sur vos cours, ultra-léger en data. Ouvrez un cours pour l&apos;utiliser.</p>
         </div>
       </div>
+
+      {/* Drawer fiche cours — sort de la gauche */}
+      <CourseDetailDrawer courseId={detailId} onClose={() => setDetailId(null)} />
     </div>
   );
 }
