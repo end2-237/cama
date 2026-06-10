@@ -14,6 +14,7 @@ import AIAssistant from "@/components/AIAssistant";
 import DiscussionsDock from "@/components/DiscussionsDock";
 import WelcomeModal from "@/components/WelcomeModal";
 import OnboardingTour from "@/components/OnboardingTour";
+import SearchFab from "@/components/SearchFab";
 
 const tabsMap: Record<string, string[]> = {
   etudiant:   ["Mes Cours", "Examens", "Résultats"],
@@ -78,6 +79,7 @@ export default function DashboardPage() {
       <WelcomeModal />
       <OnboardingTour />
       <AIAssistant />
+      <SearchFab />
       {user.role === "etudiant" && <DiscussionsDock />}
     </>
   );
