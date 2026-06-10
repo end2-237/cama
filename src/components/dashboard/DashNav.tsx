@@ -6,8 +6,10 @@ import Link from "next/link";
 import {
   Grid3x3, Search, ChevronDown, Globe, HelpCircle,
   Bell, LogOut, User, Settings, Megaphone, X, FileText, Radio, AlertCircle,
+  CalendarDays, CalendarClock,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import PersonalCalendarDrawer from "@/components/PersonalCalendarDrawer";
 
 interface DashNavProps {
   activeTab: string;
@@ -20,6 +22,7 @@ export default function DashNav({ activeTab, onTab, tabs }: DashNavProps) {
   const router = useRouter();
   const [profileOpen, setProfileOpen] = useState(false);
   const [commOpen, setCommOpen] = useState(false);
+  const [calOpen, setCalOpen] = useState(false);
 
   const ADMIN_COMMS = [
     { icon: Megaphone, type: "Circulaire", color: "text-cama bg-cama/10", title: "Fermeture administrative — 14 juillet", body: "Les services administratifs seront fermés le 14 juillet. Les demandes urgentes sont à envoyer avant le 12 juillet.", time: "Il y a 1 jour" },
@@ -36,6 +39,7 @@ export default function DashNav({ activeTab, onTab, tabs }: DashNavProps) {
   if (!user) return null;
 
   return (
+    <>
     <header className="fixed top-[48px] inset-x-0 z-50 bg-white border-b border-border shadow-sm">
       <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center h-16 gap-4">
@@ -96,6 +100,18 @@ export default function DashNav({ activeTab, onTab, tabs }: DashNavProps) {
             <Link href="/guide" className="p-2 text-muted hover:text-ink transition-colors rounded-lg hover:bg-surface">
               <HelpCircle className="w-5 h-5" />
             </Link>
+            <Link href="/calendrier" className="p-2 text-muted hover:text-ink transition-colors rounded-lg hover:bg-surface" title="Calendrier académique annuel">
+              <CalendarDays className="w-5 h-5" />
+            </Link>
+            {user.role === "etudiant" && (
+              <button
+                onClick={() => setCalOpen(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-ink border border-border hover:border-cama/40 hover:bg-surface transition-all ml-1"
+                title="Mon calendrier personnel">
+                <CalendarClock className="w-4 h-4 text-cama" />
+                <span className="hidden lg:block">Mon planning</span>
+              </button>
+            )}
             <button className="relative p-2 text-muted hover:text-ink transition-colors rounded-lg hover:bg-surface">
               <Bell className="w-5 h-5" />
               <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-green-500 border-2 border-white" />
@@ -219,5 +235,8 @@ export default function DashNav({ activeTab, onTab, tabs }: DashNavProps) {
         </div>
       </div>
     </header>
+
+    <PersonalCalendarDrawer open={calOpen} onClose={() => setCalOpen(false)} />
+    </>
   );
 }

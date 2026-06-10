@@ -53,7 +53,13 @@ export default function DashboardPage() {
       <div className="pt-[112px] min-h-screen bg-[#F9FAFB]">
         <DashNav tabs={tabs} activeTab={activeTab} onTab={setActiveTab} />
 
-        <main className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-8 animate-fade-up" key={activeTab}>
+        <main
+          className={`max-w-[1400px] mx-auto animate-fade-up ${
+            user.role === "etudiant" && activeTab === "Mes Cours"
+              ? "" /* le journal campus est collé à la nav, pas de padding global */
+              : "px-4 sm:px-6 lg:px-8 py-6"
+          }`}
+          key={activeTab}>
           {user.role === "etudiant"   && <StudentView tab={activeTab} />}
           {user.role === "enseignant" && <TeacherView tab={activeTab} />}
           {user.role === "admin"      && <AdminView />}
