@@ -3,12 +3,14 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Search } from "lucide-react";
+import { useDragOffset } from "@/hooks/useDragOffset";
 
 /* Bouton d'action flottant — raccourci vers CAMA Search.
-   Posé en bas à gauche (la droite est occupée par l'assistant IA
-   et le dock discussions). Ctrl+K ouvre aussi le moteur. */
+   Petit, or mat discret, icône centrée au repos, label au survol.
+   Déplaçable sur l'écran (position mémorisée). Ctrl+K ouvre aussi le moteur. */
 export default function SearchFab() {
   const router = useRouter();
+  const { style, bind } = useDragOffset("cama.fab.search");
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -23,26 +25,23 @@ export default function SearchFab() {
 
   return (
     <button
+      {...bind}
+      style={style}
       onClick={() => router.push("/recherche")}
-      title="Ouvrir CAMA Search (Ctrl+K)"
-      className="fixed bottom-5 left-5 z-50 group/fab flex items-center h-14 rounded-full
-                 shadow-lg hover:shadow-xl transition-all duration-300 active:scale-95
-                 pl-[18px] pr-[18px] hover:pr-5 overflow-hidden text-white"
-      style={{ background: "linear-gradient(135deg, #4F46E5 0%, #312E81 100%)" }}
+      title="CAMA Search (Ctrl+K) — glisser pour déplacer"
+      className="fixed bottom-5 left-5 z-50 group/fab flex items-center justify-center h-10 min-w-[40px]
+                 rounded-full bg-[#C9A227]/85 hover:bg-[#B8901F] text-white/95 shadow-md hover:shadow-lg
+                 transition-[background-color,box-shadow,max-width] duration-300 active:scale-95
+                 overflow-hidden px-0 hover:px-3 max-w-[40px] hover:max-w-[200px] touch-none cursor-grab active:cursor-grabbing"
     >
-      {/* halo animé */}
-      <span className="absolute inset-0 rounded-full animate-pulse-ring pointer-events-none" />
-
-      <Search className="w-5 h-5 flex-shrink-0" />
-
-      {/* label qui se déploie au survol */}
-      <span className="max-w-0 opacity-0 group-hover/fab:max-w-[180px] group-hover/fab:opacity-100 group-hover/fab:ml-2.5
-                       overflow-hidden whitespace-nowrap transition-all duration-300 text-sm font-bold">
-        CAMA <span className="text-gold">Search</span>
+      <Search className="w-[17px] h-[17px] flex-shrink-0" />
+      <span className="max-w-0 opacity-0 group-hover/fab:max-w-[130px] group-hover/fab:opacity-100 group-hover/fab:ml-2
+                       overflow-hidden whitespace-nowrap transition-all duration-300 text-xs font-bold">
+        CAMA Search
       </span>
-      <kbd className="max-w-0 opacity-0 group-hover/fab:max-w-[60px] group-hover/fab:opacity-100 group-hover/fab:ml-2
+      <kbd className="max-w-0 opacity-0 group-hover/fab:max-w-[50px] group-hover/fab:opacity-100 group-hover/fab:ml-1.5
                       overflow-hidden whitespace-nowrap transition-all duration-300
-                      text-[9px] font-mono bg-white/15 border border-white/25 px-1.5 py-0.5 rounded">
+                      text-[8px] font-mono bg-white/20 px-1 py-0.5 rounded">
         Ctrl K
       </kbd>
     </button>

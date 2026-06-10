@@ -5,6 +5,7 @@ import { MessagesSquare, X, Send, Users, ChevronLeft, GraduationCap } from "luci
 import { useAuth } from "@/context/AuthContext";
 import { useDB } from "@/hooks/useDB";
 import { uid } from "@/lib/db";
+import { useDragOffset } from "@/hooks/useDragOffset";
 
 type DMsg = { from: "moi" | "prof"; text: string; time: string };
 
@@ -58,6 +59,7 @@ export default function DiscussionsDock() {
   const { user } = useAuth();
   const { db, mutate } = useDB();
   const [open, setOpen] = useState(false);
+  const { style: dragStyle, bind } = useDragOffset("cama.fab.discussions");
   const [tab, setTab] = useState<"profs" | "forum">("profs");
   const [activeTeacher, setActiveTeacher] = useState<string | null>(null);
   const [threads, setThreads] = useState<Record<string, DMsg[]>>(
@@ -107,7 +109,7 @@ export default function DiscussionsDock() {
     <>
       {/* PANNEAU */}
       {open && (
-        <div className="fixed bottom-24 right-[88px] z-50 w-[360px] bg-white border border-border shadow-2xl overflow-hidden animate-scale-in flex flex-col" style={{ height: "500px" }}>
+        <div className="fixed bottom-24 right-[88px] z-50 w-[360px] bg-white border border-border shadow-2xl overflow-hidden animate-scale-in flex flex-col" style={{ height: "500px", ...dragStyle }}>
           {/* Header */}
           <div className="px-4 py-3 flex items-center gap-3 text-white flex-shrink-0"
             style={{ background: "linear-gradient(135deg, #1E1B4B 0%, #4F46E5 100%)" }}>
@@ -260,9 +262,12 @@ export default function DiscussionsDock() {
 
       {/* FAB Discussions — à gauche de l'assistant IA */}
       <button
+        {...bind}
+        style={dragStyle}
         onClick={() => setOpen((v) => !v)}
-        className="fixed bottom-5 right-[88px] z-50 w-14 h-14 rounded-full bg-ink hover:bg-charcoal shadow-lg hover:shadow-xl transition-all duration-200 active:scale-95 flex items-center justify-center"
-        aria-label="Discussions enseignants & forum">
+        className="fixed bottom-5 right-[88px] z-50 w-14 h-14 rounded-full bg-ink hover:bg-charcoal shadow-lg hover:shadow-xl transition-all duration-200 active:scale-95 flex items-center justify-center touch-none cursor-grab active:cursor-grabbing"
+        aria-label="Discussions enseignants & forum"
+        title="Discussions — glisser pour déplacer">
         {open
           ? <X className="w-6 h-6 text-white" />
           : (

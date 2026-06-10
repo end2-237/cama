@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { MessageCircle, X, Send, Bot, Minimize2, ExternalLink } from "lucide-react";
 import Link from "next/link";
+import { useDragOffset } from "@/hooks/useDragOffset";
 
 interface Msg { role: "user" | "bot"; text: string; }
 
@@ -41,6 +42,7 @@ export default function AIAssistant() {
   const [input, setInput] = useState("");
   const [typing, setTyping] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const { style: dragStyle, bind } = useDragOffset("cama.fab.assistant");
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -62,7 +64,7 @@ export default function AIAssistant() {
     <>
       {/* MINI CHAT */}
       {open && (
-        <div className="fixed bottom-24 right-5 z-50 w-[340px] bg-white rounded-3xl shadow-2xl border border-border overflow-hidden animate-scale-in flex flex-col" style={{ maxHeight: "480px" }}>
+        <div className="fixed bottom-24 right-5 z-50 w-[340px] bg-white rounded-3xl shadow-2xl border border-border overflow-hidden animate-scale-in flex flex-col" style={{ maxHeight: "480px", ...dragStyle }}>
           {/* Header */}
           <div className="bg-gradient-to-r from-cama to-indigo-700 px-4 py-3 flex items-center gap-3">
             <div className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center flex-shrink-0">
@@ -150,9 +152,12 @@ export default function AIAssistant() {
 
       {/* FAB */}
       <button
+        {...bind}
+        style={dragStyle}
         onClick={() => setOpen((v) => !v)}
-        className="fixed bottom-5 right-5 z-50 w-14 h-14 rounded-full bg-cama hover:bg-cama-700 shadow-lg hover:shadow-xl transition-all duration-200 active:scale-95 flex items-center justify-center"
-        aria-label="Ouvrir l'assistant CAMA">
+        className="fixed bottom-5 right-5 z-50 w-14 h-14 rounded-full bg-cama hover:bg-cama-700 shadow-lg hover:shadow-xl transition-all duration-200 active:scale-95 flex items-center justify-center touch-none cursor-grab active:cursor-grabbing"
+        aria-label="Ouvrir l'assistant CAMA"
+        title="Assistant CAMA — glisser pour déplacer">
         <div className="absolute inset-0 rounded-full bg-cama animate-ping opacity-30" />
         {open
           ? <X className="w-6 h-6 text-white relative z-10" />

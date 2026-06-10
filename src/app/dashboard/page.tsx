@@ -10,11 +10,8 @@ import TeacherView from "@/components/dashboard/TeacherView";
 import AdminView from "@/components/dashboard/AdminView";
 import JuryView from "@/components/dashboard/JuryView";
 import Footer from "@/components/landing/Footer";
-import AIAssistant from "@/components/AIAssistant";
-import DiscussionsDock from "@/components/DiscussionsDock";
 import WelcomeModal from "@/components/WelcomeModal";
 import OnboardingTour from "@/components/OnboardingTour";
-import SearchFab from "@/components/SearchFab";
 
 const tabsMap: Record<string, string[]> = {
   etudiant:   ["Mes Cours", "Examens", "Résultats"],
@@ -78,9 +75,7 @@ export default function DashboardPage() {
       {/* Global overlays & assistant */}
       <WelcomeModal />
       <OnboardingTour />
-      <AIAssistant />
-      <SearchFab />
-      {user.role === "etudiant" && <DiscussionsDock />}
+      {/* Les boutons flottants (assistant, search, discussions) sont montés globalement via GlobalActions */}
     </>
   );
 }
