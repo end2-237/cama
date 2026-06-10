@@ -99,6 +99,12 @@ export default function DashNav({ activeTab, onTab, tabs }: DashNavProps) {
 
           {/* Icônes */}
           <div className="flex items-center gap-0.5 ml-2">
+            <Link href="/recherche"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-ink border border-border hover:border-cama/40 hover:bg-surface transition-all"
+              title="CAMA Search — moteur de recherche">
+              <Search className="w-4 h-4 text-cama" />
+              <span className="hidden lg:block">CAMA <span className="text-cama">Search</span></span>
+            </Link>
             <button className="flex items-center gap-1 px-2 py-2 text-muted hover:text-ink transition-colors rounded-lg hover:bg-surface">
               <Globe className="w-5 h-5" />
               <span className="text-xs font-semibold hidden lg:block">FR</span>

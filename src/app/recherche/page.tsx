@@ -258,8 +258,9 @@ function SearchEngine() {
             </div>
           </header>
 
-          {/* Résultats */}
-          <main className="max-w-[900px] mx-auto px-4 sm:px-6 py-5">
+          {/* Résultats + sidebar */}
+          <div className="max-w-[1200px] mx-auto grid lg:grid-cols-[1fr_300px] gap-0 items-start">
+          <main className="px-4 sm:px-6 py-5 min-w-0 lg:border-r lg:border-border min-h-[calc(100vh-100px)]">
             <p className="text-[11px] text-subtle mb-4">
               Environ {filtered.length} résultat{filtered.length > 1 ? "s" : ""} ({"<"} 0,01 s) — ressources Institut JFN uniquement
             </p>
@@ -271,7 +272,7 @@ function SearchEngine() {
                 <p className="text-xs text-muted mb-4">Vérifiez l&apos;orthographe ou essayez des termes plus généraux.</p>
                 <div className="flex items-center justify-center gap-2 flex-wrap">
                   {TRENDING.slice(0, 4).map((t) => (
-                    <button key={t} onClick={() => setQ(t)}
+                    <button key={t} type="button" onClick={() => setQ(t)}
                       className="text-[11px] text-cama border border-cama/20 px-3 py-1.5 hover:bg-cama/5 transition-colors">{t}</button>
                   ))}
                 </div>
@@ -280,7 +281,7 @@ function SearchEngine() {
 
             <div className="space-y-6">
               {filtered.map((h, i) => (
-                <div key={i} className="group max-w-2xl">
+                <Link key={i} href={h.href} className="block group max-w-2xl cursor-pointer">
                   {/* fil d'ariane façon Google */}
                   <div className="flex items-center gap-2 mb-0.5">
                     <div className="w-6 h-6 bg-surface border border-border flex items-center justify-center flex-shrink-0">
@@ -293,16 +294,14 @@ function SearchEngine() {
                     <span className={`ml-auto text-[8px] font-black px-1.5 py-0.5 flex-shrink-0 ${CAT_META[h.cat].color}`}>{h.cat}</span>
                   </div>
                   {/* titre bleu cliquable */}
-                  <Link href={h.href} className="block">
-                    <h3 className="text-lg text-cama group-hover:underline leading-snug font-medium">
-                      {highlight(h.title)}
-                    </h3>
-                  </Link>
+                  <h3 className="text-lg text-cama group-hover:underline leading-snug font-medium">
+                    {highlight(h.title)}
+                  </h3>
                   {/* snippet */}
                   <p className="text-sm text-muted leading-relaxed mt-0.5 line-clamp-2">
                     {highlight(h.snippet)}
                   </p>
-                </div>
+                </Link>
               ))}
             </div>
 
@@ -311,12 +310,97 @@ function SearchEngine() {
                 <p className="text-[10px] text-subtle flex items-center gap-1.5">
                   <CornerDownLeft className="w-3 h-3" /> Cliquez sur un résultat pour y accéder directement
                 </p>
-                <button onClick={() => router.push("/dashboard")} className="text-[11px] font-bold text-cama hover:underline">
+                <button type="button" onClick={() => router.push("/dashboard")} className="text-[11px] font-bold text-cama hover:underline">
                   Retour au dashboard →
                 </button>
               </div>
             )}
           </main>
+
+          {/* ══ SIDEBAR RÉSULTATS ══ */}
+          <aside className="hidden lg:block lg:sticky lg:top-[100px] lg:max-h-[calc(100vh-100px)] lg:overflow-y-auto divide-y divide-border">
+
+            {/* Panneau de connaissance — meilleur résultat */}
+            {filtered.length > 0 && (
+              <div className="px-4 py-4 bg-white">
+                <p className="text-[9px] font-black text-subtle uppercase tracking-widest mb-2">Meilleur résultat</p>
+                <div className="flex items-start gap-2.5 mb-2">
+                  <div className="w-9 h-9 bg-cama flex items-center justify-center flex-shrink-0">
+                    {(() => { const I = filtered[0].icon; return <I className="w-4 h-4 text-white" />; })()}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs font-bold text-ink leading-snug">{filtered[0].title}</p>
+                    <p className="text-[9px] text-subtle mt-0.5">{filtered[0].meta}</p>
+                  </div>
+                </div>
+                <p className="text-[11px] text-muted leading-relaxed line-clamp-3 mb-2">{filtered[0].snippet}</p>
+                <Link href={filtered[0].href}
+                  className="block w-full text-center py-1.5 text-[11px] font-bold bg-cama text-white hover:bg-cama-700 transition-colors">
+                  Accéder directement →
+                </Link>
+              </div>
+            )}
+
+            {/* Répartition par catégorie */}
+            {hits.length > 0 && (
+              <div className="px-4 py-3 bg-white">
+                <p className="text-[9px] font-black text-subtle uppercase tracking-widest mb-2">Répartition</p>
+                <div className="space-y-1">
+                  {Object.entries(counts).map(([c, n]) => (
+                    <button key={c} type="button" onClick={() => setCat(c as Hit["cat"])}
+                      className={`w-full flex items-center justify-between px-2 py-1.5 text-[11px] transition-colors ${
+                        cat === c ? "bg-cama text-white font-bold" : "hover:bg-surface text-muted"
+                      }`}>
+                      <span>{c}</span>
+                      <span className={`font-bold ${cat === c ? "text-gold" : "text-ink"}`}>{n}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Recherches associées */}
+            <div className="px-4 py-3 bg-white">
+              <p className="text-[9px] font-black text-subtle uppercase tracking-widest mb-2 flex items-center gap-1">
+                <TrendingUp className="w-3 h-3" /> Recherches associées
+              </p>
+              <div className="space-y-0.5">
+                {TRENDING.filter((t) => t.toLowerCase() !== q.trim().toLowerCase()).slice(0, 5).map((t) => (
+                  <button key={t} type="button" onClick={() => setQ(t)}
+                    className="w-full flex items-center gap-2 px-2 py-1.5 text-[11px] text-muted hover:text-cama hover:bg-cama-50/40 transition-colors text-left">
+                    <Search className="w-3 h-3 flex-shrink-0" /> {t}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Accès directs */}
+            <div className="px-4 py-3 bg-white">
+              <p className="text-[9px] font-black text-subtle uppercase tracking-widest mb-2">Accès directs</p>
+              <div className="space-y-0.5">
+                {[
+                  { icon: Terminal,     label: "TP & VMs",       href: "/tp" },
+                  { icon: CalendarDays, label: "Calendrier",     href: "/calendrier" },
+                  { icon: HelpCircle,   label: "Guide CAMA",     href: "/guide" },
+                  { icon: User,         label: "Mon profil",     href: "/profil" },
+                ].map((l) => (
+                  <Link key={l.label} href={l.href}
+                    className="flex items-center gap-2 px-2 py-1.5 text-[11px] text-muted hover:text-cama hover:bg-cama-50/40 transition-colors">
+                    <l.icon className="w-3 h-3 flex-shrink-0" /> {l.label}
+                  </Link>
+                ))}
+              </div>
+            </div>
+
+            {/* Note légère */}
+            <div className="px-4 py-3" style={{ background: "linear-gradient(135deg, #1E1B4B, #312E81)" }}>
+              <p className="text-[10px] text-white/80 leading-relaxed">
+                <span className="font-bold text-gold">CAMA Search</span> indexe uniquement les ressources
+                officielles de l&apos;Institut JFN — aucune donnée externe, 0 Mo de data consommée.
+              </p>
+            </div>
+          </aside>
+          </div>
         </>
       )}
     </div>

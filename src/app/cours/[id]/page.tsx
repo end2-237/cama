@@ -96,6 +96,12 @@ export default function CoursePlayer() {
           <p className="text-xs text-subtle min-w-0 truncate flex-1">
             Mes Cours <span className="mx-1">/</span> <span className="text-ink font-semibold">{course.title}</span>
           </p>
+          <Link href="/recherche"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-ink border border-border hover:border-cama/40 hover:bg-surface transition-all flex-shrink-0"
+            title="CAMA Search — moteur de recherche global">
+            <Search className="w-3.5 h-3.5 text-cama" />
+            <span className="hidden md:block">CAMA <span className="text-cama">Search</span></span>
+          </Link>
           <div className="hidden sm:flex items-center gap-2">
             <div className="w-28 h-1 bg-border overflow-hidden">
               <div className="h-full bg-gradient-to-r from-cama to-gold transition-all duration-500" style={{ width: `${pct}%` }} />
