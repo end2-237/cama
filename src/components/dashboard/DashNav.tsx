@@ -74,8 +74,6 @@ export default function DashNav({ activeTab, onTab, tabs }: DashNavProps) {
             <kbd className="hidden lg:block text-[9px] font-mono text-subtle bg-white border border-border px-1.5 py-0.5 rounded">⏎</kbd>
           </button>
 
-          <div className="flex-1" />
-
           {/* Tabs */}
           <nav className="hidden md:flex items-center h-16">
             {tabs.map((t) => (
@@ -176,7 +174,6 @@ export default function DashNav({ activeTab, onTab, tabs }: DashNavProps) {
                 </div>
               )}
             </div>
-          </div>
 
           {/* Profil — style NetAcad : icône + nom + rôle */}
           <div className="relative">
@@ -242,6 +239,7 @@ export default function DashNav({ activeTab, onTab, tabs }: DashNavProps) {
               </div>
             )}
           </div>
+          </div>{/* end Groupe 2 */}
 
         </div>
       </div>
