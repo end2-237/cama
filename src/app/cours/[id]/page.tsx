@@ -8,6 +8,9 @@ import {
   Lock, Download, ChevronDown, ChevronRight, Play, Pause, Volume2,
   Headphones, AlignLeft, Send, Sparkles, CheckCircle2, MessageSquare,
   Wifi, X, User, Phone, AudioLines, Mic, MicOff, PhoneOff,
+  BookMarked, Clock, Star, TrendingUp, Bell, Share2,
+  Bookmark, Award, Zap, BarChart2, Target, Users,
+  Pencil, ThumbsUp, RotateCcw, ExternalLink, Hash, StickyNote,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useDB } from "@/hooks/useDB";
@@ -168,8 +171,40 @@ export default function CoursePlayer() {
 
         {/* ── Sidebar chapitres ── */}
         <aside className="bg-white border-r border-border lg:sticky lg:top-12 lg:max-h-[calc(100vh-48px)] lg:overflow-y-auto">
-          <div className="px-4 py-2.5 border-b-2 border-ink">
+
+          {/* Carte cours */}
+          <div className="px-4 py-3 border-b border-border"
+            style={{ background: "linear-gradient(135deg, #1E1B4B 0%, #4F46E5 100%)" }}>
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-[9px] font-black text-gold uppercase tracking-widest bg-white/10 px-1.5 py-0.5">{ue?.code}</span>
+              <span className="text-[9px] text-white/50">{ue?.ects} ECTS</span>
+            </div>
+            <p className="text-xs font-bold text-white leading-snug line-clamp-2 mb-2">{course.title}</p>
+            {/* Mini barre progression */}
+            <div className="flex items-center gap-2">
+              <div className="flex-1 h-1 bg-white/20">
+                <div className="h-full bg-gold transition-all duration-500" style={{ width: `${pct}%` }} />
+              </div>
+              <span className="text-[9px] font-bold text-gold">{pct}%</span>
+            </div>
+            <p className="text-[9px] text-white/40 mt-1">{doneCount}/{chapters.length} chapitres · {ue?.semestre}</p>
+          </div>
+
+          {/* Prochain live */}
+          {db.lives.some((l) => l.courseId === course.id && l.status === "planifie") && (
+            <div className="px-4 py-2 border-b border-border bg-red-50/50 flex items-center gap-2">
+              <Radio className="w-3.5 h-3.5 text-red-500 flex-shrink-0" />
+              <div className="min-w-0 flex-1">
+                <p className="text-[9px] font-bold text-red-600">Prochain live</p>
+                <p className="text-[10px] text-ink truncate">{db.lives.find((l) => l.courseId === course.id && l.status === "planifie")?.title}</p>
+              </div>
+              <Bell className="w-3 h-3 text-red-400 flex-shrink-0" />
+            </div>
+          )}
+
+          <div className="px-4 py-2.5 border-b-2 border-ink flex items-center justify-between">
             <p className="text-[10px] font-black text-ink uppercase tracking-widest">Chapitres</p>
+            <span className="text-[9px] text-subtle">{doneCount}/{chapters.length}</span>
           </div>
           <div className="divide-y divide-border">
             {chapters.map((c, i) => {
@@ -189,7 +224,7 @@ export default function CoursePlayer() {
                   }`}>
                     {done ? <Check className="w-3.5 h-3.5" /> : open ? c.order : <Lock className="w-3 h-3" />}
                   </div>
-                  <div className="min-w-0">
+                  <div className="min-w-0 flex-1">
                     <p className={`text-sm leading-snug ${i === chapIdx ? "font-bold text-cama" : "font-medium text-ink"}`}>{c.title}</p>
                     <div className="flex gap-1.5 mt-1">
                       {c.pdf   && <FileText className="w-3 h-3 text-subtle" />}
@@ -198,10 +233,50 @@ export default function CoursePlayer() {
                       {c.liveId && <Radio className="w-3 h-3 text-red-400" />}
                     </div>
                   </div>
+                  {done && <Star className="w-3 h-3 text-gold flex-shrink-0" />}
                 </button>
               );
             })}
           </div>
+
+          {/* Stats rapides */}
+          <div className="px-4 py-3 border-t border-border grid grid-cols-2 gap-px bg-border">
+            {[
+              { icon: Clock,     label: "Temps estimé", value: `${chapters.length * 25} min` },
+              { icon: Award,     label: "Crédits ECTS",  value: `${ue?.ects || 0} pts` },
+              { icon: Target,    label: "Objectif",      value: doneCount >= chapters.length ? "Atteint ✓" : "En cours" },
+              { icon: BarChart2, label: "Difficulté",    value: "Interméd." },
+            ].map((s) => (
+              <div key={s.label} className="bg-white p-2 text-center">
+                <s.icon className="w-3 h-3 text-cama mx-auto mb-0.5" />
+                <p className="text-[10px] font-bold text-ink leading-none">{s.value}</p>
+                <p className="text-[9px] text-subtle mt-0.5">{s.label}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Ressources du cours */}
+          <div className="border-t border-border px-4 py-3">
+            <p className="text-[9px] font-black text-subtle uppercase tracking-widest mb-2 flex items-center gap-1">
+              <BookMarked className="w-3 h-3" /> Ressources
+            </p>
+            <div className="space-y-0.5">
+              {[
+                { icon: FileText,  label: "Syllabus complet",    sub: "PDF · 0.2 Mo" },
+                { icon: Download,  label: "Supports chapitres",  sub: "ZIP · tous les PDF" },
+                { icon: ExternalLink, label: "Bibliographie UE", sub: "Liens externes" },
+              ].map((r) => (
+                <button key={r.label} className="w-full flex items-center gap-2 px-1 py-1.5 hover:bg-surface transition-colors group text-left">
+                  <r.icon className="w-3.5 h-3.5 text-subtle flex-shrink-0 group-hover:text-cama" />
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-semibold text-ink group-hover:text-cama transition-colors truncate">{r.label}</p>
+                    <p className="text-[9px] text-subtle">{r.sub}</p>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+
           {/* Forum UE */}
           <ForumPanel ueId={course.ueId} />
         </aside>
@@ -209,8 +284,22 @@ export default function CoursePlayer() {
         {/* ── Contenu central ── */}
         <div className="min-w-0">
           <div className="bg-white border-r border-border p-6 animate-fade-up" key={`${chapter?.id}-${activeMode}`}>
-            <p className="text-[10px] font-black text-cama uppercase tracking-widest mb-1">Chapitre {chapter?.order}</p>
-            <h2 className="text-2xl font-light text-ink mb-6">{chapter?.title}</h2>
+            {/* En-tête chapitre enrichi */}
+            <div className="flex items-start justify-between gap-4 mb-6">
+              <div className="flex-1 min-w-0">
+                <p className="text-[10px] font-black text-cama uppercase tracking-widest mb-1">Chapitre {chapter?.order}</p>
+                <h2 className="text-2xl font-light text-ink leading-tight">{chapter?.title}</h2>
+                <div className="flex items-center gap-3 mt-2 flex-wrap">
+                  <span className="flex items-center gap-1 text-[10px] text-subtle"><Clock className="w-3 h-3" /> ~25 min</span>
+                  <span className="flex items-center gap-1 text-[10px] text-subtle"><Users className="w-3 h-3" />142 étudiants</span>
+                  <span className="flex items-center gap-1 text-[10px] text-gold-dark"><Star className="w-3 h-3 fill-current" /> 4.7/5</span>
+                </div>
+              </div>
+              <div className="flex items-center gap-1 flex-shrink-0">
+                <button title="Mettre en favori" className="p-1.5 text-subtle hover:text-gold transition-colors"><Bookmark className="w-4 h-4" /></button>
+                <button title="Partager" className="p-1.5 text-subtle hover:text-cama transition-colors"><Share2 className="w-4 h-4" /></button>
+              </div>
+            </div>
 
             {activeMode === "pdf"   && chapter?.pdf   && <PdfMode pdf={chapter.pdf} />}
             {activeMode === "video" && chapter?.video && <VideoMode video={chapter.video} />}
@@ -218,8 +307,28 @@ export default function CoursePlayer() {
             {activeMode === "live"  && chapter?.liveId && <LiveMode liveId={chapter.liveId} />}
             {activeMode === "ia"    && <ProfIA chapter={chapter} courseTitle={course.title} />}
 
+            {/* Objectifs du chapitre */}
+            <div className="mt-8 pt-5 border-t border-border">
+              <p className="text-[9px] font-black text-subtle uppercase tracking-widest mb-2 flex items-center gap-1">
+                <Target className="w-3 h-3 text-cama" /> Objectifs pédagogiques
+              </p>
+              <div className="grid sm:grid-cols-2 gap-1.5">
+                {[
+                  "Comprendre les concepts fondamentaux du chapitre",
+                  "Appliquer les méthodes sur des cas pratiques",
+                  "Analyser et comparer différentes approches",
+                  "Synthétiser les points-clés pour l'examen",
+                ].map((obj, i) => (
+                  <div key={i} className="flex items-start gap-2 text-[11px] text-muted">
+                    <Zap className="w-3 h-3 text-cama flex-shrink-0 mt-0.5" />
+                    {obj}
+                  </div>
+                ))}
+              </div>
+            </div>
+
             {/* Checkpoint */}
-            <div className="mt-8 pt-5 border-t border-border flex items-center justify-between flex-wrap gap-3">
+            <div className="mt-5 pt-5 border-t border-border flex items-center justify-between flex-wrap gap-3">
               {doneIds.has(chapter?.id) ? (
                 <p className="flex items-center gap-2 text-green-600 font-bold text-sm">
                   <CheckCircle2 className="w-5 h-5" /> Chapitre validé
@@ -241,10 +350,90 @@ export default function CoursePlayer() {
               )}
             </div>
           </div>
+
+          {/* Zone de notes personnelles */}
+          <ChapterNotes chapId={chapter?.id || ""} />
+
+          {/* Chapitres voisins */}
+          <div className="bg-white border-r border-border border-t border-border px-6 py-4">
+            <p className="text-[9px] font-black text-subtle uppercase tracking-widest mb-3 flex items-center gap-1">
+              <Hash className="w-3 h-3" /> Navigation dans le cours
+            </p>
+            <div className="grid grid-cols-2 gap-px bg-border">
+              <button disabled={chapIdx === 0} onClick={() => setChapIdx(chapIdx - 1)}
+                className="bg-white p-3 flex items-center gap-2 hover:bg-surface transition-colors disabled:opacity-40 disabled:cursor-not-allowed text-left">
+                <ArrowLeft className="w-3.5 h-3.5 text-muted flex-shrink-0" />
+                <div className="min-w-0">
+                  <p className="text-[9px] text-subtle">Précédent</p>
+                  <p className="text-[11px] font-bold text-ink truncate">{chapIdx > 0 ? chapters[chapIdx - 1]?.title : "—"}</p>
+                </div>
+              </button>
+              <button disabled={chapIdx >= chapters.length - 1} onClick={() => setChapIdx(chapIdx + 1)}
+                className="bg-white p-3 flex items-center justify-end gap-2 hover:bg-surface transition-colors disabled:opacity-40 disabled:cursor-not-allowed text-right">
+                <div className="min-w-0">
+                  <p className="text-[9px] text-subtle">Suivant</p>
+                  <p className="text-[11px] font-bold text-ink truncate">{chapIdx < chapters.length - 1 ? chapters[chapIdx + 1]?.title : "—"}</p>
+                </div>
+                <ChevronRight className="w-3.5 h-3.5 text-muted flex-shrink-0" />
+              </button>
+            </div>
+          </div>
         </div>
 
-        {/* ── Sidebar droite : Chat Prof ── */}
-        <ProfChat courseTitle={course.title} />
+        {/* ── Sidebar droite ── */}
+        <div className="flex flex-col lg:sticky lg:top-12" style={{ height: "calc(100vh - 48px)" }}>
+
+          {/* Mémo & évaluation du chapitre */}
+          <div className="bg-white border-b border-border px-4 py-3 flex-shrink-0">
+            <p className="text-[9px] font-black text-subtle uppercase tracking-widest mb-2 flex items-center gap-1">
+              <TrendingUp className="w-3 h-3 text-cama" /> Ma progression
+            </p>
+            <div className="flex items-center gap-3 mb-2">
+              <div className="flex-1 h-1.5 bg-surface overflow-hidden">
+                <div className="h-full bg-gradient-to-r from-cama to-gold transition-all duration-700" style={{ width: `${pct}%` }} />
+              </div>
+              <span className="text-xs font-bold text-cama flex-shrink-0">{pct}%</span>
+            </div>
+            <div className="flex gap-1 flex-wrap">
+              {chapters.map((c, i) => (
+                <button key={c.id} onClick={() => setChapIdx(i)} title={c.title}
+                  className={`w-5 h-2 transition-colors ${
+                    doneIds.has(c.id) ? "bg-green-500" : i === chapIdx ? "bg-cama" : "bg-border hover:bg-cama/40"
+                  }`} />
+              ))}
+            </div>
+            <p className="text-[9px] text-subtle mt-1.5">{doneCount}/{chapters.length} · {chapters.length - doneCount} restants</p>
+          </div>
+
+          {/* Évaluer ce chapitre */}
+          <div className="bg-white border-b border-border px-4 py-3 flex-shrink-0">
+            <p className="text-[9px] font-black text-subtle uppercase tracking-widest mb-2 flex items-center gap-1">
+              <Star className="w-3 h-3 text-gold-dark" /> Évaluer ce chapitre
+            </p>
+            <div className="flex items-center gap-2 mb-2">
+              {[1,2,3,4,5].map((s) => (
+                <button key={s} className="text-border hover:text-gold transition-colors">
+                  <Star className="w-5 h-5" />
+                </button>
+              ))}
+            </div>
+            <div className="flex gap-1.5">
+              {[
+                { icon: ThumbsUp, label: "Clair" },
+                { icon: Zap,      label: "Utile" },
+                { icon: RotateCcw, label: "À revoir" },
+              ].map((b) => (
+                <button key={b.label}
+                  className="flex items-center gap-1 px-2 py-1 text-[9px] font-bold border border-border hover:border-cama/40 hover:text-cama transition-colors text-muted">
+                  <b.icon className="w-3 h-3" />{b.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Chat prof — prend le reste */}
+          <ProfChat courseTitle={course.title} />
+        </div>
       </div>
     </div>
   );
@@ -288,7 +477,7 @@ function ProfChat({ courseTitle }: { courseTitle: string }) {
   }
 
   return (
-    <aside className="bg-white overflow-hidden lg:sticky lg:top-12 flex flex-col" style={{ height: "calc(100vh - 48px)" }}>
+    <aside className="bg-white overflow-hidden flex flex-col flex-1 min-h-0">
       {/* Header */}
       <div className="px-4 py-3 border-b border-border bg-gradient-to-r from-cama/5 to-indigo-50 flex items-center gap-3">
         <div className="relative flex-shrink-0">
@@ -742,6 +931,42 @@ function ProfIA({ chapter, courseTitle }: { chapter: DBChapter; courseTitle: str
             <Send className="w-4 h-4" />
           </button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+/* ════ NOTES PERSONNELLES ════ */
+function ChapterNotes({ chapId }: { chapId: string }) {
+  const key = `notes-chap-${chapId}`;
+  const [note, setNote] = useState(() => (typeof window !== "undefined" ? localStorage.getItem(key) || "" : ""));
+  const [saved, setSaved] = useState(false);
+  const save = () => {
+    localStorage.setItem(key, note);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 1500);
+  };
+  return (
+    <div className="bg-white border-r border-border border-t border-border px-6 py-4">
+      <p className="text-[9px] font-black text-subtle uppercase tracking-widest mb-2 flex items-center gap-1">
+        <StickyNote className="w-3 h-3 text-gold-dark" /> Mes notes — chapitre
+        <span className="ml-auto text-[8px] text-subtle font-normal normal-case">sauvegardé localement</span>
+      </p>
+      <textarea
+        value={note}
+        onChange={(e) => setNote(e.target.value)}
+        placeholder="Écrivez vos notes, questions, idées pour ce chapitre…"
+        rows={4}
+        className="w-full text-xs text-ink placeholder-subtle bg-surface border border-border p-2.5 outline-none focus:border-cama transition-colors resize-none leading-relaxed"
+      />
+      <div className="flex items-center justify-between mt-1.5">
+        <p className="text-[9px] text-subtle">{note.length} caractères</p>
+        <button onClick={save}
+          className={`flex items-center gap-1 text-[10px] font-bold px-3 py-1 transition-colors ${
+            saved ? "bg-green-50 text-green-600" : "bg-cama text-white hover:bg-cama-700"
+          }`}>
+          {saved ? <><Check className="w-3 h-3" /> Sauvegardé</> : <><Pencil className="w-3 h-3" /> Sauvegarder</>}
+        </button>
       </div>
     </div>
   );
