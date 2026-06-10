@@ -149,7 +149,7 @@ function MediaBlock({ media }: { media: Media }) {
 
 function NewsFeed() {
   return (
-    <aside className="bg-white border-r border-border min-h-full">
+    <aside className="bg-white border-r border-border lg:sticky lg:top-[112px] lg:h-[calc(100vh-112px)] lg:overflow-y-auto">
       {/* Cartouche journal */}
       <div className="px-4 py-3 border-b-2 border-ink flex items-baseline justify-between">
         <div>
