@@ -55,8 +55,8 @@ export default function DashboardPage() {
 
         <main
           className={`max-w-[1400px] mx-auto animate-fade-up ${
-            user.role === "etudiant" && activeTab === "Mes Cours"
-              ? "" /* le journal campus est collé à la nav, pas de padding global */
+            user.role === "etudiant"
+              ? "" /* layout 3 colonnes : le journal campus est collé à la nav */
               : "px-4 sm:px-6 lg:px-8 py-6"
           }`}
           key={activeTab}>

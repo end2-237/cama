@@ -54,7 +54,7 @@ const JOURNAL: Article[] = [
     title: "JFN parmi les 10 meilleures universités tech d'Afrique centrale",
     subtitle: "Le classement QS Africa 2025 distingue l'institut pour l'informatique et l'ingénierie.",
     body: "L'Institut JFN se hisse à la 7e place du classement régional, porté par son taux d'insertion professionnelle de 84 % et le déploiement de la plateforme CAMA. Le jury salue « une approche pédagogique pensée pour les réalités d'infrastructure du continent ».",
-    media: { kind: "image", src: "https://images.unsplash.com/photo-1523050854058-8df90110c9f1?w=640&q=70", legend: "Le campus de Yaoundé lors de la rentrée 2025. © Presse JFN" },
+    media: { kind: "image", src: "https://jfn-univ.com/wp-content/uploads/2024/08/jfn-2.jpg", legend: "Le campus de Yaoundé lors de la rentrée 2025. © Presse JFN" },
     author: "Rédaction JFN",
     time: "Il y a 1 jour",
     refs: [
@@ -471,50 +471,109 @@ function ExamsTab() {
   if (!db || !user) return null;
 
   return (
-    <div className="max-w-3xl">
-      <div className="flex items-center gap-3 mb-6">
-        <ShieldCheck className="w-7 h-7 text-ink" strokeWidth={1.5} />
-        <h1 className="text-3xl font-light text-ink">Mes Examens</h1>
-      </div>
-      <div className="space-y-3">
-        {db.exams.map((e) => {
-          const ue = db.ues.find((u) => u.id === e.ueId);
-          const attempt = db.attempts.find((a) => a.examId === e.id && a.studentId === user.id);
-          return (
-            <div key={e.id} className="bg-white rounded-2xl border border-border p-5 flex items-center gap-4 flex-wrap">
-              <div className={`w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 ${
-                e.status === "ouvert" ? "bg-cama-50" : "bg-surface"}`}>
-                <ShieldCheck className={`w-5 h-5 ${e.status === "ouvert" ? "text-cama" : "text-subtle"}`} />
-              </div>
-              <div className="flex-1 min-w-[200px]">
-                <p className="text-[10px] text-subtle">{ue?.code} · {e.durationMin} min · {e.questions.length} questions</p>
-                <p className="font-bold text-ink text-sm">{e.title}</p>
-                <p className="text-[10px] text-muted flex items-center gap-1 mt-0.5">
-                  <Calendar className="w-3 h-3" />
-                  {new Date(e.date).toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" })}
-                </p>
-              </div>
-              {attempt ? (
-                <div className="text-right">
-                  <span className="badge bg-green-50 text-green-600 text-[10px]">
-                    {attempt.status === "corrige" ? `Corrigé · ${attempt.score}/20` : `Soumis${attempt.score !== undefined ? ` · QCM ${attempt.score}/20` : ""}`}
-                  </span>
-                  {attempt.alerts.length > 0 && (
-                    <p className="text-[10px] text-gold-dark flex items-center gap-1 mt-1 justify-end">
-                      <AlertCircle className="w-3 h-3" /> {attempt.alerts.length} signalement(s)
-                    </p>
-                  )}
+    <div className="grid grid-cols-1 lg:grid-cols-[290px_1fr_250px] items-start">
+
+      {/* ── COL GAUCHE : Journal campus ── */}
+      <NewsFeed />
+
+      {/* ── COL CENTRE : Examens ── */}
+      <div className="px-4 py-3 border-r border-border min-h-full">
+        <div className="flex items-center gap-2 mb-3 pb-2 border-b border-border">
+          <ShieldCheck className="w-5 h-5 text-ink" strokeWidth={1.5} />
+          <h1 className="text-xl font-light text-ink">Mes Examens</h1>
+        </div>
+
+        <div className="border border-border divide-y divide-border bg-white">
+          {db.exams.map((e) => {
+            const ue = db.ues.find((u) => u.id === e.ueId);
+            const attempt = db.attempts.find((a) => a.examId === e.id && a.studentId === user.id);
+            return (
+              <div key={e.id} className="p-3 flex items-center gap-3 flex-wrap hover:bg-cama-50/30 transition-colors">
+                <div className={`w-10 h-10 flex items-center justify-center flex-shrink-0 ${
+                  e.status === "ouvert" ? "bg-cama-50" : "bg-surface"}`}>
+                  <ShieldCheck className={`w-4 h-4 ${e.status === "ouvert" ? "text-cama" : "text-subtle"}`} />
                 </div>
-              ) : e.status === "ouvert" ? (
-                <Link href={`/examen/${e.id}`} className="btn-primary py-2 px-5 text-xs gap-1.5">
-                  <ShieldCheck className="w-3.5 h-3.5" /> Passer l&apos;examen
-                </Link>
-              ) : (
-                <span className="badge bg-surface text-muted text-[10px]">{e.status === "planifie" ? "Planifié" : "Terminé"}</span>
-              )}
-            </div>
-          );
-        })}
+                <div className="flex-1 min-w-[180px]">
+                  <p className="text-[10px] text-subtle">{ue?.code} · {e.durationMin} min · {e.questions.length} questions</p>
+                  <p className="font-bold text-ink text-sm">{e.title}</p>
+                  <p className="text-[10px] text-muted flex items-center gap-1 mt-0.5">
+                    <Calendar className="w-3 h-3" />
+                    {new Date(e.date).toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" })}
+                  </p>
+                </div>
+                {attempt ? (
+                  <div className="text-right">
+                    <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 bg-green-50 text-green-600">
+                      {attempt.status === "corrige" ? `Corrigé · ${attempt.score}/20` : `Soumis${attempt.score !== undefined ? ` · QCM ${attempt.score}/20` : ""}`}
+                    </span>
+                    {attempt.alerts.length > 0 && (
+                      <p className="text-[10px] text-gold-dark flex items-center gap-1 mt-1 justify-end">
+                        <AlertCircle className="w-3 h-3" /> {attempt.alerts.length} signalement(s)
+                      </p>
+                    )}
+                  </div>
+                ) : e.status === "ouvert" ? (
+                  <Link href={`/examen/${e.id}`}
+                    className="inline-flex items-center gap-1.5 text-xs font-bold text-white bg-cama px-4 py-2 hover:bg-cama-700 transition-colors">
+                    <ShieldCheck className="w-3.5 h-3.5" /> Passer l&apos;examen
+                  </Link>
+                ) : (
+                  <span className="text-[10px] font-bold px-2 py-0.5 bg-surface text-muted">{e.status === "planifie" ? "Planifié" : "Terminé"}</span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ── COL DROITE : Consignes Safe-CAMA + prochaines sessions ── */}
+      <div className="bg-white min-h-full">
+        <div className="px-4 py-3 border-b border-border">
+          <h2 className="text-[10px] font-black text-ink uppercase tracking-widest mb-2">Consignes Safe-CAMA</h2>
+          <div className="space-y-2">
+            {[
+              "Plein écran obligatoire pendant toute l'épreuve",
+              "Copier-coller et clic droit désactivés",
+              "Tout changement d'onglet est signalé au jury",
+              "Sauvegarde automatique toutes les 15 secondes",
+              "Aucune image ne quitte votre appareil",
+            ].map((r, i) => (
+              <div key={i} className="flex gap-2 items-start">
+                <CheckCircle2 className="w-3.5 h-3.5 text-green-500 flex-shrink-0 mt-0.5" />
+                <p className="text-xs text-ink leading-snug">{r}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="px-4 py-3 border-b border-border">
+          <h2 className="text-[10px] font-black text-ink uppercase tracking-widest mb-2">Prochaines sessions</h2>
+          <div className="space-y-2">
+            {[
+              { date: "15 juin", label: "Examen INF201 — Safe-CAMA", color: "bg-cama" },
+              { date: "8 — 20 juin", label: "Session semestrielle S2", color: "bg-red-400" },
+              { date: "6 — 11 juil.", label: "Session de rattrapage", color: "bg-amber-400" },
+            ].map((a, i) => (
+              <div key={i} className="flex items-center gap-2.5">
+                <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${a.color}`} />
+                <div>
+                  <p className="text-[10px] font-bold text-cama leading-none">{a.date}</p>
+                  <p className="text-xs text-ink">{a.label}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+          <Link href="/calendrier" className="block text-[10px] font-bold text-cama hover:underline mt-2">
+            Calendrier académique →
+          </Link>
+        </div>
+
+        <div className="p-4 text-white"
+          style={{ background: "linear-gradient(135deg, #1E1B4B 0%, #4F46E5 100%)" }}>
+          <ShieldCheck className="w-5 h-5 text-gold mb-1.5" />
+          <p className="font-bold text-sm leading-snug mb-1">Human-in-the-loop</p>
+          <p className="text-white/60 text-xs leading-relaxed">L&apos;IA signale, le jury décide. Aucune sanction automatique — vous disposez toujours d&apos;un droit d&apos;appel.</p>
+        </div>
       </div>
     </div>
   );
@@ -530,64 +589,123 @@ function ResultsTab() {
   const totalCredits = validated.reduce((a, r) => a + r.credits, 0);
 
   return (
-    <div className="max-w-3xl">
-      <div className="flex items-center gap-3 mb-6">
-        <Award className="w-7 h-7 text-ink" strokeWidth={1.5} />
-        <h1 className="text-3xl font-light text-ink">Mes Résultats</h1>
+    <div className="grid grid-cols-1 lg:grid-cols-[290px_1fr_250px] items-start">
+
+      {/* ── COL GAUCHE : Journal campus ── */}
+      <NewsFeed />
+
+      {/* ── COL CENTRE : Résultats ── */}
+      <div className="px-4 py-3 border-r border-border min-h-full">
+        <div className="flex items-center gap-2 mb-3 pb-2 border-b border-border">
+          <Award className="w-5 h-5 text-ink" strokeWidth={1.5} />
+          <h1 className="text-xl font-light text-ink">Mes Résultats</h1>
+        </div>
+
+        <div className="border border-border bg-white mb-2">
+          <table className="w-full">
+            <thead><tr className="bg-surface border-b border-border">
+              <th className="text-left text-[10px] font-bold text-muted uppercase tracking-widest px-3 py-2">UE</th>
+              <th className="text-left text-[10px] font-bold text-muted uppercase tracking-widest px-3 py-2">Note</th>
+              <th className="text-left text-[10px] font-bold text-muted uppercase tracking-widest px-3 py-2">Crédits</th>
+              <th className="text-left text-[10px] font-bold text-muted uppercase tracking-widest px-3 py-2">Jury</th>
+            </tr></thead>
+            <tbody>
+              {results.map((r) => {
+                const ue = db.ues.find((u) => u.id === r.ueId);
+                return (
+                  <tr key={r.id} className="border-b border-border last:border-0 hover:bg-cama-50/30 transition-colors">
+                    <td className="px-3 py-2.5">
+                      <p className="text-sm font-semibold text-ink">{ue?.title}</p>
+                      <p className="text-[10px] text-subtle">{ue?.code}</p>
+                    </td>
+                    <td className="px-3 py-2.5">
+                      <span className={`font-bold ${r.note >= 10 ? "text-green-600" : "text-red-500"}`}>{r.note}/20</span>
+                    </td>
+                    <td className="px-3 py-2.5 text-sm text-ink">{r.note >= 10 ? r.credits : 0} ECTS</td>
+                    <td className="px-3 py-2.5">
+                      {r.validatedByJury
+                        ? <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 bg-green-50 text-green-600"><CheckCircle2 className="w-3 h-3" /> Validé</span>
+                        : <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 bg-gold/10 text-gold-dark"><Clock className="w-3 h-3" /> En délibération</span>}
+                    </td>
+                  </tr>
+                );
+              })}
+              {results.length === 0 && (
+                <tr><td colSpan={4} className="px-3 py-6 text-center text-sm text-muted">Aucun résultat publié pour le moment.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="p-4 text-white flex items-center gap-4 flex-wrap"
+          style={{ background: "linear-gradient(135deg, #1E1B4B 0%, #4F46E5 100%)" }}>
+          <div className="w-11 h-11 bg-white/10 flex items-center justify-center flex-shrink-0">
+            <GraduationCap className="w-6 h-6 text-gold" />
+          </div>
+          <div className="flex-1 min-w-[180px]">
+            <p className="font-bold text-sm">Relevé & certification vérifiable</p>
+            <p className="text-white/60 text-xs">{totalCredits} crédits ECTS validés par le jury · document à QR code authentifiable</p>
+          </div>
+          <Link href="/diplome" className="inline-flex items-center gap-1.5 text-xs font-bold text-white bg-gold px-4 py-2 hover:bg-gold-dark transition-colors flex-shrink-0">
+            <QrCode className="w-3.5 h-3.5" /> Voir mon relevé
+          </Link>
+        </div>
+        <p className="text-[10px] text-subtle mt-2 flex items-center gap-1.5">
+          <ChevronRight className="w-3 h-3" /> Confiance par la preuve : chaque action de votre parcours est horodatée et rattachée au document.
+        </p>
       </div>
 
-      <div className="bg-white rounded-2xl border border-border overflow-hidden mb-6">
-        <table className="w-full">
-          <thead><tr className="bg-surface border-b border-border">
-            <th className="text-left text-[10px] font-bold text-muted uppercase tracking-widest px-5 py-3">UE</th>
-            <th className="text-left text-[10px] font-bold text-muted uppercase tracking-widest px-5 py-3">Note</th>
-            <th className="text-left text-[10px] font-bold text-muted uppercase tracking-widest px-5 py-3">Crédits</th>
-            <th className="text-left text-[10px] font-bold text-muted uppercase tracking-widest px-5 py-3">Jury</th>
-          </tr></thead>
-          <tbody>
-            {results.map((r) => {
-              const ue = db.ues.find((u) => u.id === r.ueId);
-              return (
-                <tr key={r.id} className="border-b border-border last:border-0">
-                  <td className="px-5 py-3">
-                    <p className="text-sm font-semibold text-ink">{ue?.title}</p>
-                    <p className="text-[10px] text-subtle">{ue?.code}</p>
-                  </td>
-                  <td className="px-5 py-3">
-                    <span className={`font-bold ${r.note >= 10 ? "text-green-600" : "text-red-500"}`}>{r.note}/20</span>
-                  </td>
-                  <td className="px-5 py-3 text-sm text-ink">{r.note >= 10 ? r.credits : 0} ECTS</td>
-                  <td className="px-5 py-3">
-                    {r.validatedByJury
-                      ? <span className="badge bg-green-50 text-green-600 text-[10px]"><CheckCircle2 className="w-3 h-3" /> Validé</span>
-                      : <span className="badge bg-gold/10 text-gold-dark text-[10px]"><Clock className="w-3 h-3" /> En délibération</span>}
-                  </td>
-                </tr>
-              );
-            })}
-            {results.length === 0 && (
-              <tr><td colSpan={4} className="px-5 py-8 text-center text-sm text-muted">Aucun résultat publié pour le moment.</td></tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+      {/* ── COL DROITE : Synthèse + délibérations ── */}
+      <div className="bg-white min-h-full">
+        <div className="px-4 py-3 border-b border-border">
+          <h2 className="text-[10px] font-black text-ink uppercase tracking-widest mb-2">Synthèse</h2>
+          <div className="grid grid-cols-2 gap-px bg-border border border-border">
+            {[
+              { value: `${totalCredits}`, label: "ECTS validés", color: "text-green-600" },
+              { value: `${validated.length}/${results.length}`, label: "UE certifiées", color: "text-cama" },
+            ].map((s, i) => (
+              <div key={i} className="bg-white p-2.5 text-center">
+                <p className={`text-lg font-bold leading-none ${s.color}`}>{s.value}</p>
+                <p className="text-[9px] text-muted mt-1">{s.label}</p>
+              </div>
+            ))}
+          </div>
+        </div>
 
-      <div className="rounded-2xl p-6 text-white flex items-center gap-5 flex-wrap"
-        style={{ background: "linear-gradient(135deg, #1E1B4B 0%, #4F46E5 100%)" }}>
-        <div className="w-14 h-14 rounded-2xl bg-white/10 flex items-center justify-center flex-shrink-0">
-          <GraduationCap className="w-7 h-7 text-gold" />
+        <div className="px-4 py-3 border-b border-border">
+          <h2 className="text-[10px] font-black text-ink uppercase tracking-widest mb-2">Délibérations</h2>
+          <div className="space-y-2">
+            {[
+              { date: "25 juin · 9h", label: "Délibération jury S4 — salle A12", color: "bg-purple-400" },
+              { date: "29 juin", label: "Publication des résultats annuels", color: "bg-green-500" },
+              { date: "18 juil.", label: "Cérémonie de remise des diplômes", color: "bg-gold" },
+            ].map((a, i) => (
+              <div key={i} className="flex items-center gap-2.5">
+                <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${a.color}`} />
+                <div>
+                  <p className="text-[10px] font-bold text-cama leading-none">{a.date}</p>
+                  <p className="text-xs text-ink">{a.label}</p>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
-        <div className="flex-1 min-w-[200px]">
-          <p className="font-bold">Relevé & certification vérifiable</p>
-          <p className="text-white/60 text-sm">{totalCredits} crédits ECTS validés par le jury · document à QR code authentifiable</p>
+
+        <div className="px-4 py-3 border-b border-border">
+          <h2 className="text-[10px] font-black text-ink uppercase tracking-widest mb-2">Vérification publique</h2>
+          <p className="text-xs text-muted leading-relaxed mb-2">Tout recruteur peut authentifier votre relevé en scannant le QR code — aucune connexion requise.</p>
+          <Link href="/verifier/CAMA-U1-2025" className="text-[10px] font-bold text-cama hover:underline">
+            Tester la page de vérification →
+          </Link>
         </div>
-        <Link href="/diplome" className="btn-gold py-2.5 px-5 text-sm gap-2 flex-shrink-0">
-          <QrCode className="w-4 h-4" /> Voir mon relevé
-        </Link>
+
+        <div className="p-4 text-white"
+          style={{ background: "linear-gradient(135deg, #1E1B4B 0%, #4F46E5 100%)" }}>
+          <Award className="w-5 h-5 text-gold mb-1.5" />
+          <p className="font-bold text-sm leading-snug mb-1">Décision humaine garantie</p>
+          <p className="text-white/60 text-xs leading-relaxed">Chaque note est validée en délibération par le jury avant certification — jamais par un algorithme seul.</p>
+        </div>
       </div>
-      <p className="text-[10px] text-subtle mt-3 flex items-center gap-1.5">
-        <ChevronRight className="w-3 h-3" /> Confiance par la preuve : chaque action de votre parcours est horodatée et rattachée au document.
-      </p>
     </div>
   );
 }
