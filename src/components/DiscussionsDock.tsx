@@ -59,7 +59,7 @@ export default function DiscussionsDock() {
   const { user } = useAuth();
   const { db, mutate } = useDB();
   const [open, setOpen] = useState(false);
-  const { style: dragStyle, bind } = useDragOffset("cama.fab.discussions");
+  const { style: dragStyle, bind } = useDragOffset();
   const [tab, setTab] = useState<"profs" | "forum">("profs");
   const [activeTeacher, setActiveTeacher] = useState<string | null>(null);
   const [threads, setThreads] = useState<Record<string, DMsg[]>>(

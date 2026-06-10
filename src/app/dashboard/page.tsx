@@ -12,6 +12,7 @@ import JuryView from "@/components/dashboard/JuryView";
 import Footer from "@/components/landing/Footer";
 import WelcomeModal from "@/components/WelcomeModal";
 import OnboardingTour from "@/components/OnboardingTour";
+import GlobalActions from "@/components/GlobalActions";
 
 const tabsMap: Record<string, string[]> = {
   etudiant:   ["Mes Cours", "Examens", "Résultats"],
@@ -75,7 +76,7 @@ export default function DashboardPage() {
       {/* Global overlays & assistant */}
       <WelcomeModal />
       <OnboardingTour />
-      {/* Les boutons flottants (assistant, search, discussions) sont montés globalement via GlobalActions */}
+      <GlobalActions />
     </>
   );
 }

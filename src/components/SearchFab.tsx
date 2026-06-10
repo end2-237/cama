@@ -10,7 +10,7 @@ import { useDragOffset } from "@/hooks/useDragOffset";
    Déplaçable sur l'écran (position mémorisée). Ctrl+K ouvre aussi le moteur. */
 export default function SearchFab() {
   const router = useRouter();
-  const { style, bind } = useDragOffset("cama.fab.search");
+  const { style, bind } = useDragOffset();
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {

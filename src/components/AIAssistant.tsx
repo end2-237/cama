@@ -42,7 +42,7 @@ export default function AIAssistant() {
   const [input, setInput] = useState("");
   const [typing, setTyping] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
-  const { style: dragStyle, bind } = useDragOffset("cama.fab.assistant");
+  const { style: dragStyle, bind } = useDragOffset();
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
