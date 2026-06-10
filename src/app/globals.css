@@ -177,6 +177,84 @@
 .delay-700 { animation-delay: 700ms; }
 .delay-800 { animation-delay: 800ms; }
 
+/* ═══════════════════════════════════════════════
+   Scrollbars CAMA — fines, arrondies, dégradé indigo
+   ═══════════════════════════════════════════════ */
+
+/* Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(79, 70, 229, 0.45) transparent;
+}
+
+/* WebKit (Chrome / Edge / Safari) */
+*::-webkit-scrollbar {
+  width: 9px;
+  height: 9px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #6366F1 0%, #4F46E5 60%, #4338CA 100%);
+  border-radius: 99px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, #4F46E5 0%, #4338CA 60%, #312E81 100%);
+  background-clip: padding-box;
+}
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* Scrollbar principale de la page : piste légère */
+html::-webkit-scrollbar {
+  width: 11px;
+}
+html::-webkit-scrollbar-track {
+  background: #F4F4F6;
+}
+html::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #6366F1 0%, #4F46E5 50%, #F59E0B 160%);
+  border-radius: 99px;
+  border: 2px solid #F4F4F6;
+  background-clip: padding-box;
+}
+
+/* Variante sombre — pour les panneaux sur fond noir (terminal TP, etc.) */
+.scrollbar-dark {
+  scrollbar-color: rgba(255, 255, 255, 0.25) transparent;
+}
+.scrollbar-dark::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.22);
+  border-radius: 99px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+.scrollbar-dark::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.4);
+  background-clip: padding-box;
+}
+
+/* Variante invisible — apparaît seulement au survol */
+.scrollbar-ghost {
+  scrollbar-color: transparent transparent;
+}
+.scrollbar-ghost:hover {
+  scrollbar-color: rgba(79, 70, 229, 0.45) transparent;
+}
+.scrollbar-ghost::-webkit-scrollbar-thumb {
+  background: transparent;
+}
+.scrollbar-ghost:hover::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #6366F1 0%, #4338CA 100%);
+  border-radius: 99px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
 /* Input focus glow */
 .input-auth {
   @apply w-full border border-border rounded-xl px-4 py-3 text-sm text-ink
