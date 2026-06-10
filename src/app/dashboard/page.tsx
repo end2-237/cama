@@ -11,6 +11,7 @@ import AdminView from "@/components/dashboard/AdminView";
 import JuryView from "@/components/dashboard/JuryView";
 import Footer from "@/components/landing/Footer";
 import AIAssistant from "@/components/AIAssistant";
+import DiscussionsDock from "@/components/DiscussionsDock";
 import WelcomeModal from "@/components/WelcomeModal";
 import OnboardingTour from "@/components/OnboardingTour";
 
@@ -36,6 +37,11 @@ export default function DashboardPage() {
   useEffect(() => {
     if (!loading && !user) router.replace("/auth/login");
   }, [loading, user, router]);
+
+  /* Toujours revenir en haut quand on change d'onglet */
+  useEffect(() => {
+    window.scrollTo({ top: 0 });
+  }, [activeTab]);
 
   if (loading || !user) {
     return (
@@ -72,6 +78,7 @@ export default function DashboardPage() {
       <WelcomeModal />
       <OnboardingTour />
       <AIAssistant />
+      {user.role === "etudiant" && <DiscussionsDock />}
     </>
   );
 }
