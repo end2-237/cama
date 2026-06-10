@@ -9,7 +9,7 @@ import {
   CalendarClock, HelpCircle, MessagesSquare, Bot, FileText,
   Pencil, Globe, Wifi, Bell, Lock, ChevronRight, Building2,
   Clock, Radio, LayoutDashboard, Star, Zap, UserCheck, AlarmClock,
-  BadgeCheck, BarChart2, Hash,
+  BadgeCheck, BarChart2, Hash, Search,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useDB } from "@/hooks/useDB";
@@ -57,12 +57,75 @@ export default function ProfilePage() {
     <div className="min-h-screen bg-surface">
       {/* Top bar */}
       <header className="bg-white border-b border-border sticky top-0 z-40">
-        <div className="max-w-[1100px] mx-auto px-4 sm:px-6 flex items-center gap-4 h-12">
-          <Link href="/dashboard" className="flex items-center gap-2 text-sm text-muted hover:text-ink transition-colors">
-            <ArrowLeft className="w-4 h-4" /> Dashboard
+        <div className="max-w-[1400px] mx-auto px-4 sm:px-6 flex items-center gap-3 h-12">
+
+          {/* Retour + logo */}
+          <Link href="/dashboard" className="flex items-center gap-2 text-sm text-muted hover:text-ink transition-colors flex-shrink-0">
+            <ArrowLeft className="w-4 h-4" />
+            <span className="hidden sm:block">Dashboard</span>
           </Link>
-          <div className="w-px h-5 bg-border" />
-          <p className="text-xs text-subtle">Mon profil</p>
+          <div className="w-px h-5 bg-border flex-shrink-0" />
+          <Link href="/" className="flex items-center gap-2 flex-shrink-0">
+            <div className="w-1 h-6 bg-gradient-to-b from-cama to-gold" />
+            <span className="text-sm font-bold text-ink tracking-tight">CA<span className="text-cama">MA</span></span>
+          </Link>
+          <span className="text-[10px] font-black uppercase tracking-widest text-subtle hidden md:block">Mon profil</span>
+
+          {/* Recherche */}
+          <div className="hidden md:flex flex-1 max-w-xs items-center gap-2 bg-surface px-3 py-1.5 border border-border focus-within:border-cama transition-colors ml-2">
+            <Search className="w-3.5 h-3.5 text-subtle flex-shrink-0" />
+            <input type="text" placeholder="Rechercher dans mon profil..."
+              className="bg-transparent text-xs text-ink placeholder-subtle outline-none w-full" />
+          </div>
+
+          <div className="flex-1" />
+
+          {/* Liens rapides */}
+          <nav className="hidden lg:flex items-center gap-0.5 text-xs font-semibold">
+            {[
+              { label: "Mes cours",  href: "/dashboard" },
+              { label: "Calendrier", href: "/calendrier" },
+              { label: "Diplôme",    href: "/diplome" },
+              { label: "Guide",      href: "/guide" },
+            ].map((l) => (
+              <Link key={l.label} href={l.href}
+                className="px-3 py-1.5 text-muted hover:text-cama hover:bg-cama-50/40 transition-colors">
+                {l.label}
+              </Link>
+            ))}
+          </nav>
+          <div className="w-px h-5 bg-border hidden lg:block" />
+
+          {/* Icônes actions */}
+          <div className="flex items-center gap-0.5">
+            <button onClick={() => setCalOpen(true)} title="Mon planning"
+              className="p-1.5 text-muted hover:text-cama hover:bg-surface transition-colors">
+              <CalendarClock className="w-4 h-4" />
+            </button>
+            <Link href="/calendrier" title="Calendrier académique"
+              className="p-1.5 text-muted hover:text-cama hover:bg-surface transition-colors hidden sm:block">
+              <CalendarDays className="w-4 h-4" />
+            </Link>
+            <button title="Notifications" className="relative p-1.5 text-muted hover:text-cama hover:bg-surface transition-colors">
+              <Bell className="w-4 h-4" />
+              <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-red-500" />
+            </button>
+            <Link href="/guide" title="Aide"
+              className="p-1.5 text-muted hover:text-cama hover:bg-surface transition-colors hidden sm:block">
+              <HelpCircle className="w-4 h-4" />
+            </Link>
+          </div>
+
+          {/* Mini profil */}
+          <div className="flex items-center gap-2 pl-2 border-l border-border flex-shrink-0">
+            <div className={`w-7 h-7 rounded-full ${user.avatarColor} flex items-center justify-center text-white text-[10px] font-bold`}>
+              {user.initials}
+            </div>
+            <div className="hidden md:block leading-tight">
+              <p className="text-xs font-bold text-ink leading-none">{user.firstName}</p>
+              <p className="text-[9px] text-subtle leading-none mt-0.5">{user.level || user.roleLabel}</p>
+            </div>
+          </div>
         </div>
       </header>
 
