@@ -56,27 +56,23 @@ export default function DashNav({ activeTab, onTab, tabs }: DashNavProps) {
           </Link>
 
           {/* Explore */}
-          <button className="hidden md:flex items-center gap-2 border border-ink/30 rounded-full px-4 py-1.5 text-sm font-medium text-ink hover:bg-surface hover:border-cama/40 transition-all active:scale-95">
+          <button className="hidden xl:flex items-center gap-2 border border-ink/30 rounded-full px-4 py-1.5 text-sm font-medium text-ink hover:bg-surface hover:border-cama/40 transition-all active:scale-95">
             <Grid3x3 className="w-4 h-4" />
             Explorer
             <ChevronDown className="w-3.5 h-3.5" />
           </button>
 
-          {/* Search */}
-          <div className="hidden md:flex flex-1 max-w-sm items-center gap-2 bg-surface rounded-full px-4 py-2 border border-border focus-within:border-cama focus-within:ring-2 focus-within:ring-cama/10 transition-all">
-            <Search className="w-4 h-4 text-subtle flex-shrink-0" />
-            <input
-              type="text"
-              placeholder="Rechercher cours, ressources..."
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  const v = (e.target as HTMLInputElement).value.trim();
-                  router.push(v ? `/recherche?q=${encodeURIComponent(v)}` : "/recherche");
-                }
-              }}
-              className="bg-transparent text-sm text-ink placeholder-subtle outline-none w-full"
-            />
-          </div>
+          {/* CAMA Search — barre unique qui ouvre le moteur */}
+          <button
+            onClick={() => router.push("/recherche")}
+            className="hidden md:flex flex-1 max-w-sm items-center gap-2.5 bg-surface rounded-full px-4 py-2 border border-border hover:border-cama/50 hover:shadow-sm transition-all group text-left"
+            title="Ouvrir CAMA Search">
+            <Search className="w-4 h-4 text-cama flex-shrink-0" />
+            <span className="text-sm text-subtle group-hover:text-muted transition-colors flex-1 truncate">
+              Rechercher sur <span className="font-bold text-ink">CA<span className="text-cama">MA</span></span>…
+            </span>
+            <kbd className="hidden lg:block text-[9px] font-mono text-subtle bg-white border border-border px-1.5 py-0.5 rounded">⏎</kbd>
+          </button>
 
           <div className="flex-1" />
 
@@ -97,37 +93,40 @@ export default function DashNav({ activeTab, onTab, tabs }: DashNavProps) {
             ))}
           </nav>
 
-          {/* Icônes */}
-          <div className="flex items-center gap-0.5 ml-2">
-            <Link href="/recherche"
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-ink border border-border hover:border-cama/40 hover:bg-surface transition-all"
-              title="CAMA Search — moteur de recherche">
-              <Search className="w-4 h-4 text-cama" />
-              <span className="hidden lg:block">CAMA <span className="text-cama">Search</span></span>
-            </Link>
-            <button className="flex items-center gap-1 px-2 py-2 text-muted hover:text-ink transition-colors rounded-lg hover:bg-surface">
-              <Globe className="w-5 h-5" />
-              <span className="text-xs font-semibold hidden lg:block">FR</span>
+          {/* Séparateur */}
+          <div className="hidden md:block w-px h-7 bg-border mx-1.5" />
+
+          {/* Groupe 1 — utilitaires discrets */}
+          <div className="flex items-center">
+            <button className="flex items-center gap-1 px-2 py-2 text-muted hover:text-ink transition-colors rounded-lg hover:bg-surface" title="Langue">
+              <Globe className="w-[18px] h-[18px]" />
+              <span className="text-xs font-semibold hidden xl:block">FR</span>
             </button>
-            <Link href="/guide" className="p-2 text-muted hover:text-ink transition-colors rounded-lg hover:bg-surface">
-              <HelpCircle className="w-5 h-5" />
+            <Link href="/guide" className="p-2 text-muted hover:text-ink transition-colors rounded-lg hover:bg-surface" title="Guide CAMA">
+              <HelpCircle className="w-[18px] h-[18px]" />
             </Link>
             <Link href="/calendrier" className="p-2 text-muted hover:text-ink transition-colors rounded-lg hover:bg-surface" title="Calendrier académique annuel">
-              <CalendarDays className="w-5 h-5" />
+              <CalendarDays className="w-[18px] h-[18px]" />
             </Link>
             {user.role === "etudiant" && (
               <button
                 onClick={() => setCalOpen(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-ink border border-border hover:border-cama/40 hover:bg-surface transition-all ml-1"
-                title="Mon calendrier personnel">
-                <CalendarClock className="w-4 h-4 text-cama" />
-                <span className="hidden lg:block">Mon planning</span>
+                className="p-2 text-muted hover:text-cama transition-colors rounded-lg hover:bg-surface"
+                title="Mon planning personnel">
+                <CalendarClock className="w-[18px] h-[18px]" />
               </button>
             )}
-            <button className="relative p-2 text-muted hover:text-ink transition-colors rounded-lg hover:bg-surface">
-              <Bell className="w-5 h-5" />
+            <button className="relative p-2 text-muted hover:text-ink transition-colors rounded-lg hover:bg-surface" title="Notifications">
+              <Bell className="w-[18px] h-[18px]" />
               <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-green-500 border-2 border-white" />
             </button>
+          </div>
+
+          {/* Séparateur */}
+          <div className="hidden md:block w-px h-7 bg-border mx-1.5" />
+
+          {/* Groupe 2 — actions fortes */}
+          <div className="flex items-center gap-1.5">
 
             {/* Communication Administration */}
             <div className="relative">

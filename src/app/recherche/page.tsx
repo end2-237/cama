@@ -170,7 +170,7 @@ function SearchEngine() {
       {/* ── MODE ACCUEIL (à la Google) ── */}
       {!hasQuery && (
         <div className="min-h-screen flex flex-col">
-          <header className="flex items-center justify-between px-4 sm:px-6 h-12 border-b border-border">
+          <header className="relative z-10 flex items-center justify-between px-4 sm:px-6 h-12 border-b border-border bg-white">
             <Link href="/dashboard" className="flex items-center gap-2 text-sm text-muted hover:text-ink transition-colors">
               <ArrowLeft className="w-4 h-4" /> Dashboard
             </Link>
@@ -181,7 +181,7 @@ function SearchEngine() {
             </div>
           </header>
 
-          <div className="flex-1 flex flex-col items-center justify-center px-4 -mt-16">
+          <div className="flex-1 flex flex-col items-center justify-center px-4">
             {/* Logo */}
             <div className="flex items-center gap-3 mb-8">
               <div className="w-2 h-12 bg-gradient-to-b from-cama to-gold" />
@@ -225,7 +225,7 @@ function SearchEngine() {
         <>
           {/* Barre haute compacte */}
           <header className="sticky top-0 z-40 bg-white border-b border-border">
-            <div className="max-w-[900px] mx-auto px-4 sm:px-6 py-3 flex items-center gap-4">
+            <div className="px-4 sm:px-6 py-3 flex items-center gap-4">
               <button onClick={() => { setQ(""); setCat("Tous"); }} className="flex items-center gap-2 flex-shrink-0">
                 <div className="w-1.5 h-8 bg-gradient-to-b from-cama to-gold" />
                 <span className="text-lg font-black text-ink tracking-tight hidden sm:block">CA<span className="text-cama">MA</span></span>
@@ -246,7 +246,7 @@ function SearchEngine() {
             </div>
 
             {/* Filtres catégories */}
-            <div className="max-w-[900px] mx-auto px-4 sm:px-6 flex items-center gap-0 overflow-x-auto">
+            <div className="px-4 sm:px-6 flex items-center gap-0 overflow-x-auto">
               {(["Tous", "Cours", "Chapitre", "Live", "Forum", "UE", "Page"] as const).map((c) => (
                 <button key={c} onClick={() => setCat(c)}
                   className={`px-3 py-2 text-xs font-bold border-b-2 transition-colors whitespace-nowrap ${
@@ -258,9 +258,9 @@ function SearchEngine() {
             </div>
           </header>
 
-          {/* Résultats + sidebar */}
-          <div className="max-w-[1200px] mx-auto grid lg:grid-cols-[1fr_300px] gap-0 items-start">
-          <main className="px-4 sm:px-6 py-5 min-w-0 lg:border-r lg:border-border min-h-[calc(100vh-100px)]">
+          {/* Résultats + sidebar — pleine largeur, sidebar collée au bord droit */}
+          <div className="grid lg:grid-cols-[1fr_380px] gap-0 items-start">
+          <main className="px-4 sm:px-6 py-5 min-w-0 min-h-[calc(100vh-100px)]">
             <p className="text-[11px] text-subtle mb-4">
               Environ {filtered.length} résultat{filtered.length > 1 ? "s" : ""} ({"<"} 0,01 s) — ressources Institut JFN uniquement
             </p>
@@ -317,8 +317,8 @@ function SearchEngine() {
             )}
           </main>
 
-          {/* ══ SIDEBAR RÉSULTATS ══ */}
-          <aside className="hidden lg:block lg:sticky lg:top-[100px] lg:max-h-[calc(100vh-100px)] lg:overflow-y-auto divide-y divide-border">
+          {/* ══ SIDEBAR RÉSULTATS — collée au bord droit ══ */}
+          <aside className="hidden lg:block lg:sticky lg:top-[100px] lg:h-[calc(100vh-100px)] lg:overflow-y-auto divide-y divide-border border-l border-border bg-white">
 
             {/* Panneau de connaissance — meilleur résultat */}
             {filtered.length > 0 && (
