@@ -70,35 +70,106 @@ export default function CoursePlayer() {
     });
   };
 
+  const doneCount = chapters.filter((c) => doneIds.has(c.id)).length;
+
   return (
     <div className="min-h-screen bg-surface">
       {/* Top bar */}
       <header className="bg-white border-b border-border sticky top-0 z-40">
-        <div className="max-w-[1400px] mx-auto px-4 sm:px-6 flex items-center gap-4 h-14">
+        <div className="max-w-[1400px] mx-auto px-4 sm:px-6 flex items-center gap-4 h-12">
           <Link href="/dashboard" className="flex items-center gap-2 text-sm text-muted hover:text-ink transition-colors">
             <ArrowLeft className="w-4 h-4" /> Dashboard
           </Link>
           <div className="w-px h-5 bg-border" />
-          <div className="min-w-0 flex-1">
-            <p className="text-[10px] text-subtle">{ue?.code} · {ue?.ects} ECTS</p>
-            <p className="text-sm font-bold text-ink truncate">{course.title}</p>
-          </div>
-          {/* Progression */}
+          <p className="text-xs text-subtle min-w-0 truncate flex-1">
+            Mes Cours <span className="mx-1">/</span> <span className="text-ink font-semibold">{course.title}</span>
+          </p>
           <div className="hidden sm:flex items-center gap-2">
-            <div className="w-28 h-1.5 bg-border rounded-full overflow-hidden">
-              <div className="h-full bg-gradient-to-r from-cama to-gold rounded-full transition-all duration-500" style={{ width: `${pct}%` }} />
+            <div className="w-28 h-1 bg-border overflow-hidden">
+              <div className="h-full bg-gradient-to-r from-cama to-gold transition-all duration-500" style={{ width: `${pct}%` }} />
             </div>
             <span className="text-xs font-bold text-cama">{pct}%</span>
           </div>
         </div>
       </header>
 
-      <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-6 grid lg:grid-cols-[260px_1fr_280px] gap-5 items-start">
+      {/* ── HERO ── */}
+      <section className="relative overflow-hidden text-white"
+        style={{ background: "linear-gradient(120deg, #1E1B4B 0%, #312E81 55%, #4F46E5 100%)" }}>
+        {/* Motif kente subtil */}
+        <div className="absolute inset-0 opacity-[0.07]" style={{
+          backgroundImage: "repeating-linear-gradient(90deg, transparent, transparent 22px, #fff 22px, #fff 23px), repeating-linear-gradient(0deg, transparent, transparent 22px, #fff 22px, #fff 23px)",
+        }} />
+        {/* Arcs décoratifs */}
+        <svg className="absolute -right-10 -top-16 w-72 h-72 opacity-20" viewBox="0 0 200 200" fill="none">
+          {[80, 60, 40, 20].map((r) => (
+            <circle key={r} cx="100" cy="100" r={r} stroke="#F59E0B" strokeWidth="1.5" />
+          ))}
+        </svg>
+
+        <div className="relative max-w-[1400px] mx-auto px-4 sm:px-6 py-8 flex flex-wrap items-end gap-6">
+          <div className="flex-1 min-w-[280px]">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-[10px] font-black uppercase tracking-widest bg-gold text-white px-2 py-0.5">{ue?.code}</span>
+              <span className="text-[10px] font-bold text-white/60">{ue?.ects} ECTS · {ue?.semestre}</span>
+            </div>
+            <h1 className="text-2xl sm:text-3xl font-bold leading-tight mb-2">{course.title}</h1>
+            <div className="flex items-center gap-2 text-xs text-white/70">
+              <div className="w-6 h-6 rounded-full bg-white/15 flex items-center justify-center text-[9px] font-bold">AB</div>
+              Pr. Amina Bello
+              <span className="text-white/30">·</span>
+              {chapters.length} chapitres
+              <span className="text-white/30">·</span>
+              <span className="flex items-center gap-1">
+                {course.profIA && <><Bot className="w-3.5 h-3.5 text-gold" /> Prof IA inclus</>}
+              </span>
+            </div>
+          </div>
+
+          {/* Stat progression */}
+          <div className="flex items-center gap-4">
+            <div className="text-right">
+              <p className="text-3xl font-black text-gold leading-none">{pct}%</p>
+              <p className="text-[10px] text-white/60 mt-1">{doneCount}/{chapters.length} chapitres validés</p>
+            </div>
+            <div className="w-14 h-14 relative">
+              <svg className="w-full h-full -rotate-90" viewBox="0 0 36 36">
+                <circle cx="18" cy="18" r="15.9" fill="none" stroke="rgba(255,255,255,.15)" strokeWidth="3" />
+                <circle cx="18" cy="18" r="15.9" fill="none" stroke="#F59E0B" strokeWidth="3"
+                  strokeDasharray={`${pct} 100`} strokeLinecap="round" />
+              </svg>
+            </div>
+          </div>
+        </div>
+
+        {/* Tabs modes — intégrés au bas du hero */}
+        <div className="relative max-w-[1400px] mx-auto px-4 sm:px-6 flex gap-0 flex-wrap">
+          {availModes.map((m) => {
+            const Icon = MODE_META[m].icon;
+            return (
+              <button
+                key={m}
+                onClick={() => setMode(m)}
+                className={`flex items-center gap-2 px-5 py-2.5 text-sm font-bold transition-all border-b-[3px] ${
+                  activeMode === m
+                    ? "bg-surface text-cama border-gold"
+                    : "text-white/70 border-transparent hover:text-white hover:bg-white/10"
+                }`}
+              >
+                <Icon className="w-4 h-4" /> {MODE_META[m].label}
+                {m === "live" && <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />}
+              </button>
+            );
+          })}
+        </div>
+      </section>
+
+      <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-4 grid lg:grid-cols-[260px_1fr_280px] gap-4 items-start">
 
         {/* ── Sidebar chapitres ── */}
-        <aside className="bg-white rounded-2xl border border-border overflow-hidden lg:sticky lg:top-20">
-          <div className="px-4 py-3 border-b border-border bg-cama-50">
-            <p className="text-xs font-bold text-cama uppercase tracking-wider">Chapitres</p>
+        <aside className="bg-white border border-border overflow-hidden lg:sticky lg:top-16">
+          <div className="px-4 py-2.5 border-b-2 border-ink">
+            <p className="text-[10px] font-black text-ink uppercase tracking-widest">Chapitres</p>
           </div>
           <div className="divide-y divide-border">
             {chapters.map((c, i) => {
@@ -109,11 +180,11 @@ export default function CoursePlayer() {
                   key={c.id}
                   disabled={!open}
                   onClick={() => { setChapIdx(i); }}
-                  className={`w-full flex items-center gap-3 px-4 py-3.5 text-left transition-colors ${
-                    i === chapIdx ? "bg-cama-50/60" : open ? "hover:bg-surface" : "opacity-50 cursor-not-allowed"
+                  className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors border-l-2 ${
+                    i === chapIdx ? "bg-cama-50/60 border-l-cama" : open ? "hover:bg-surface border-l-transparent" : "opacity-50 cursor-not-allowed border-l-transparent"
                   }`}
                 >
-                  <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold flex-shrink-0 ${
+                  <div className={`w-6 h-6 flex items-center justify-center text-[11px] font-bold flex-shrink-0 ${
                     done ? "bg-green-500 text-white" : i === chapIdx ? "bg-cama text-white" : "bg-border text-subtle"
                   }`}>
                     {done ? <Check className="w-3.5 h-3.5" /> : open ? c.order : <Lock className="w-3 h-3" />}
@@ -137,30 +208,9 @@ export default function CoursePlayer() {
 
         {/* ── Contenu central ── */}
         <div className="min-w-0">
-          {/* Tabs modes */}
-          <div className="flex gap-2 mb-4 flex-wrap">
-            {availModes.map((m) => {
-              const Icon = MODE_META[m].icon;
-              return (
-                <button
-                  key={m}
-                  onClick={() => setMode(m)}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-bold border-2 transition-all ${
-                    activeMode === m
-                      ? "border-cama bg-cama text-white shadow-md shadow-cama/20"
-                      : "border-border bg-white text-muted hover:border-cama/40 hover:text-cama"
-                  }`}
-                >
-                  <Icon className="w-4 h-4" /> {MODE_META[m].label}
-                  {m === "live" && <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />}
-                </button>
-              );
-            })}
-          </div>
-
-          <div className="bg-white rounded-2xl border border-border p-6 animate-fade-up" key={`${chapter?.id}-${activeMode}`}>
-            <p className="text-xs text-subtle mb-1">Chapitre {chapter?.order}</p>
-            <h1 className="text-2xl font-light text-ink mb-6">{chapter?.title}</h1>
+          <div className="bg-white border border-border p-6 animate-fade-up" key={`${chapter?.id}-${activeMode}`}>
+            <p className="text-[10px] font-black text-cama uppercase tracking-widest mb-1">Chapitre {chapter?.order}</p>
+            <h2 className="text-2xl font-light text-ink mb-6">{chapter?.title}</h2>
 
             {activeMode === "pdf"   && chapter?.pdf   && <PdfMode pdf={chapter.pdf} />}
             {activeMode === "video" && chapter?.video && <VideoMode video={chapter.video} />}
@@ -169,7 +219,7 @@ export default function CoursePlayer() {
             {activeMode === "ia"    && <ProfIA chapter={chapter} courseTitle={course.title} />}
 
             {/* Checkpoint */}
-            <div className="mt-8 pt-6 border-t border-border flex items-center justify-between flex-wrap gap-3">
+            <div className="mt-8 pt-5 border-t border-border flex items-center justify-between flex-wrap gap-3">
               {doneIds.has(chapter?.id) ? (
                 <p className="flex items-center gap-2 text-green-600 font-bold text-sm">
                   <CheckCircle2 className="w-5 h-5" /> Chapitre validé
@@ -178,12 +228,14 @@ export default function CoursePlayer() {
                 <p className="text-sm text-muted">Validez ce checkpoint pour débloquer le chapitre suivant.</p>
               )}
               {!doneIds.has(chapter?.id) && (
-                <button onClick={validateChapter} className="btn-primary gap-2 py-2.5 px-6 text-sm">
+                <button onClick={validateChapter}
+                  className="inline-flex items-center gap-2 text-sm font-bold text-white bg-cama px-6 py-2.5 hover:bg-cama-700 transition-colors">
                   <Check className="w-4 h-4" /> Valider le chapitre
                 </button>
               )}
               {doneIds.has(chapter?.id) && chapIdx < chapters.length - 1 && (
-                <button onClick={() => setChapIdx(chapIdx + 1)} className="btn-primary gap-2 py-2.5 px-6 text-sm">
+                <button onClick={() => setChapIdx(chapIdx + 1)}
+                  className="inline-flex items-center gap-2 text-sm font-bold text-white bg-cama px-6 py-2.5 hover:bg-cama-700 transition-colors">
                   Chapitre suivant <ChevronRight className="w-4 h-4" />
                 </button>
               )}
@@ -236,7 +288,7 @@ function ProfChat({ courseTitle }: { courseTitle: string }) {
   }
 
   return (
-    <aside className="bg-white rounded-2xl border border-border overflow-hidden lg:sticky lg:top-20 flex flex-col" style={{ maxHeight: "calc(100vh - 96px)" }}>
+    <aside className="bg-white border border-border overflow-hidden lg:sticky lg:top-16 flex flex-col" style={{ maxHeight: "calc(100vh - 80px)" }}>
       {/* Header */}
       <div className="px-4 py-3 border-b border-border bg-gradient-to-r from-cama/5 to-indigo-50 flex items-center gap-3">
         <div className="relative flex-shrink-0">
