@@ -9,6 +9,17 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useDB } from "@/hooks/useDB";
+import { COURS_INTERMEDIAIRES, formatFcfa } from "@/lib/parcours";
+
+/* Visuels des cours hors cursus (par slug) */
+const HORS_CURSUS_IMG: Record<string, string> = {
+  anglais:        "https://images.unsplash.com/photo-1543109740-4bdb38fda756?w=480&q=70",
+  diction:        "https://images.unsplash.com/photo-1475721027785-f74eccf877e2?w=480&q=70",
+  bureautique:    "https://images.unsplash.com/photo-1587614382346-4ec70e388b28?w=480&q=70",
+  entrepreneuriat:"https://images.unsplash.com/photo-1556761175-5973dc0f32e7?w=480&q=70",
+  allemand:       "https://images.unsplash.com/photo-1467269204594-9661b134dd2b?w=480&q=70",
+  design:         "https://images.unsplash.com/photo-1626785774573-4b799315345d?w=480&q=70",
+};
 
 export default function StudentView({ tab }: { tab: string }) {
   if (tab === "Examens")   return <ExamsTab />;
@@ -367,6 +378,39 @@ function CoursesTab() {
               </Link>
             );
           })}
+        </div>
+
+        {/* ── HORS CURSUS ── */}
+        <div className="flex items-center justify-between mt-4 mb-2 pb-2 border-b border-border">
+          <div className="flex items-center gap-2">
+            <GraduationCap className="w-5 h-5 text-ink" strokeWidth={1.5} />
+            <h2 className="text-xl font-light text-ink">Hors cursus</h2>
+          </div>
+          <p className="text-[10px] text-subtle">Cours intermédiaires ouverts à tous, hors parcours académique</p>
+        </div>
+        <div className="grid grid-cols-2 xl:grid-cols-3 gap-px bg-border border border-border">
+          {COURS_INTERMEDIAIRES.map((c) => (
+            <div key={c.slug} className="bg-white group cursor-pointer hover:bg-cama-50/30 transition-colors">
+              <div className="relative h-24 overflow-hidden">
+                <img src={HORS_CURSUS_IMG[c.slug]} alt={c.title}
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
+                <span className={`absolute top-1.5 right-1.5 text-[9px] font-black px-1.5 py-0.5 ${
+                  c.gratuit ? "bg-green-600 text-white" : "bg-gold text-white"
+                }`}>
+                  {c.gratuit ? "GRATUIT" : formatFcfa(c.prix!)}
+                </span>
+                <span className="absolute bottom-1.5 left-1.5 text-[9px] font-bold text-white bg-black/50 px-1.5 py-0.5">{c.duree}</span>
+              </div>
+              <div className="p-2.5">
+                <h3 className="text-xs font-bold text-ink leading-snug group-hover:text-cama transition-colors">{c.emoji} {c.title}</h3>
+                <p className="text-[10px] text-muted leading-snug mt-0.5 line-clamp-2">{c.desc}</p>
+                <button className="mt-1.5 text-[10px] font-bold text-white bg-ink px-2 py-1 hover:bg-cama transition-colors">
+                  {c.gratuit ? "S'inscrire gratuitement" : "Souscrire"}
+                </button>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
 
