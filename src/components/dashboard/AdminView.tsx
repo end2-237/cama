@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { getMaintenance, setMaintenance } from "@/lib/maintenance";
 import {
   Users, BookOpen, GraduationCap, ShieldCheck, TrendingUp, AlertTriangle,
   CheckCircle2, Clock, ChevronRight, UserPlus, Settings, BarChart2,
@@ -452,7 +453,17 @@ function SettingsTab() {
     proctoring: true, audioFirst: true, dataBudget: true, profIA: true,
     autoBackup: true, maintenance: false, publicVerify: true, jury: true,
   });
-  const flip = (k: string) => setToggles((t) => ({ ...t, [k]: !t[k] }));
+
+  /* synchronise l'état du mode maintenance au montage */
+  useEffect(() => {
+    setToggles((t) => ({ ...t, maintenance: getMaintenance().on }));
+  }, []);
+
+  const flip = (k: string) => setToggles((t) => {
+    const next = { ...t, [k]: !t[k] };
+    if (k === "maintenance") setMaintenance(next.maintenance); // active réellement la page /maintenance
+    return next;
+  });
 
   const SECTIONS: { title: string; icon: typeof Bot; items: { k: string; label: string; desc: string }[] }[] = [
     {

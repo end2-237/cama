@@ -13,6 +13,7 @@ import Footer from "@/components/landing/Footer";
 import WelcomeModal from "@/components/WelcomeModal";
 import OnboardingTour from "@/components/OnboardingTour";
 import GlobalActions from "@/components/GlobalActions";
+import { useMaintenance } from "@/hooks/useMaintenance";
 
 const tabsMap: Record<string, string[]> = {
   etudiant:   ["Mes Cours", "Examens", "Résultats"],
@@ -24,6 +25,7 @@ const tabsMap: Record<string, string[]> = {
 export default function DashboardPage() {
   const { user, loading } = useAuth();
   const router = useRouter();
+  const maintenance = useMaintenance();
 
   const tabs = user ? tabsMap[user.role] : [];
   const [activeTab, setActiveTab] = useState("");
@@ -36,6 +38,13 @@ export default function DashboardPage() {
   useEffect(() => {
     if (!loading && !user) router.replace("/auth/login");
   }, [loading, user, router]);
+
+  /* Mode maintenance : les étudiants sont redirigés (admin/enseignant/jury passent) */
+  useEffect(() => {
+    if (!loading && user && user.role === "etudiant" && maintenance.on) {
+      router.replace("/maintenance");
+    }
+  }, [loading, user, maintenance.on, router]);
 
   /* Toujours revenir en haut quand on change d'onglet */
   useEffect(() => {
