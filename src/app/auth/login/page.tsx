@@ -5,8 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Eye, EyeOff, Globe, AlertCircle, Loader2 } from "lucide-react";
 import AuthPanel from "@/components/auth/AuthPanel";
-import { login } from "@/lib/auth";
-import { useAuth } from "@/context/AuthContext";
+import { supabase } from "@/lib/supabase";
 
 const DEMO = [
   { role: "Étudiant",      email: "jean-paul@jfn.cm",     password: "etudiant123" },
@@ -15,8 +14,7 @@ const DEMO = [
 ];
 
 export default function LoginPage() {
-  const router      = useRouter();
-  const { setUser } = useAuth();
+  const router = useRouter();
 
   const [email,   setEmail]   = useState("");
   const [pwd,     setPwd]     = useState("");
@@ -28,14 +26,12 @@ export default function LoginPage() {
     e.preventDefault();
     setError("");
     setLoading(true);
-    await new Promise((r) => setTimeout(r, 600)); // petit délai UX
-    const user = login(email, pwd);
+    const { error: authError } = await supabase.auth.signInWithPassword({ email, password: pwd });
     setLoading(false);
-    if (!user) {
+    if (authError) {
       setError("Email ou mot de passe incorrect.");
       return;
     }
-    setUser(user);
     router.push("/dashboard");
   };
 
