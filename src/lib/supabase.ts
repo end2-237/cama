@@ -21,6 +21,9 @@ export interface DBUser {
   avatar_color: string;
   school: string | null;
   level: string | null;
+  phone: string | null;
+  phone_prefix: string | null;
+  student_card: string | null;
   created_at: string;
 }
 

@@ -1,9 +1,11 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Eye, EyeOff, Globe, ChevronRight, Check } from "lucide-react";
+import { ArrowLeft, Eye, EyeOff, Globe, ChevronRight, Check, AlertCircle, Loader2 } from "lucide-react";
 import AuthPanel from "@/components/auth/AuthPanel";
+import { supabase } from "@/lib/supabase";
 
 const ecoles = [
   "École d'Informatique",
@@ -13,12 +15,98 @@ const ecoles = [
 
 const niveaux = ["L1", "L2", "L3", "M1", "M2"];
 
+// Palette d'avatars attribuée aléatoirement à l'inscription
+const AVATAR_COLORS = ["#6366f1", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899", "#14b8a6"];
+
 export default function RegisterPage() {
+  const router = useRouter();
+
   const [showPwd,   setShowPwd]   = useState(false);
   const [step,      setStep]      = useState<1|2>(1);
   const [role,      setRole]      = useState<"etudiant"|"enseignant">("etudiant");
-  const [niveau,    setNiveau]    = useState<string>("");
   const [accepted,  setAccepted]  = useState(false);
+
+  // Données du formulaire — tout est capté et persisté
+  const [firstName,   setFirstName]   = useState("");
+  const [lastName,    setLastName]    = useState("");
+  const [email,       setEmail]       = useState("");
+  const [pwd,         setPwd]         = useState("");
+  const [school,      setSchool]      = useState("");
+  const [niveau,      setNiveau]      = useState("");
+  const [studentCard, setStudentCard] = useState("");
+  const [phone,       setPhone]       = useState("");
+
+  const [error,   setError]   = useState("");
+  const [loading, setLoading] = useState(false);
+
+  // Validation étape 1 avant de continuer
+  const canContinue = firstName.trim() && lastName.trim() && email.trim() && pwd.length >= 8;
+
+  const goToStep2 = () => {
+    setError("");
+    if (!firstName.trim() || !lastName.trim()) { setError("Renseignez votre prénom et nom."); return; }
+    if (!email.trim())                          { setError("Renseignez votre email."); return; }
+    if (pwd.length < 8)                         { setError("Le mot de passe doit faire au moins 8 caractères."); return; }
+    setStep(2);
+  };
+
+  const handleRegister = async () => {
+    setError("");
+    if (!school)   { setError("Sélectionnez votre école."); return; }
+    if (role === "etudiant" && !niveau) { setError("Sélectionnez votre niveau."); return; }
+    if (!accepted) { setError("Vous devez accepter les conditions d'utilisation."); return; }
+
+    setLoading(true);
+
+    // 1. Création du compte Supabase Auth
+    const { data: authData, error: authError } = await supabase.auth.signUp({
+      email,
+      password: pwd,
+      options: {
+        data: { first_name: firstName, last_name: lastName, role },
+      },
+    });
+
+    if (authError || !authData.user) {
+      setLoading(false);
+      setError(
+        authError?.message?.includes("already")
+          ? "Un compte existe déjà avec cet email."
+          : "Erreur lors de la création du compte. Réessayez."
+      );
+      return;
+    }
+
+    // 2. Enregistrement du profil complet dans public.users
+    const avatarColor = AVATAR_COLORS[Math.floor(Math.random() * AVATAR_COLORS.length)];
+    const { error: profileError } = await supabase.from("users").insert({
+      id:           authData.user.id,
+      email,
+      first_name:   firstName,
+      last_name:    lastName,
+      role,
+      avatar_color: avatarColor,
+      school,
+      level:        role === "etudiant" ? niveau : null,
+      student_card: role === "etudiant" ? (studentCard || null) : null,
+      phone:        phone || null,
+      phone_prefix: "+237",
+    });
+
+    setLoading(false);
+
+    if (profileError) {
+      setError("Compte créé mais erreur d'enregistrement du profil. Contactez l'administration.");
+      return;
+    }
+
+    // 3. Si la session est active (confirmation email désactivée) → dashboard
+    if (authData.session) {
+      router.push("/dashboard");
+    } else {
+      router.push("/auth/login?registered=1");
+    }
+  };
 
   return (
     <div className="min-h-screen grid lg:grid-cols-[42%_58%]">
@@ -136,22 +224,42 @@ export default function RegisterPage() {
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="block text-sm font-medium text-ink mb-1.5">Prénom</label>
-                      <input type="text" placeholder="Jean-Paul" className="input-auth" />
+                      <input
+                        type="text"
+                        value={firstName}
+                        onChange={(e) => { setFirstName(e.target.value); setError(""); }}
+                        placeholder="Jean-Paul"
+                        className="input-auth"
+                      />
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-ink mb-1.5">Nom</label>
-                      <input type="text" placeholder="Mbarga" className="input-auth" />
+                      <input
+                        type="text"
+                        value={lastName}
+                        onChange={(e) => { setLastName(e.target.value); setError(""); }}
+                        placeholder="Mbarga"
+                        className="input-auth"
+                      />
                     </div>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-ink mb-1.5">Email</label>
-                    <input type="email" placeholder="votre@email.cm" className="input-auth" />
+                    <input
+                      type="email"
+                      value={email}
+                      onChange={(e) => { setEmail(e.target.value); setError(""); }}
+                      placeholder="votre@email.cm"
+                      className="input-auth"
+                    />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-ink mb-1.5">Mot de passe</label>
                     <div className="relative">
                       <input
                         type={showPwd ? "text" : "password"}
+                        value={pwd}
+                        onChange={(e) => { setPwd(e.target.value); setError(""); }}
                         placeholder="Min. 8 caractères"
                         className="input-auth pr-11"
                       />
@@ -166,9 +274,17 @@ export default function RegisterPage() {
                   </div>
                 </div>
 
+                {error && (
+                  <div className="flex items-center gap-2 text-red-600 text-sm bg-red-50 border border-red-100 rounded-xl px-4 py-3 mb-4 animate-fade-up">
+                    <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                    {error}
+                  </div>
+                )}
+
                 <button
-                  onClick={() => setStep(2)}
-                  className="w-full btn-primary py-3.5 text-base rounded-xl justify-center shadow-lg shadow-cama/20 hover:shadow-cama/40 hover:scale-[1.01] transition-all duration-200"
+                  onClick={goToStep2}
+                  disabled={!canContinue}
+                  className="w-full btn-primary py-3.5 text-base rounded-xl justify-center shadow-lg shadow-cama/20 hover:shadow-cama/40 hover:scale-[1.01] transition-all duration-200 disabled:opacity-60 disabled:cursor-not-allowed disabled:scale-100"
                 >
                   Continuer
                   <ChevronRight className="w-4 h-4" />
@@ -186,9 +302,13 @@ export default function RegisterPage() {
                 <div className="space-y-4 mb-6">
                   <div>
                     <label className="block text-sm font-medium text-ink mb-1.5">École</label>
-                    <select className="input-auth bg-white cursor-pointer">
+                    <select
+                      value={school}
+                      onChange={(e) => { setSchool(e.target.value); setError(""); }}
+                      className="input-auth bg-white cursor-pointer"
+                    >
                       <option value="">Sélectionner une école</option>
-                      {ecoles.map((e) => <option key={e}>{e}</option>)}
+                      {ecoles.map((e) => <option key={e} value={e}>{e}</option>)}
                     </select>
                   </div>
 
@@ -200,7 +320,7 @@ export default function RegisterPage() {
                           {niveaux.map((n) => (
                             <button
                               key={n}
-                              onClick={() => setNiveau(n)}
+                              onClick={() => { setNiveau(n); setError(""); }}
                               className={`py-2.5 rounded-xl text-xs font-bold border-2 transition-all duration-200 ${
                                 niveau === n
                                   ? "border-cama bg-cama text-white scale-105 shadow-md shadow-cama/25"
@@ -214,7 +334,13 @@ export default function RegisterPage() {
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-ink mb-1.5">Numéro de carte étudiant</label>
-                        <input type="text" placeholder="JFN-2024-XXXX" className="input-auth" />
+                        <input
+                          type="text"
+                          value={studentCard}
+                          onChange={(e) => setStudentCard(e.target.value)}
+                          placeholder="JFN-2024-XXXX"
+                          className="input-auth"
+                        />
                       </div>
                     </>
                   )}
@@ -225,14 +351,20 @@ export default function RegisterPage() {
                       <div className="border border-border rounded-xl px-3 py-3 flex items-center gap-1.5 text-sm text-muted flex-shrink-0 bg-surface">
                         🇨🇲 +237
                       </div>
-                      <input type="tel" placeholder="6XX XXX XXX" className="input-auth flex-1" />
+                      <input
+                        type="tel"
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value)}
+                        placeholder="6XX XXX XXX"
+                        className="input-auth flex-1"
+                      />
                     </div>
                   </div>
 
                   {/* Conditions */}
                   <label
                     className="flex items-start gap-3 cursor-pointer group"
-                    onClick={() => setAccepted(!accepted)}
+                    onClick={() => { setAccepted(!accepted); setError(""); }}
                   >
                     <div className={`w-5 h-5 rounded border-2 mt-0.5 flex-shrink-0 flex items-center justify-center transition-all duration-200 ${
                       accepted
@@ -251,8 +383,21 @@ export default function RegisterPage() {
                   </label>
                 </div>
 
-                <button className="w-full btn-primary py-3.5 text-base rounded-xl justify-center shadow-lg shadow-cama/20 hover:shadow-cama/40 hover:scale-[1.01] transition-all duration-200">
-                  Créer mon compte
+                {error && (
+                  <div className="flex items-center gap-2 text-red-600 text-sm bg-red-50 border border-red-100 rounded-xl px-4 py-3 mb-4 animate-fade-up">
+                    <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                    {error}
+                  </div>
+                )}
+
+                <button
+                  onClick={handleRegister}
+                  disabled={loading}
+                  className="w-full btn-primary py-3.5 text-base rounded-xl justify-center shadow-lg shadow-cama/20 hover:shadow-cama/40 hover:scale-[1.01] transition-all duration-200 disabled:opacity-70 disabled:cursor-not-allowed disabled:scale-100"
+                >
+                  {loading ? (
+                    <><Loader2 className="w-4 h-4 animate-spin" /> Création…</>
+                  ) : "Créer mon compte"}
                 </button>
               </div>
             )}

@@ -16,6 +16,8 @@ export interface AppUser {
   avatarColor: string;
   school:      string;
   level:       string;
+  phone:       string;
+  studentCard: string;
   initials:    string;
 }
 
@@ -38,6 +40,8 @@ function toAppUser(db: DBUser): AppUser {
     avatarColor: db.avatar_color,
     school:      db.school ?? "",
     level:       db.level  ?? "",
+    phone:       db.phone ? `${db.phone_prefix ?? "+237"} ${db.phone}` : "",
+    studentCard: db.student_card ?? "",
     initials:    `${db.first_name[0]}${db.last_name[0]}`.toUpperCase(),
   };
 }
