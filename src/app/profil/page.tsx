@@ -46,6 +46,23 @@ export default function ProfilePage() {
   const alerts = attempts.reduce((a, x) => a + x.alerts.length, 0);
   const qrCode = `CAMA-${user.id.toUpperCase()}-2025`;
 
+  /* Dossier académique réel (table inscriptions) */
+  const d = user.dossier;
+  const parcoursSlug   = d?.parcoursSlug ?? "genie-logiciel";
+  const filiereTitle   = d?.parcoursTitle ?? "Génie Logiciel";
+  const filiereSchool  = d?.school ?? user.school ?? "École d'Informatique";
+  const campus         = d?.campus ?? "Yaoundé";
+  const modeLabel      = d?.modeLabel ?? "Hybride";
+  const matricule      = user.studentCard || d?.matricule || "—";
+  const academicYear   = d?.academicYear ?? "2025–2026";
+  const semestre       = d?.semester ?? 1;
+  const niveau         = d?.level || user.level || "L1";
+  const cycleType      = d?.cycleType ?? "Licence";
+  const totalEcts      = d?.totalEcts ?? 180;
+  const enrolledLabel  = d?.enrolledAt
+    ? new Date(d.enrolledAt).toLocaleDateString("fr-FR", { month: "long", year: "numeric" })
+    : "—";
+
   const QUICK_LINKS = [
     { icon: CalendarClock, label: "Mon planning", sub: "Programme hebdo selon votre mode", action: () => setCalOpen(true) },
     { icon: CalendarDays,  label: "Calendrier académique", sub: "Année 2025–2026", href: "/calendrier" },
@@ -147,17 +164,17 @@ export default function ProfilePage() {
           <div className="flex-1 min-w-[240px]">
             <div className="flex items-center gap-2 flex-wrap mb-1">
               <h1 className="text-2xl font-bold">{user.name}</h1>
-              <span className="text-[10px] font-black uppercase tracking-widest bg-gold text-white px-2 py-0.5">{user.level || user.roleLabel}</span>
-              <span className="text-[10px] font-bold bg-white/15 px-2 py-0.5">Mode hybride</span>
+              <span className="text-[10px] font-black uppercase tracking-widest bg-gold text-white px-2 py-0.5">{niveau || user.roleLabel}</span>
+              <span className="text-[10px] font-bold bg-white/15 px-2 py-0.5">Mode {modeLabel.toLowerCase()}</span>
             </div>
             <p className="text-white/70 text-sm flex items-center gap-2 flex-wrap">
               <span className="flex items-center gap-1"><Mail className="w-3.5 h-3.5" /> {user.email}</span>
               <span className="text-white/30">·</span>
-              <span className="flex items-center gap-1"><GraduationCap className="w-3.5 h-3.5" /> Licence Informatique</span>
+              <span className="flex items-center gap-1"><GraduationCap className="w-3.5 h-3.5" /> {cycleType} {filiereTitle}</span>
               <span className="text-white/30">·</span>
-              <span className="flex items-center gap-1"><MapPin className="w-3.5 h-3.5" /> Campus Yaoundé</span>
+              <span className="flex items-center gap-1"><MapPin className="w-3.5 h-3.5" /> Campus {campus}</span>
             </p>
-            <p className="text-white/50 text-xs mt-1">Matricule JFN-2024-0871 · inscrit depuis octobre 2024 · semestre 4 en cours</p>
+            <p className="text-white/50 text-xs mt-1">Matricule {matricule} · inscrit depuis {enrolledLabel} · semestre {semestre} en cours</p>
           </div>
           {/* Anneau progression */}
           <div className="flex items-center gap-3">
@@ -324,10 +341,10 @@ export default function ProfilePage() {
             </h2>
             <div className="grid sm:grid-cols-2 gap-px bg-border border border-border">
               {[
-                { k: "Filière", v: "Génie Logiciel — École d'Informatique" },
-                { k: "Cycle", v: "Licence (LMD) · L2 · 180 ECTS au total" },
-                { k: "Mode d'inscription", v: "Hybride — campus mar./jeu. + plateforme CAMA" },
-                { k: "Année académique", v: "2025–2026 · Semestre 4" },
+                { k: "Filière", v: `${filiereTitle} — ${filiereSchool}` },
+                { k: "Cycle", v: `${cycleType} (LMD) · ${niveau} · ${totalEcts} ECTS au total` },
+                { k: "Mode d'inscription", v: modeLabel },
+                { k: "Année académique", v: `${academicYear} · Semestre ${semestre}` },
               ].map((r) => (
                 <div key={r.k} className="bg-white p-3">
                   <p className="text-[10px] text-subtle uppercase tracking-wider">{r.k}</p>
@@ -335,7 +352,7 @@ export default function ProfilePage() {
                 </div>
               ))}
             </div>
-            <Link href="/parcours/genie-logiciel" className="inline-flex items-center gap-1 text-[11px] font-bold text-cama hover:underline mt-2">
+            <Link href={`/parcours/${parcoursSlug}`} className="inline-flex items-center gap-1 text-[11px] font-bold text-cama hover:underline mt-2">
               Voir la fiche complète du parcours <ChevronRight className="w-3 h-3" />
             </Link>
           </section>
@@ -462,7 +479,7 @@ export default function ProfilePage() {
 
           {/* Mode & campus */}
           <section className="px-4 py-4 border-b border-border">
-            <h2 className="text-[10px] font-black text-ink uppercase tracking-widest mb-3">Mon mode hybride</h2>
+            <h2 className="text-[10px] font-black text-ink uppercase tracking-widest mb-3">Mon mode {modeLabel.toLowerCase()}</h2>
             <div className="space-y-2">
               {[
                 { icon: Building2, t: "Mardi & jeudi", d: "Présence campus — TD, TP, cours magistraux" },
@@ -478,7 +495,7 @@ export default function ProfilePage() {
                 </div>
               ))}
             </div>
-            <Link href="/parcours/genie-logiciel/campus" className="text-[10px] font-bold text-cama hover:underline mt-2 inline-block">
+            <Link href={`/parcours/${parcoursSlug}/campus`} className="text-[10px] font-bold text-cama hover:underline mt-2 inline-block">
               Détails campus & règlement →
             </Link>
           </section>

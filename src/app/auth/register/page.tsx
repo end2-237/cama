@@ -6,17 +6,32 @@ import Link from "next/link";
 import { ArrowLeft, Eye, EyeOff, Globe, ChevronRight, Check, AlertCircle, Loader2 } from "lucide-react";
 import AuthPanel from "@/components/auth/AuthPanel";
 import { supabase } from "@/lib/supabase";
-
-const ecoles = [
-  "École d'Informatique",
-  "École de Gestion",
-  "École des Sciences",
-];
+import { PARCOURS, CYCLES } from "@/lib/parcours";
 
 const niveaux = ["L1", "L2", "L3", "M1", "M2"];
 
+// Filières réelles du catalogue, groupées par école
+const PARCOURS_BY_SCHOOL = PARCOURS.reduce<Record<string, typeof PARCOURS>>((acc, p) => {
+  (acc[p.school] ??= []).push(p);
+  return acc;
+}, {});
+
 // Palette d'avatars attribuée aléatoirement à l'inscription
 const AVATAR_COLORS = ["#6366f1", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899", "#14b8a6"];
+
+// Année académique + semestre courants (rentrée en septembre)
+function currentAcademicYear(): string {
+  const now = new Date();
+  const y = now.getFullYear();
+  const start = now.getMonth() >= 8 ? y : y - 1; // mois 8 = septembre
+  return `${start}–${start + 1}`;
+}
+
+function generateMatricule(): string {
+  const year = new Date().getFullYear();
+  const n = Math.floor(1000 + Math.random() * 9000);
+  return `JFN-${year}-${n}`;
+}
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -31,10 +46,13 @@ export default function RegisterPage() {
   const [lastName,    setLastName]    = useState("");
   const [email,       setEmail]       = useState("");
   const [pwd,         setPwd]         = useState("");
-  const [school,      setSchool]      = useState("");
+  const [parcoursSlug, setParcoursSlug] = useState("");
+  const [mode,        setMode]        = useState<"presentiel"|"hybride"|"online">("hybride");
   const [niveau,      setNiveau]      = useState("");
   const [studentCard, setStudentCard] = useState("");
   const [phone,       setPhone]       = useState("");
+
+  const parcours = PARCOURS.find((p) => p.slug === parcoursSlug);
 
   const [error,   setError]   = useState("");
   const [loading, setLoading] = useState(false);
@@ -52,9 +70,9 @@ export default function RegisterPage() {
 
   const handleRegister = async () => {
     setError("");
-    if (!school)   { setError("Sélectionnez votre école."); return; }
+    if (!parcours)  { setError("Sélectionnez votre filière."); return; }
     if (role === "etudiant" && !niveau) { setError("Sélectionnez votre niveau."); return; }
-    if (!accepted) { setError("Vous devez accepter les conditions d'utilisation."); return; }
+    if (!accepted)  { setError("Vous devez accepter les conditions d'utilisation."); return; }
 
     setLoading(true);
 
@@ -77,28 +95,57 @@ export default function RegisterPage() {
       return;
     }
 
-    // 2. Enregistrement du profil complet dans public.users
+    const userId = authData.user.id;
+    const matricule = studentCard.trim() || generateMatricule();
+
+    // 2. Profil complet dans public.users
     const avatarColor = AVATAR_COLORS[Math.floor(Math.random() * AVATAR_COLORS.length)];
     const { error: profileError } = await supabase.from("users").insert({
-      id:           authData.user.id,
+      id:           userId,
       email,
       first_name:   firstName,
       last_name:    lastName,
       role,
       avatar_color: avatarColor,
-      school,
+      school:       parcours.school,
       level:        role === "etudiant" ? niveau : null,
-      student_card: role === "etudiant" ? (studentCard || null) : null,
+      student_card: role === "etudiant" ? matricule : null,
       phone:        phone || null,
       phone_prefix: "+237",
     });
 
-    setLoading(false);
-
     if (profileError) {
+      setLoading(false);
       setError("Compte créé mais erreur d'enregistrement du profil. Contactez l'administration.");
       return;
     }
+
+    // 3. Dossier académique (inscription) — uniquement pour les étudiants
+    if (role === "etudiant") {
+      const { error: dossierError } = await supabase.from("inscriptions").insert({
+        user_id:        userId,
+        matricule,
+        parcours_slug:  parcours.slug,
+        parcours_title: parcours.title,
+        school:         parcours.school,
+        cycle_type:     parcours.cycleType,
+        level:          niveau,
+        mode,
+        campus:         "Yaoundé",
+        academic_year:  currentAcademicYear(),
+        semester:       1,
+        total_ects:     parcours.totalEcts,
+        status:         "en_attente",
+      });
+
+      if (dossierError) {
+        setLoading(false);
+        setError("Compte créé mais erreur d'ouverture du dossier académique. Contactez l'administration.");
+        return;
+      }
+    }
+
+    setLoading(false);
 
     // 3. Si la session est active (confirmation email désactivée) → dashboard
     if (authData.session) {
@@ -301,16 +348,49 @@ export default function RegisterPage() {
 
                 <div className="space-y-4 mb-6">
                   <div>
-                    <label className="block text-sm font-medium text-ink mb-1.5">École</label>
+                    <label className="block text-sm font-medium text-ink mb-1.5">Filière</label>
                     <select
-                      value={school}
-                      onChange={(e) => { setSchool(e.target.value); setError(""); }}
+                      value={parcoursSlug}
+                      onChange={(e) => { setParcoursSlug(e.target.value); setError(""); }}
                       className="input-auth bg-white cursor-pointer"
                     >
-                      <option value="">Sélectionner une école</option>
-                      {ecoles.map((e) => <option key={e} value={e}>{e}</option>)}
+                      <option value="">Sélectionner une filière</option>
+                      {Object.entries(PARCOURS_BY_SCHOOL).map(([school, list]) => (
+                        <optgroup key={school} label={school}>
+                          {list.map((p) => (
+                            <option key={p.slug} value={p.slug}>{p.title}</option>
+                          ))}
+                        </optgroup>
+                      ))}
                     </select>
+                    {parcours && (
+                      <p className="text-[11px] text-muted mt-1">
+                        {parcours.school} · {parcours.diplome}
+                      </p>
+                    )}
                   </div>
+
+                  {role === "etudiant" && (
+                    <div>
+                      <label className="block text-sm font-medium text-ink mb-1.5">Mode d&apos;inscription</label>
+                      <div className="grid grid-cols-3 gap-2">
+                        {CYCLES.map((c) => (
+                          <button
+                            key={c.id}
+                            type="button"
+                            onClick={() => { setMode(c.id); setError(""); }}
+                            className={`py-2.5 rounded-xl text-xs font-bold border-2 transition-all duration-200 ${
+                              mode === c.id
+                                ? "border-cama bg-cama text-white scale-105 shadow-md shadow-cama/25"
+                                : "border-border text-muted hover:border-cama hover:text-cama hover:scale-105"
+                            }`}
+                          >
+                            {c.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
                   {role === "etudiant" && (
                     <>
@@ -333,12 +413,14 @@ export default function RegisterPage() {
                         </div>
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-ink mb-1.5">Numéro de carte étudiant</label>
+                        <label className="block text-sm font-medium text-ink mb-1.5">
+                          Matricule <span className="text-subtle font-normal">(optionnel — généré sinon)</span>
+                        </label>
                         <input
                           type="text"
                           value={studentCard}
                           onChange={(e) => setStudentCard(e.target.value)}
-                          placeholder="JFN-2024-XXXX"
+                          placeholder="JFN-2025-XXXX"
                           className="input-auth"
                         />
                       </div>

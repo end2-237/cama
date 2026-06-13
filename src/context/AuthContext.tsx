@@ -2,7 +2,26 @@
 
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 import { supabase } from "@/lib/supabase";
-import type { DBUser, UserRole } from "@/lib/supabase";
+import type { DBUser, DBInscription, UserRole, CycleMode } from "@/lib/supabase";
+
+// Dossier académique de l'étudiant (issu de la table inscriptions)
+export interface Dossier {
+  matricule:     string;
+  parcoursSlug:  string;
+  parcoursTitle: string;
+  school:        string;
+  cycleType:     string;
+  level:         string;
+  mode:          CycleMode;
+  modeLabel:     string;
+  campus:        string;
+  academicYear:  string;
+  semester:      number;
+  totalEcts:     number;
+  status:        DBInscription["status"];
+  statusLabel:   string;
+  enrolledAt:    string;
+}
 
 // Shape exposée dans l'app (compatible avec l'ancien AuthContext)
 export interface AppUser {
@@ -19,6 +38,39 @@ export interface AppUser {
   phone:       string;
   studentCard: string;
   initials:    string;
+  dossier:     Dossier | null;
+}
+
+const MODE_LABELS: Record<CycleMode, string> = {
+  presentiel: "Présentiel",
+  hybride:    "Hybride",
+  online:     "En ligne",
+};
+
+const STATUS_LABELS: Record<DBInscription["status"], string> = {
+  en_attente: "Inscription en attente de validation",
+  validee:    "Inscription validée",
+  rejetee:    "Inscription rejetée",
+};
+
+function toDossier(db: DBInscription): Dossier {
+  return {
+    matricule:     db.matricule,
+    parcoursSlug:  db.parcours_slug,
+    parcoursTitle: db.parcours_title,
+    school:        db.school,
+    cycleType:     db.cycle_type,
+    level:         db.level,
+    mode:          db.mode,
+    modeLabel:     MODE_LABELS[db.mode] ?? db.mode,
+    campus:        db.campus,
+    academicYear:  db.academic_year,
+    semester:      db.semester,
+    totalEcts:     db.total_ects,
+    status:        db.status,
+    statusLabel:   STATUS_LABELS[db.status] ?? db.status,
+    enrolledAt:    db.enrolled_at,
+  };
 }
 
 const ROLE_LABELS: Record<UserRole, string> = {
@@ -28,7 +80,7 @@ const ROLE_LABELS: Record<UserRole, string> = {
   jury:       "Jury",
 };
 
-function toAppUser(db: DBUser): AppUser {
+function toAppUser(db: DBUser, dossier: DBInscription | null): AppUser {
   return {
     id:          db.id,
     email:       db.email,
@@ -43,6 +95,7 @@ function toAppUser(db: DBUser): AppUser {
     phone:       db.phone ? `${db.phone_prefix ?? "+237"} ${db.phone}` : "",
     studentCard: db.student_card ?? "",
     initials:    `${db.first_name[0]}${db.last_name[0]}`.toUpperCase(),
+    dossier:     dossier ? toDossier(dossier) : null,
   };
 }
 
@@ -80,12 +133,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   async function fetchProfile(userId: string) {
-    const { data } = await supabase
-      .from("users")
-      .select("*")
-      .eq("id", userId)
-      .single();
-    if (data) setUser(toAppUser(data as DBUser));
+    const [{ data: profile }, { data: inscription }] = await Promise.all([
+      supabase.from("users").select("*").eq("id", userId).single(),
+      supabase.from("inscriptions").select("*").eq("user_id", userId)
+        .order("enrolled_at", { ascending: false }).limit(1).maybeSingle(),
+    ]);
+    if (profile) {
+      setUser(toAppUser(profile as DBUser, (inscription as DBInscription) ?? null));
+    }
   }
 
   const logout = async () => {

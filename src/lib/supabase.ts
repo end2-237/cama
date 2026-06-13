@@ -27,6 +27,24 @@ export interface DBUser {
   created_at: string;
 }
 
+export interface DBInscription {
+  id: string;
+  user_id: string;
+  matricule: string;
+  parcours_slug: string;
+  parcours_title: string;
+  school: string;
+  cycle_type: string;
+  level: string;
+  mode: CycleMode;
+  campus: string;
+  academic_year: string;
+  semester: number;
+  total_ects: number;
+  status: "en_attente" | "validee" | "rejetee";
+  enrolled_at: string;
+}
+
 export interface DBCourse {
   id: string;
   code: string;
