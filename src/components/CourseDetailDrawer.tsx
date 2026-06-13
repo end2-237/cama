@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useDB } from "@/hooks/useDB";
+import { studentMode, SESSION_KINDS } from "@/lib/scheduling";
 
 interface Props {
   courseId: string | null;
@@ -29,6 +30,17 @@ export default function CourseDetailDrawer({ courseId, onClose }: Props) {
   const nextLive = lives.find((l) => l.status === "planifie" || l.status === "encours");
   const forumCount = db?.forum.filter((f) => f.ueId === course?.ueId).length || 0;
   const unlocked = (i: number) => i === 0 || doneIds.has(chapters[i - 1].id);
+
+  const det = course?.details;
+  const mode = db && user ? studentMode(db.studentSettings, user.id) : "presentiel";
+  const courseSessions = (db?.sessions || []).filter(
+    (s) => s.courseId === courseId && s.status === "valide" && s.modes.includes(mode),
+  );
+  const objectives = det?.objectives?.length ? det.objectives : [
+    "Maîtriser les concepts fondamentaux de l'UE",
+    "Réussir le checkpoint de chaque chapitre",
+    "Être prêt pour l'examen Safe-CAMA",
+  ];
 
   return (
     <>
@@ -184,9 +196,11 @@ export default function CourseDetailDrawer({ courseId, onClose }: Props) {
                       { icon: GraduationCap, k: "UE", v: `${ue.code} — ${ue.title}` },
                       { icon: Award,    k: "Crédits", v: `${ue.ects} ECTS` },
                       { icon: CalendarClock, k: "Semestre", v: ue.semestre },
-                      { icon: BarChart2, k: "Difficulté", v: "Intermédiaire" },
-                      { icon: Clock,    k: "Charge estimée", v: `${chapters.length * 25} min + TD` },
-                      { icon: Star,     k: "Évaluation", v: "4.7/5 (142 étudiants)" },
+                      { icon: BarChart2, k: "Difficulté", v: det?.difficulte || "Intermédiaire" },
+                      { icon: Clock,    k: "Volume horaire", v: det?.volume || `${chapters.length * 25} min + TD` },
+                      ...(det?.prerequis ? [{ icon: ChevronRight, k: "Prérequis", v: det.prerequis }] : []),
+                      ...(det?.audience ? [{ icon: User, k: "Public visé", v: det.audience }] : []),
+                      ...(det?.evaluation ? [{ icon: Award, k: "Évaluation", v: det.evaluation }] : [{ icon: Star, k: "Évaluation", v: "4.7/5 (142 étudiants)" }]),
                     ].map((r) => (
                       <div key={r.k} className="flex items-start gap-2.5">
                         <r.icon className="w-3.5 h-3.5 text-cama flex-shrink-0 mt-0.5" />
@@ -224,22 +238,50 @@ export default function CourseDetailDrawer({ courseId, onClose }: Props) {
                   </div>
                 </div>
 
+                {/* Planning du cours (séances validées pour mon mode) */}
+                <div className="px-4 py-3">
+                  <p className="text-[9px] font-black text-subtle uppercase tracking-widest mb-2 flex items-center gap-1">
+                    <CalendarClock className="w-3 h-3 text-cama" /> Planning de ce cours
+                  </p>
+                  {courseSessions.length === 0 ? (
+                    <p className="text-[11px] text-muted">Aucune séance planifiée pour votre mode d&apos;inscription.</p>
+                  ) : (
+                    <div className="space-y-1.5">
+                      {courseSessions.map((s) => {
+                        const k = SESSION_KINDS[s.kind];
+                        return (
+                          <div key={s.id} className="flex items-center gap-2 text-[11px]">
+                            <span className={`text-[8px] font-bold px-1.5 py-0.5 border flex-shrink-0 ${k.color}`}>{k.label}</span>
+                            <span className="text-ink font-semibold flex-shrink-0">{s.day}</span>
+                            <span className="text-muted">{s.end ? `${s.start}–${s.end}` : s.start}</span>
+                            {s.room && <span className="text-subtle truncate">· {s.room}</span>}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                  <Link href="/calendrier" className="text-[10px] font-bold text-cama hover:underline mt-2 inline-block">Calendrier complet →</Link>
+                </div>
+
                 {/* Objectifs */}
                 <div className="px-4 py-3">
                   <p className="text-[9px] font-black text-subtle uppercase tracking-widest mb-2 flex items-center gap-1">
                     <Target className="w-3 h-3 text-cama" /> À la fin de ce cours
                   </p>
                   <div className="space-y-1.5">
-                    {[
-                      "Maîtriser les concepts fondamentaux de l'UE",
-                      "Réussir le checkpoint de chaque chapitre",
-                      "Être prêt pour l'examen Safe-CAMA",
-                    ].map((o, i) => (
+                    {objectives.map((o, i) => (
                       <p key={i} className="flex items-start gap-2 text-[11px] text-muted">
                         <ChevronRight className="w-3 h-3 text-cama flex-shrink-0 mt-0.5" /> {o}
                       </p>
                     ))}
                   </div>
+                  {det?.competences?.length ? (
+                    <div className="flex flex-wrap gap-1.5 mt-2.5">
+                      {det.competences.map((c) => (
+                        <span key={c} className="text-[9px] font-bold px-2 py-0.5 bg-cama-50 text-cama">{c}</span>
+                      ))}
+                    </div>
+                  ) : null}
                 </div>
 
                 {/* Communauté */}

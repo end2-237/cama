@@ -18,7 +18,7 @@ import { useMaintenance } from "@/hooks/useMaintenance";
 const tabsMap: Record<string, string[]> = {
   etudiant:   ["Mes Cours", "Examens", "Résultats"],
   enseignant: ["Mes Cours", "Étudiants", "Évaluations"],
-  admin:      ["Tableau de bord", "Utilisateurs", "Paramètres"],
+  admin:      ["Tableau de bord", "Planification", "Utilisateurs", "Paramètres"],
   jury:       ["Délibérations", "Cas d'intégrité"],
 };
 

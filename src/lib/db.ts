@@ -26,9 +26,56 @@ export interface DBChapter {
   liveId?: string;
 }
 
+export interface DBCourseDetails {
+  objectives?:  string[];   // objectifs pédagogiques
+  competences?: string[];   // compétences visées
+  prerequis?:   string;     // prérequis
+  audience?:    string;     // public visé
+  evaluation?:  string;     // modalités d'évaluation
+  volume?:      string;     // volume horaire ("45h CM + 20h TD")
+  difficulte?:  "Débutant" | "Intermédiaire" | "Avancé";
+}
+
 export interface DBCourse {
   id: string; ueId: string; title: string; teacherId: string;
   published: boolean; profIA: boolean; description: string;
+  details?: DBCourseDetails;
+}
+
+/* ── Planification & calendrier ── */
+export type CycleMode = "online" | "hybride" | "presentiel";
+export type SessionKind = "campus" | "live" | "async" | "examen";
+
+export interface DBSession {
+  id: string; courseId: string; ueId: string; title: string;
+  day: string;            // "Lundi" … "Samedi"
+  start: string;          // "08h00"
+  end: string;            // "11h00"
+  kind: SessionKind;
+  room?: string;
+  modes: CycleMode[];     // pour quels modes de cycle cette séance s'applique
+  proposedBy: string;     // id enseignant
+  status: "propose" | "valide" | "rejete";
+  semester: string;       // "S4"
+}
+
+export interface DBCalEvent {
+  id: string; date: string; label: string;
+  type: "cours" | "examen" | "jury" | "resultat" | "admin" | "vacances" | "event";
+  semester: 1 | 2;
+}
+
+export interface DBStudentSetting {
+  studentId: string;
+  mode: CycleMode;
+  deadlineWeeks?: number; // hybride : délai max (semaines) pour boucler la progression online
+}
+
+export interface DBSlotRequest {
+  id: string; studentId: string;
+  day: string; start: string; end: string;
+  ue: string; note: string;
+  status: "propose" | "valide" | "rejete";
 }
 
 export interface DBChatMsg {
@@ -109,6 +156,10 @@ interface DB {
   progress:  DBProgress[];
   forum:     DBForumMsg[];
   notifs:    DBNotif[];
+  sessions:        DBSession[];
+  calendarEvents:  DBCalEvent[];
+  studentSettings: DBStudentSetting[];
+  slotRequests:    DBSlotRequest[];
 }
 
 /* ── Seed ── */
@@ -121,7 +172,22 @@ const SEED: DB = {
   ],
   courses: [
     { id: "c1", ueId: "ue1", title: "Structures de données avancées", teacherId: "u2", published: true,  profIA: true,
-      description: "Arbres, graphes, tables de hachage et analyse de complexité — le socle de tout informaticien." },
+      description: "Arbres, graphes, tables de hachage et analyse de complexité — le socle de tout informaticien.",
+      details: {
+        objectives: [
+          "Maîtriser l'analyse de complexité (notation Big-O)",
+          "Implémenter arbres binaires de recherche et arbres équilibrés",
+          "Choisir la structure adaptée à un problème donné",
+          "Optimiser temps et mémoire en contexte bas-débit",
+        ],
+        competences: ["Algorithmique", "Analyse de complexité", "Structures arborescentes", "Tables de hachage"],
+        prerequis: "INF101 — Programmation impérative, bases de l'algorithmique.",
+        audience: "Étudiants L2 Informatique (S3/S4) et auditeurs en reconversion.",
+        evaluation: "Contrôle continu (40%) + examen Safe-CAMA (60%). Quiz par chapitre.",
+        volume: "45h CM + 20h TD + 10h TP",
+        difficulte: "Intermédiaire",
+      },
+    },
     { id: "c2", ueId: "ue2", title: "Développement web full-stack",   teacherId: "u2", published: true,  profIA: true,
       description: "Du HTML aux API REST : construire une application web complète, optimisée bas-débit." },
     { id: "c3", ueId: "ue3", title: "Analyse mathématique II",        teacherId: "u2", published: false, profIA: false,
@@ -238,11 +304,54 @@ const SEED: DB = {
     { id: "n1", userId: "u1", text: "Live « TD Arbres binaires » démarre bientôt", time: "Il y a 10 min", read: false },
     { id: "n2", userId: "u1", text: "Examen INF201 ouvert — 45 min", time: "Il y a 1h", read: false },
   ],
+  sessions: [
+    /* ── Séances validées (planifiées par l'admin) ── */
+    { id: "s1", courseId: "c1", ueId: "ue1", title: "Structures de données — cours magistral", day: "Lundi", start: "08h00", end: "11h00", kind: "campus", room: "Salle B204", modes: ["presentiel", "hybride"], proposedBy: "u2", status: "valide", semester: "S4" },
+    { id: "s2", courseId: "c1", ueId: "ue1", title: "Classe virtuelle — Structures de données", day: "Lundi", start: "18h00", end: "19h30", kind: "live", modes: ["online", "hybride"], proposedBy: "u2", status: "valide", semester: "S4" },
+    { id: "s3", courseId: "c1", ueId: "ue1", title: "TD Arbres binaires", day: "Mardi", start: "10h15", end: "12h15", kind: "campus", room: "Salle B204", modes: ["presentiel"], proposedBy: "u2", status: "valide", semester: "S4" },
+    { id: "s4", courseId: "c1", ueId: "ue1", title: "TD virtuel — Arbres binaires", day: "Mardi", start: "18h00", end: "19h00", kind: "live", modes: ["online", "hybride"], proposedBy: "u2", status: "valide", semester: "S4" },
+    { id: "s5", courseId: "c2", ueId: "ue2", title: "Bases de données — cours", day: "Mercredi", start: "08h00", end: "10h00", kind: "campus", room: "Labo Info 1", modes: ["presentiel", "hybride"], proposedBy: "u2", status: "valide", semester: "S4" },
+    { id: "s6", courseId: "c2", ueId: "ue2", title: "Vidéos + PDF — Bases de données", day: "Mercredi", start: "Libre accès", end: "", kind: "async", modes: ["online", "hybride"], proposedBy: "u2", status: "valide", semester: "S4" },
+    { id: "s7", courseId: "c2", ueId: "ue2", title: "Classe virtuelle — Bases de données", day: "Jeudi", start: "18h00", end: "19h30", kind: "live", modes: ["online", "hybride"], proposedBy: "u2", status: "valide", semester: "S4" },
+    { id: "s8", courseId: "c1", ueId: "ue1", title: "Permanence Prof — questions/réponses", day: "Vendredi", start: "17h00", end: "18h00", kind: "live", modes: ["online", "hybride", "presentiel"], proposedBy: "u2", status: "valide", semester: "S4" },
+    /* ── Propositions en attente de validation admin ── */
+    { id: "s9", courseId: "c3", ueId: "ue3", title: "Analyse mathématique II — CM", day: "Jeudi", start: "08h00", end: "10h00", kind: "campus", room: "Amphi 2", modes: ["presentiel", "hybride"], proposedBy: "u2", status: "propose", semester: "S4" },
+    { id: "s10", courseId: "c3", ueId: "ue3", title: "Live de synthèse — Analyse II", day: "Samedi", start: "09h00", end: "10h30", kind: "live", modes: ["online", "hybride"], proposedBy: "u2", status: "propose", semester: "S4" },
+  ],
+  calendarEvents: [
+    { id: "ce1", date: "01 sept. 2025", label: "Rentrée administrative — inscriptions & réinscriptions", type: "admin", semester: 1 },
+    { id: "ce2", date: "08 sept. 2025", label: "Rentrée académique — début des cours S1 / S3 / S5", type: "cours", semester: 1 },
+    { id: "ce3", date: "22 sept. 2025", label: "Clôture des inscriptions tardives", type: "admin", semester: 1 },
+    { id: "ce4", date: "13 oct. 2025", label: "Semaine d'intégration & forum des clubs", type: "event", semester: 1 },
+    { id: "ce5", date: "03 — 08 nov. 2025", label: "Contrôles continus n°1 (toutes filières)", type: "examen", semester: 1 },
+    { id: "ce6", date: "15 déc. 2025", label: "Fin des enseignements du semestre 1", type: "cours", semester: 1 },
+    { id: "ce7", date: "16 déc. 2025 — 04 janv. 2026", label: "Vacances de fin d'année", type: "vacances", semester: 1 },
+    { id: "ce8", date: "05 — 17 janv. 2026", label: "Examens semestriels S1 (sessions Safe-CAMA)", type: "examen", semester: 1 },
+    { id: "ce9", date: "26 janv. 2026", label: "Délibérations du jury — semestre 1", type: "jury", semester: 1 },
+    { id: "ce10", date: "30 janv. 2026", label: "Publication des résultats S1 (relevés certifiés QR)", type: "resultat", semester: 1 },
+    { id: "ce11", date: "02 févr. 2026", label: "Début des cours S2 / S4 / S6", type: "cours", semester: 2 },
+    { id: "ce12", date: "16 — 21 mars 2026", label: "Contrôles continus n°2", type: "examen", semester: 2 },
+    { id: "ce13", date: "30 mars — 05 avr. 2026", label: "Vacances de Pâques", type: "vacances", semester: 2 },
+    { id: "ce14", date: "20 avr. 2026", label: "Lancement des stages de fin de cycle (L3 / M2)", type: "event", semester: 2 },
+    { id: "ce15", date: "11 — 16 mai 2026", label: "Contrôles continus n°3", type: "examen", semester: 2 },
+    { id: "ce16", date: "05 juin 2026", label: "Fin des enseignements du semestre 2", type: "cours", semester: 2 },
+    { id: "ce17", date: "08 — 20 juin 2026", label: "Examens semestriels S2 (sessions Safe-CAMA)", type: "examen", semester: 2 },
+    { id: "ce18", date: "25 juin 2026", label: "Délibérations du jury — semestre 2", type: "jury", semester: 2 },
+    { id: "ce19", date: "29 juin 2026", label: "Publication des résultats annuels", type: "resultat", semester: 2 },
+    { id: "ce20", date: "06 — 11 juil. 2026", label: "Session de rattrapage", type: "examen", semester: 2 },
+    { id: "ce21", date: "18 juil. 2026", label: "Cérémonie de remise des diplômes", type: "event", semester: 2 },
+  ],
+  studentSettings: [
+    { studentId: "u1", mode: "hybride", deadlineWeeks: 12 },
+  ],
+  slotRequests: [
+    { id: "sr1", studentId: "u1", day: "Mercredi", start: "20h00", end: "21h00", ue: "INF202", note: "Créneau du soir pour suivre les bases de données en ligne après le travail.", status: "propose" },
+  ],
 };
 
 /* ── Accès ── */
 
-const KEY = "cama_db_v2";
+const KEY = "cama_db_v3";
 
 export function loadDB(): DB {
   if (typeof window === "undefined") return SEED;

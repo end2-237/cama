@@ -2,15 +2,20 @@
 
 import { useEffect, useState } from "react";
 import { getMaintenance, setMaintenance } from "@/lib/maintenance";
+import { useDB } from "@/hooks/useDB";
+import { uid } from "@/lib/db";
+import { CYCLE_MODES, SESSION_KINDS } from "@/lib/scheduling";
 import {
   Users, BookOpen, GraduationCap, ShieldCheck, TrendingUp, AlertTriangle,
   CheckCircle2, Clock, ChevronRight, UserPlus, Settings, BarChart2,
   Activity, Server, Database, Radio, Megaphone, FileText, Search,
   Wifi, HardDrive, Lock, Gavel, Building2, Zap, Bot,
   Terminal, Filter, MoreVertical, Check, ToggleRight, ToggleLeft, Globe,
+  CalendarDays, Plus, X, Trash2, Send, MapPin,
 } from "lucide-react";
 
 export default function AdminView({ tab }: { tab: string }) {
+  if (tab === "Planification") return <PlanningTab />;
   if (tab === "Utilisateurs") return <UsersTab />;
   if (tab === "Paramètres")   return <SettingsTab />;
   return <OverviewTab />;
@@ -575,6 +580,216 @@ function SettingsTab() {
       <div className="mt-3 flex items-center gap-2 p-3 bg-gold/5 border border-gold/20">
         <AlertTriangle className="w-4 h-4 text-gold-dark flex-shrink-0" />
         <p className="text-[11px] text-ink leading-snug">Le <strong>mode maintenance</strong> bloque l&apos;accès étudiant. À n&apos;activer que lors des fenêtres de maintenance planifiées.</p>
+      </div>
+    </AdminShell>
+  );
+}
+
+/* ════════════════════════════════════════════════════════════
+   PLANIFICATION (calendrier annuel + validation propositions)
+════════════════════════════════════════════════════════════ */
+const EV_TYPES = ["cours", "examen", "jury", "resultat", "admin", "vacances", "event"] as const;
+const EV_LABEL: Record<string, string> = {
+  cours: "Enseignement", examen: "Examens", jury: "Jury", resultat: "Résultats",
+  admin: "Administratif", vacances: "Vacances", event: "Événement",
+};
+const SESSION_STATUS = {
+  propose: { label: "En attente", cls: "bg-gold/10 text-gold-dark" },
+  valide:  { label: "Validée", cls: "bg-green-50 text-green-600" },
+  rejete:  { label: "Refusée", cls: "bg-red-50 text-red-500" },
+} as const;
+
+function PlanningTab() {
+  const { db, mutate } = useDB();
+  const [evDate, setEvDate] = useState("");
+  const [evLabel, setEvLabel] = useState("");
+  const [evType, setEvType] = useState<string>("cours");
+  const [evSem, setEvSem] = useState<1 | 2>(2);
+  if (!db) return null;
+
+  const proposals = db.sessions.filter((s) => s.status === "propose");
+  const validated = db.sessions.filter((s) => s.status === "valide");
+  const pendingSlots = db.slotRequests.filter((r) => r.status === "propose");
+
+  const addEvent = () => {
+    if (!evDate.trim() || !evLabel.trim()) return;
+    mutate((d) => d.calendarEvents.push({ id: uid("ce"), date: evDate.trim(), label: evLabel.trim(), type: evType as never, semester: evSem }));
+    setEvDate(""); setEvLabel("");
+  };
+  const delEvent = (id: string) => mutate((d) => { d.calendarEvents = d.calendarEvents.filter((e) => e.id !== id); });
+  const setSession = (id: string, status: "valide" | "rejete") => mutate((d) => { const s = d.sessions.find((x) => x.id === id); if (s) s.status = status; });
+  const setSlot = (id: string, status: "valide" | "rejete") => mutate((d) => { const r = d.slotRequests.find((x) => x.id === id); if (r) r.status = status; });
+
+  const right = (
+    <>
+      <div className="px-4 py-3 border-b border-border">
+        <h2 className="text-[10px] font-black text-ink uppercase tracking-widest mb-2">À traiter</h2>
+        <div className="grid grid-cols-2 gap-px bg-border border border-border">
+          {[
+            { value: String(proposals.length), label: "propositions profs", color: "text-gold-dark" },
+            { value: String(pendingSlots.length), label: "créneaux étudiants", color: "text-cama" },
+          ].map((s, i) => (
+            <div key={i} className="bg-white p-2.5 text-center">
+              <p className={`text-lg font-bold leading-none ${s.color}`}>{s.value}</p>
+              <p className="text-[9px] text-muted mt-1">{s.label}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="px-4 py-3 border-b border-border">
+        <h2 className="text-[10px] font-black text-ink uppercase tracking-widest mb-2">Séances validées par mode</h2>
+        <div className="space-y-2.5">
+          {CYCLE_MODES.map((m) => {
+            const n = validated.filter((s) => s.modes.includes(m.id)).length;
+            const max = validated.length || 1;
+            return (
+              <div key={m.id}>
+                <div className="flex items-center justify-between text-xs mb-1">
+                  <span className="flex items-center gap-2 text-muted"><span className="w-2 h-2 rounded-full" style={{ background: m.color }} /> {m.short}</span>
+                  <span className="font-bold text-ink">{n}</span>
+                </div>
+                <div className="h-1.5 bg-surface overflow-hidden"><div className="h-full" style={{ width: `${(n / max) * 100}%`, background: m.color }} /></div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+      <GradientNote icon={CalendarDays} title="Propose → Valide → Reçoit"
+        body="Les enseignants proposent les séances, vous les validez et planifiez ici, les étudiants les reçoivent dans leur calendrier selon leur mode d'inscription." />
+    </>
+  );
+
+  return (
+    <AdminShell right={right}>
+      <div className="flex items-center gap-2 mb-3 pb-2 border-b border-border">
+        <CalendarDays className="w-5 h-5 text-ink" strokeWidth={1.5} />
+        <h1 className="text-xl font-light text-ink">Planification</h1>
+      </div>
+
+      {/* ── Propositions de séances (profs) ── */}
+      <p className="text-[10px] font-black text-ink uppercase tracking-widest mb-2 flex items-center gap-1.5">
+        <Send className="w-3.5 h-3.5 text-cama" /> Propositions des enseignants
+        {proposals.length > 0 && <span className="text-[9px] font-bold px-1.5 py-0.5 bg-gold/10 text-gold-dark">{proposals.length} en attente</span>}
+      </p>
+      <div className="border border-border divide-y divide-border bg-white mb-4">
+        {db.sessions.length === 0 && <p className="px-4 py-6 text-sm text-muted text-center">Aucune séance proposée.</p>}
+        {[...proposals, ...db.sessions.filter((s) => s.status !== "propose")].map((s) => {
+          const k = SESSION_KINDS[s.kind];
+          const st = SESSION_STATUS[s.status];
+          const ue = db.ues.find((u) => u.id === s.ueId);
+          return (
+            <div key={s.id} className="p-3 flex items-center gap-3 flex-wrap">
+              <span className={`text-[9px] font-bold px-1.5 py-0.5 border flex-shrink-0 ${k.color}`}>{k.label}</span>
+              <div className="flex-1 min-w-[180px]">
+                <p className="text-sm font-semibold text-ink">{s.title}</p>
+                <p className="text-[11px] text-muted flex items-center gap-2 flex-wrap mt-0.5">
+                  <span>{ue?.code}</span>
+                  <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {s.day} · {s.end ? `${s.start}–${s.end}` : s.start}</span>
+                  {s.room && <span className="flex items-center gap-1"><MapPin className="w-3 h-3" /> {s.room}</span>}
+                </p>
+                <div className="flex items-center gap-1 mt-1 flex-wrap">
+                  {s.modes.map((m) => {
+                    const mm = CYCLE_MODES.find((x) => x.id === m)!;
+                    return <span key={m} className="text-[8px] font-bold px-1.5 py-0.5 text-white" style={{ background: mm.color }}>{mm.short}</span>;
+                  })}
+                </div>
+              </div>
+              {s.status === "propose" ? (
+                <div className="flex items-center gap-1.5">
+                  <button onClick={() => setSession(s.id, "valide")} className="flex items-center gap-1 px-3 py-1.5 bg-green-500 text-white text-[11px] font-bold hover:bg-green-600 transition-colors"><Check className="w-3.5 h-3.5" /> Valider</button>
+                  <button onClick={() => setSession(s.id, "rejete")} className="flex items-center gap-1 px-2.5 py-1.5 border border-border text-muted text-[11px] font-bold hover:border-red-300 hover:text-red-500 transition-colors"><X className="w-3.5 h-3.5" /> Refuser</button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <span className={`text-[10px] font-bold px-2 py-0.5 ${st.cls}`}>{st.label}</span>
+                  {s.status === "rejete" && <button onClick={() => setSession(s.id, "valide")} className="text-[10px] font-bold text-cama hover:underline">Revalider</button>}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* ── Demandes de créneaux (étudiants) ── */}
+      <p className="text-[10px] font-black text-ink uppercase tracking-widest mb-2 flex items-center gap-1.5">
+        <Clock className="w-3.5 h-3.5 text-cama" /> Créneaux proposés par les étudiants
+        {pendingSlots.length > 0 && <span className="text-[9px] font-bold px-1.5 py-0.5 bg-cama-50 text-cama">{pendingSlots.length} en attente</span>}
+      </p>
+      <div className="border border-border divide-y divide-border bg-white mb-4">
+        {db.slotRequests.length === 0 && <p className="px-4 py-6 text-sm text-muted text-center">Aucune demande de créneau.</p>}
+        {db.slotRequests.map((r) => {
+          const st = SESSION_STATUS[r.status];
+          return (
+            <div key={r.id} className="p-3 flex items-center gap-3 flex-wrap">
+              <div className="w-9 h-9 rounded-full bg-cama-50 text-cama flex items-center justify-center text-[10px] font-bold flex-shrink-0">
+                {r.studentId === "u1" ? "JP" : "ÉT"}
+              </div>
+              <div className="flex-1 min-w-[180px]">
+                <p className="text-sm font-semibold text-ink flex items-center gap-2">
+                  <Clock className="w-3.5 h-3.5 text-subtle" /> {r.day} · {r.start}–{r.end} <span className="text-[11px] text-muted font-normal">· {r.ue}</span>
+                </p>
+                <p className="text-[11px] text-muted leading-snug mt-0.5">{r.note}</p>
+              </div>
+              {r.status === "propose" ? (
+                <div className="flex items-center gap-1.5">
+                  <button onClick={() => setSlot(r.id, "valide")} className="flex items-center gap-1 px-3 py-1.5 bg-green-500 text-white text-[11px] font-bold hover:bg-green-600 transition-colors"><Check className="w-3.5 h-3.5" /> Valider</button>
+                  <button onClick={() => setSlot(r.id, "rejete")} className="flex items-center gap-1 px-2.5 py-1.5 border border-border text-muted text-[11px] font-bold hover:border-red-300 hover:text-red-500 transition-colors"><X className="w-3.5 h-3.5" /> Refuser</button>
+                </div>
+              ) : (
+                <span className={`text-[10px] font-bold px-2 py-0.5 ${st.cls}`}>{st.label}</span>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* ── Calendrier académique annuel ── */}
+      <p className="text-[10px] font-black text-ink uppercase tracking-widest mb-2 flex items-center gap-1.5">
+        <CalendarDays className="w-3.5 h-3.5 text-cama" /> Calendrier académique annuel
+      </p>
+      <div className="border border-border bg-white p-3 mb-2">
+        <div className="grid sm:grid-cols-[1fr_1.4fr_auto_auto_auto] gap-2 items-end">
+          <div>
+            <label className="text-[9px] font-bold text-muted uppercase tracking-wider mb-1 block">Date</label>
+            <input value={evDate} onChange={(e) => setEvDate(e.target.value)} placeholder="08 sept. 2025" className="w-full text-sm border border-border px-3 py-2 outline-none focus:border-cama" />
+          </div>
+          <div>
+            <label className="text-[9px] font-bold text-muted uppercase tracking-wider mb-1 block">Intitulé</label>
+            <input value={evLabel} onChange={(e) => setEvLabel(e.target.value)} placeholder="Début des cours…" className="w-full text-sm border border-border px-3 py-2 outline-none focus:border-cama" />
+          </div>
+          <div>
+            <label className="text-[9px] font-bold text-muted uppercase tracking-wider mb-1 block">Type</label>
+            <select value={evType} onChange={(e) => setEvType(e.target.value)} className="text-sm border border-border px-2 py-2 outline-none bg-white">
+              {EV_TYPES.map((t) => <option key={t} value={t}>{EV_LABEL[t]}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="text-[9px] font-bold text-muted uppercase tracking-wider mb-1 block">Sem.</label>
+            <select value={evSem} onChange={(e) => setEvSem(Number(e.target.value) as 1 | 2)} className="text-sm border border-border px-2 py-2 outline-none bg-white">
+              <option value={1}>S1</option><option value={2}>S2</option>
+            </select>
+          </div>
+          <button onClick={addEvent} className="flex items-center gap-1.5 px-4 py-2 bg-cama text-white text-[11px] font-bold hover:bg-cama-700 transition-colors h-[38px]"><Plus className="w-3.5 h-3.5" /> Ajouter</button>
+        </div>
+      </div>
+      <div className="grid md:grid-cols-2 gap-2">
+        {[1, 2].map((sem) => (
+          <div key={sem} className="border border-border bg-white">
+            <p className="px-3 py-2 bg-surface border-b border-border text-xs font-bold text-ink">Semestre {sem}</p>
+            <div className="divide-y divide-border max-h-72 overflow-y-auto">
+              {db.calendarEvents.filter((e) => e.semester === sem).map((e) => (
+                <div key={e.id} className="px-3 py-2 flex items-center gap-2 group">
+                  <span className="text-[9px] font-bold px-1.5 py-0.5 bg-cama-50 text-cama flex-shrink-0">{EV_LABEL[e.type]}</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[10px] font-bold text-cama">{e.date}</p>
+                    <p className="text-xs text-ink leading-snug">{e.label}</p>
+                  </div>
+                  <button onClick={() => delEvent(e.id)} className="p-1 text-subtle hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all flex-shrink-0"><Trash2 className="w-3.5 h-3.5" /></button>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
       </div>
     </AdminShell>
   );
