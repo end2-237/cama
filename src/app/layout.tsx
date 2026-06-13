@@ -9,6 +9,8 @@ const inter = Inter({
   display: "swap",
 });
 
+export const dynamic = 'force-dynamic';
+
 export const metadata: Metadata = {
   title: "CAMA — Plateforme Académique JFN",
   description:
