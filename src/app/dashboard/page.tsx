@@ -60,14 +60,14 @@ export default function DashboardPage() {
 
         <main
           className={`max-w-[1400px] mx-auto animate-fade-up ${
-            user.role === "etudiant" || user.role === "enseignant"
+            user.role === "etudiant" || user.role === "enseignant" || user.role === "admin"
               ? "" /* layout 3 colonnes edge-to-edge : feed collé à la nav */
               : "px-4 sm:px-6 lg:px-8 py-6"
           }`}
           key={activeTab}>
           {user.role === "etudiant"   && <StudentView tab={activeTab} />}
           {user.role === "enseignant" && <TeacherView tab={activeTab} />}
-          {user.role === "admin"      && <AdminView />}
+          {user.role === "admin"      && <AdminView tab={activeTab} />}
           {user.role === "jury"       && <JuryView tab={activeTab} />}
         </main>
         <Footer />
