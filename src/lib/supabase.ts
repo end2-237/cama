@@ -5,7 +5,7 @@ const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
 export const supabase = createClient(url, key);
 
-// Types alignés sur le schéma DB
+// Types alignés sur le schéma DB (voir supabase/schema.sql)
 export type UserRole = "etudiant" | "enseignant" | "admin" | "jury";
 export type CycleMode = "online" | "hybride" | "presentiel";
 export type SessionStatus = "propose" | "valide" | "rejete";
@@ -45,64 +45,66 @@ export interface DBInscription {
   enrolled_at: string;
 }
 
-export interface DBCourse {
+// Programme académique : 1 matière (filière × année × semestre)
+// + affectation enseignant (admin) + contenu (enseignant)
+export interface DBProgramCourse {
   id: string;
+  parcours_slug: string;
+  parcours_title: string;
+  annee_niveau: string;          // L1..M2
+  semestre: string;              // S1..S6
   code: string;
   title: string;
+  ects: number;
+  hours: number;                 // volume horaire
+  modalites: string[];           // video, pdf, plateforme, live
+  evaluation: string | null;
+  ordre: number;
+  teacher_id: string | null;     // assigné par l'admin
+  academic_year: string | null;
   description: string | null;
-  cover_url: string | null;
-  ue_id: string;
-  teacher_id: string;
-  semester: number;
-  is_published: boolean;
-  has_ai: boolean;
   objectives: string[];
   competences: string[];
   prerequis: string | null;
   audience: string | null;
-  evaluation: string | null;
-  volume: string | null;
   difficulte: string | null;
+  published: boolean;
+  prof_ia: boolean;
+  created_at: string;
+}
+
+export interface DBChapter {
+  id: string;
+  program_course_id: string;
+  ordre: number;
+  title: string;
+  pdf: { name: string; sizeMo: number; pages: number } | null;
+  video: { title: string; durationMin: number; transcript: string; sizeMo: number } | null;
+  natif: { blocks: unknown[] } | null;
+  live_id: string | null;
   created_at: string;
 }
 
 export interface DBSession {
   id: string;
-  course_id: string;
+  program_course_id: string;
   title: string;
-  day: string;
-  start: string;
-  end: string;
+  day: string | null;
+  start_time: string | null;
+  end_time: string | null;
   kind: SessionKind;
   room: string | null;
   modes: CycleMode[];
-  proposed_by: string;
+  academic_year: string | null;
+  semestre: string | null;
+  week_start: string | null;
   status: SessionStatus;
-  semester: number;
+  proposed_by: string | null;
+  created_at: string;
 }
 
-export interface DBSlotRequest {
-  id: string;
-  user_id: string;
-  day: string;
-  start: string;
-  end: string;
-  ue: string;
-  note: string | null;
-  status: SlotStatus;
-}
-
-export interface DBStudentSetting {
-  id: string;
-  user_id: string;
-  mode: CycleMode;
-  deadline_weeks: number;
-}
-
-export interface DBCalendarEvent {
-  id: string;
-  date: string;
-  label: string;
-  type: string;
-  semester: number;
+export interface DBChapterProgress {
+  student_id: string;
+  chapter_id: string;
+  done_at: string;
 }
