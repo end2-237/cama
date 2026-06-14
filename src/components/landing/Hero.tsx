@@ -19,7 +19,7 @@ export default function Hero() {
 
         {/* 2. Grande ligne ondulée traversante — respiration */}
         <path
-          d="M -60 65% C 200 55%, 420 75%, 660 62% S 980 52%, 1200 65% S 1500 75%, 1600 62%"
+          d="M -60 390 C 200 330, 420 450, 660 372 S 980 312, 1200 390 S 1500 450, 1600 372"
           fill="none" stroke="#4F46E5" strokeWidth="1.8" opacity="0.07" strokeDasharray="12 20"
         />
       </svg>
