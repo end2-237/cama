@@ -65,11 +65,6 @@ export default function AdminProgrammePage() {
     return Object.entries(m).sort(([a], [b]) => a.localeCompare(b));
   }, [courses]);
 
-  const teacherName = (id: string | null) => {
-    const t = teachers.find((x) => x.id === id);
-    return t ? `${t.first_name} ${t.last_name}` : "Non assigné";
-  };
-
   if (loading || !user) {
     return <div className="min-h-screen flex items-center justify-center">
       <div className="w-8 h-8 rounded-full border-4 border-cama border-t-transparent animate-spin" />
