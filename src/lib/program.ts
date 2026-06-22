@@ -1,5 +1,5 @@
 import { supabase } from "@/lib/supabase";
-import type { DBProgramCourse } from "@/lib/supabase";
+import type { DBProgramCourse, DBSession } from "@/lib/supabase";
 import { PARCOURS } from "@/lib/parcours";
 
 /** Heuristique volume horaire par défaut : ~10h de contact par crédit ECTS. */
@@ -62,3 +62,87 @@ export async function assignTeacher(courseId: string, teacherId: string | null) 
 export async function updateHours(courseId: string, hours: number) {
   return supabase.from("program_courses").update({ hours }).eq("id", courseId);
 }
+
+// ── Horaires (course_sessions) ──
+export async function fetchSessions(courseIds: string[]): Promise<DBSession[]> {
+  if (courseIds.length === 0) return [];
+  const { data } = await supabase.from("course_sessions").select("*").in("program_course_id", courseIds);
+  return (data as DBSession[]) ?? [];
+}
+
+export async function upsertSession(s: Partial<DBSession>) {
+  if (s.id) {
+    return supabase.from("course_sessions").update(s).eq("id", s.id);
+  }
+  return supabase.from("course_sessions").insert(s);
+}
+
+export async function deleteSession(id: string) {
+  return supabase.from("course_sessions").delete().eq("id", id);
+}
+
+// ── Analytics filière (taux de performance / couverture) ──
+export interface ProgramAnalytics {
+  students: number;        // étudiants inscrits dans la filière
+  matieres: number;
+  assigned: number;        // matières avec enseignant
+  published: number;       // matières avec contenu publié
+  totalEcts: number;
+  totalHours: number;
+  chapters: number;        // total chapitres créés
+  avgCompletion: number;   // % moyen de progression des étudiants
+  perCourse: Record<string, { chapters: number; completion: number }>;
+}
+
+export async function fetchAnalytics(slug: string): Promise<ProgramAnalytics> {
+  const courses = await fetchProgram(slug);
+  const courseIds = courses.map((c) => c.id);
+
+  // Étudiants inscrits dans la filière
+  const { count: students } = await supabase
+    .from("inscriptions").select("*", { count: "exact", head: true })
+    .eq("parcours_slug", slug);
+  const nbStudents = students ?? 0;
+
+  // Chapitres de toutes les matières de la filière
+  const { data: chaptersData } = courseIds.length
+    ? await supabase.from("course_chapters").select("id,program_course_id").in("program_course_id", courseIds)
+    : { data: [] as { id: string; program_course_id: string }[] };
+  const chapters = (chaptersData as { id: string; program_course_id: string }[]) ?? [];
+  const chapterIds = chapters.map((c) => c.id);
+
+  // Progression enregistrée
+  const { data: progData } = chapterIds.length
+    ? await supabase.from("chapter_progress").select("chapter_id").in("chapter_id", chapterIds)
+    : { data: [] as { chapter_id: string }[] };
+  const prog = (progData as { chapter_id: string }[]) ?? [];
+
+  // Agrégat par matière
+  const perCourse: ProgramAnalytics["perCourse"] = {};
+  courses.forEach((c) => {
+    const chs = chapters.filter((x) => x.program_course_id === c.id);
+    const chIds = new Set(chs.map((x) => x.id));
+    const done = prog.filter((p) => chIds.has(p.chapter_id)).length;
+    const possible = chs.length * Math.max(nbStudents, 1);
+    perCourse[c.id] = {
+      chapters: chs.length,
+      completion: possible ? Math.round((done / possible) * 100) : 0,
+    };
+  });
+
+  const completions = Object.values(perCourse).map((p) => p.completion).filter((_, i) => chapters.length > 0);
+  const avgCompletion = completions.length ? Math.round(completions.reduce((a, b) => a + b, 0) / completions.length) : 0;
+
+  return {
+    students: nbStudents,
+    matieres: courses.length,
+    assigned: courses.filter((c) => c.teacher_id).length,
+    published: courses.filter((c) => c.published).length,
+    totalEcts: courses.reduce((a, c) => a + c.ects, 0),
+    totalHours: courses.reduce((a, c) => a + c.hours, 0),
+    chapters: chapters.length,
+    avgCompletion,
+    perCourse,
+  };
+}
+

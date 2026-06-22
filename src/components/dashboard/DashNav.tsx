@@ -91,6 +91,15 @@ export default function DashNav({ activeTab, onTab, tabs }: DashNavProps) {
                 {t}
               </button>
             ))}
+            {/* Lien Programme — admin & enseignant */}
+            {(user.role === "admin" || user.role === "enseignant") && (
+              <Link
+                href="/admin/programme"
+                className="px-3 h-16 flex items-center text-[13px] font-semibold border-b-2 border-transparent text-muted hover:text-cama transition-all duration-200 whitespace-nowrap"
+              >
+                Programme
+              </Link>
+            )}
           </nav>
 
           {/* Séparateur */}
