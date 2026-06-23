@@ -139,6 +139,67 @@ create table if not exists public.remote_machines (
 );
 
 -- ════════════════════════════════════════════════════════════
+-- 8. EXAMENS & ÉVALUATIONS (Phase 3)
+-- ════════════════════════════════════════════════════════════
+create table if not exists public.exams (
+  id                uuid primary key default gen_random_uuid(),
+  program_course_id uuid not null references public.program_courses(id) on delete cascade,
+  title             text not null,
+  duration_min      int  not null default 60,
+  status            text not null default 'planifie',  -- planifie|ouvert|termine
+  scheduled_at      timestamptz,
+  shuffle           boolean not null default true,
+  created_by        uuid references public.users(id) on delete set null,
+  created_at        timestamptz not null default now()
+);
+create index if not exists idx_exams_course on public.exams(program_course_id);
+
+create table if not exists public.exam_questions (
+  id            uuid primary key default gen_random_uuid(),
+  exam_id       uuid not null references public.exams(id) on delete cascade,
+  ordre         int  not null default 0,
+  type          text not null default 'qcm',       -- qcm|ouverte
+  text          text not null,
+  options       text[] not null default '{}',
+  correct_index int,                                -- index bonne réponse (qcm)
+  points        int  not null default 1
+);
+create index if not exists idx_eq_exam on public.exam_questions(exam_id);
+
+create table if not exists public.exam_attempts (
+  id           uuid primary key default gen_random_uuid(),
+  exam_id      uuid not null references public.exams(id) on delete cascade,
+  student_id   uuid not null references public.users(id) on delete cascade,
+  status       text not null default 'encours',     -- encours|soumis|corrige
+  started_at   timestamptz not null default now(),
+  submitted_at timestamptz,
+  answers      jsonb not null default '{}',          -- { questionId: indexOuTexte }
+  score        numeric,
+  score_max    numeric,
+  feedback     text,
+  alerts       jsonb not null default '[]',          -- [{time,type,detail}]
+  unique (exam_id, student_id)
+);
+create index if not exists idx_att_student on public.exam_attempts(student_id);
+create index if not exists idx_att_exam on public.exam_attempts(exam_id);
+
+create table if not exists public.deliberations (
+  id                uuid primary key default gen_random_uuid(),
+  program_course_id uuid not null references public.program_courses(id) on delete cascade,
+  student_id        uuid not null references public.users(id) on delete cascade,
+  attempt_id        uuid references public.exam_attempts(id) on delete set null,
+  note              numeric,                          -- /20
+  credits           int  not null default 0,
+  status            text not null default 'en_delib', -- en_delib|valide|rejete
+  validated_by      uuid references public.users(id) on delete set null,
+  validated_at      timestamptz,
+  comment           text,
+  created_at        timestamptz not null default now(),
+  unique (program_course_id, student_id)
+);
+create index if not exists idx_delib_student on public.deliberations(student_id);
+
+-- ════════════════════════════════════════════════════════════
 -- RLS désactivée (prototype — clé anon en accès direct)
 -- ════════════════════════════════════════════════════════════
 alter table public.inscriptions    disable row level security;
@@ -147,3 +208,7 @@ alter table public.course_chapters disable row level security;
 alter table public.course_sessions disable row level security;
 alter table public.chapter_progress disable row level security;
 alter table public.remote_machines disable row level security;
+alter table public.exams           disable row level security;
+alter table public.exam_questions  disable row level security;
+alter table public.exam_attempts   disable row level security;
+alter table public.deliberations   disable row level security;

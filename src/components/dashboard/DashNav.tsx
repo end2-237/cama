@@ -105,15 +105,33 @@ export default function DashNav({ activeTab, onTab, tabs }: DashNavProps) {
               </>
             )}
             {user.role === "enseignant" && (
-              <Link href="/enseignant/cours"
-                className="px-3 h-16 flex items-center text-[13px] font-semibold border-b-2 border-transparent text-muted hover:text-cama transition-all duration-200 whitespace-nowrap">
-                Mes matières
-              </Link>
+              <>
+                <Link href="/enseignant/cours"
+                  className="px-3 h-16 flex items-center text-[13px] font-semibold border-b-2 border-transparent text-muted hover:text-cama transition-all duration-200 whitespace-nowrap">
+                  Mes matières
+                </Link>
+                <Link href="/enseignant/examens"
+                  className="px-3 h-16 flex items-center text-[13px] font-semibold border-b-2 border-transparent text-muted hover:text-cama transition-all duration-200 whitespace-nowrap">
+                  Examens
+                </Link>
+              </>
             )}
             {user.role === "etudiant" && (
-              <Link href="/etudiant/programme"
+              <>
+                <Link href="/etudiant/programme"
+                  className="px-3 h-16 flex items-center text-[13px] font-semibold border-b-2 border-transparent text-muted hover:text-cama transition-all duration-200 whitespace-nowrap">
+                  Mon programme
+                </Link>
+                <Link href="/etudiant/examens"
+                  className="px-3 h-16 flex items-center text-[13px] font-semibold border-b-2 border-transparent text-muted hover:text-cama transition-all duration-200 whitespace-nowrap">
+                  Examens
+                </Link>
+              </>
+            )}
+            {(user.role === "jury" || user.role === "admin") && (
+              <Link href="/jury/deliberations"
                 className="px-3 h-16 flex items-center text-[13px] font-semibold border-b-2 border-transparent text-muted hover:text-cama transition-all duration-200 whitespace-nowrap">
-                Mon programme
+                Délibérations
               </Link>
             )}
           </nav>

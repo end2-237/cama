@@ -109,6 +109,63 @@ export interface DBChapterProgress {
   done_at: string;
 }
 
+// ── Examens & évaluations (Phase 3) ──
+export type ExamStatus = "planifie" | "ouvert" | "termine";
+export type QuestionType = "qcm" | "ouverte";
+export type AttemptStatus = "encours" | "soumis" | "corrige";
+export type DelibStatus = "en_delib" | "valide" | "rejete";
+
+export interface DBExam {
+  id: string;
+  program_course_id: string;
+  title: string;
+  duration_min: number;
+  status: ExamStatus;
+  scheduled_at: string | null;
+  shuffle: boolean;
+  created_by: string | null;
+  created_at: string;
+}
+
+export interface DBExamQuestion {
+  id: string;
+  exam_id: string;
+  ordre: number;
+  type: QuestionType;
+  text: string;
+  options: string[];
+  correct_index: number | null;
+  points: number;
+}
+
+export interface DBExamAttempt {
+  id: string;
+  exam_id: string;
+  student_id: string;
+  status: AttemptStatus;
+  started_at: string;
+  submitted_at: string | null;
+  answers: Record<string, number | string>;
+  score: number | null;
+  score_max: number | null;
+  feedback: string | null;
+  alerts: { time: string; type: string; detail: string }[];
+}
+
+export interface DBDeliberation {
+  id: string;
+  program_course_id: string;
+  student_id: string;
+  attempt_id: string | null;
+  note: number | null;
+  credits: number;
+  status: DelibStatus;
+  validated_by: string | null;
+  validated_at: string | null;
+  comment: string | null;
+  created_at: string;
+}
+
 // Machine Linux distante : expose un terminal web (ttyd/wetty/guacamole)
 // accessible en HTTPS. CAMA embarque ce terminal pour s'y connecter.
 export interface DBRemoteMachine {
