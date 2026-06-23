@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   Grid3x3, Search, ChevronDown, Globe, HelpCircle,
-  Bell, LogOut, User, Settings, Megaphone, X, FileText, Radio, AlertCircle,
+  Bell, LogOut, User, Settings, Megaphone, X,
   CalendarDays, CalendarClock,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
@@ -24,12 +24,7 @@ export default function DashNav({ activeTab, onTab, tabs }: DashNavProps) {
   const [commOpen, setCommOpen] = useState(false);
   const [calOpen, setCalOpen] = useState(false);
 
-  const ADMIN_COMMS = [
-    { icon: Megaphone, type: "Circulaire", color: "text-cama bg-cama/10", title: "Fermeture administrative — 14 juillet", body: "Les services administratifs seront fermés le 14 juillet. Les demandes urgentes sont à envoyer avant le 12 juillet.", time: "Il y a 1 jour" },
-    { icon: AlertCircle, type: "Urgent", color: "text-red-500 bg-red-50", title: "Mise à jour des photos de carte étudiante", body: "Tous les étudiants doivent mettre à jour leur photo au secrétariat avant le 20 juin pour l'impression des nouvelles cartes.", time: "Il y a 2 jours" },
-    { icon: FileText, type: "Note de service", color: "text-amber-600 bg-amber-50", title: "Calendrier des délibérations S4", body: "Les résultats du semestre 4 seront délibérés le 25 juin à 9h en salle A12. Présence non obligatoire pour les étudiants.", time: "Il y a 3 jours" },
-    { icon: Radio, type: "Événement", color: "text-green-600 bg-green-50", title: "Cérémonie de remise des diplômes", body: "La cérémonie annuelle de remise des diplômes est programmée le 5 juillet à l'amphithéâtre principal. Invitation à venir chercher au secrétariat.", time: "Il y a 5 jours" },
-  ];
+  const ADMIN_COMMS: { icon: typeof Megaphone; type: string; color: string; title: string; body: string; time: string }[] = [];
 
   const handleLogout = () => {
     logout();
@@ -181,7 +176,7 @@ export default function DashNav({ activeTab, onTab, tabs }: DashNavProps) {
                 title="Communication Administration">
                 <Megaphone className="w-4 h-4 flex-shrink-0" />
                 <span className="hidden lg:block max-w-0 opacity-0 group-hover/adm:max-w-[110px] group-hover/adm:opacity-100 group-hover/adm:ml-1.5 overflow-hidden whitespace-nowrap transition-all duration-300">Administration</span>
-                <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center border-2 border-white">4</span>
+                {ADMIN_COMMS.length > 0 && <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center border-2 border-white">{ADMIN_COMMS.length}</span>}
               </button>
 
               {commOpen && (

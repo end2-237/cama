@@ -17,9 +17,9 @@ import { useMaintenance } from "@/hooks/useMaintenance";
 
 const tabsMap: Record<string, string[]> = {
   etudiant:   ["Mes Cours", "Examens", "Résultats"],
-  enseignant: ["Mes Cours", "Étudiants", "Évaluations"],
-  admin:      ["Tableau de bord", "Planification", "Utilisateurs", "Paramètres"],
-  jury:       ["Délibérations", "Cas d'intégrité"],
+  enseignant: ["Mes Cours", "Étudiants"],
+  admin:      ["Tableau de bord", "Paramètres"],
+  jury:       ["Délibérations"],
 };
 
 export default function DashboardPage() {
@@ -68,11 +68,7 @@ export default function DashboardPage() {
         <DashNav tabs={tabs} activeTab={activeTab} onTab={setActiveTab} />
 
         <main
-          className={`max-w-[1400px] mx-auto animate-fade-up ${
-            user.role === "etudiant" || user.role === "enseignant" || user.role === "admin"
-              ? "" /* layout 3 colonnes edge-to-edge : feed collé à la nav */
-              : "px-4 sm:px-6 lg:px-8 py-6"
-          }`}
+          className="max-w-[1400px] mx-auto animate-fade-up px-4 sm:px-6 lg:px-8 py-6"
           key={activeTab}>
           {user.role === "etudiant"   && <StudentView tab={activeTab} />}
           {user.role === "enseignant" && <TeacherView tab={activeTab} />}
