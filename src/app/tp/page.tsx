@@ -1,672 +1,349 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import {
-  ArrowLeft, Terminal, Monitor, Server, Wifi, WifiOff,
-  Play, Square, RefreshCw, Copy, CheckCheck, ChevronRight,
-  Globe, Lock, Cpu, HardDrive, MemoryStick, Clock,
-  AlertTriangle, Info, Zap, BookOpen, Download, ShieldCheck,
-  Layers, Search, Bell, HelpCircle, KeyRound, Activity,
+  ArrowLeft, Play, Loader2, Terminal, RotateCcw, FileCode2, Server,
+  CheckCircle2, AlertCircle, ChevronDown, Cpu, Plus, Trash2, X,
+  ExternalLink, Maximize2, Wifi, Code2,
 } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
+import { fetchRuntimes, executeCode, versionFor, LANGS, type Runtime } from "@/lib/piston";
+import { fetchMachines, addMachine, deleteMachine } from "@/lib/tp";
+import type { DBRemoteMachine } from "@/lib/supabase";
 
-/* ── Types ── */
-type VMStatus = "running" | "stopped" | "starting" | "error";
-type ConnMode  = "vnc" | "ssh" | "rdp";
+const MonacoEditor = dynamic(() => import("@monaco-editor/react"), {
+  ssr: false,
+  loading: () => <div className="h-full flex items-center justify-center text-sm text-white/50">Chargement de l&apos;éditeur…</div>,
+});
 
-interface VM {
-  id: string;
-  name: string;
-  os: string;
-  osIcon: string;
-  tp: string;
-  cpu: number;
-  ram: number;
-  disk: number;
-  status: VMStatus;
-  ip: string;
-  connModes: ConnMode[];
-  desc: string;
-}
-
-interface RemoteMachine {
-  id: string;
-  label: string;
-  host: string;
-  port: number;
-  mode: ConnMode;
-  desc: string;
-  status: "up" | "down";
-}
-
-/* ── Données démo ── */
-const VMS: VM[] = [
-  {
-    id: "vm-linux-1",
-    name: "Debian 12 — Réseau",
-    os: "Debian GNU/Linux 12",
-    osIcon: "🐧",
-    tp: "INF301 — TP Réseaux S4",
-    cpu: 2, ram: 2, disk: 20,
-    status: "running",
-    ip: "10.10.1.11",
-    connModes: ["vnc", "ssh"],
-    desc: "Environnement pré-configuré avec Cisco Packet Tracer, Wireshark et iperf3.",
-  },
-  {
-    id: "vm-win-1",
-    name: "Windows Server 2022",
-    os: "Windows Server 2022",
-    osIcon: "🪟",
-    tp: "INF305 — Administration systèmes",
-    cpu: 4, ram: 4, disk: 60,
-    status: "stopped",
-    ip: "10.10.1.22",
-    connModes: ["rdp", "vnc"],
-    desc: "Active Directory, IIS, PowerShell pré-installés. Snapshot pédagogique fourni.",
-  },
-  {
-    id: "vm-kali",
-    name: "Kali Linux 2024.2",
-    os: "Kali Linux",
-    osIcon: "🐉",
-    tp: "INF402 — Sécurité offensive (encadré)",
-    cpu: 2, ram: 4, disk: 40,
-    status: "stopped",
-    ip: "10.10.1.33",
-    connModes: ["vnc", "ssh"],
-    desc: "Accessible uniquement pendant les séances TP encadrées. Toutes actions sont journalisées.",
-  },
-  {
-    id: "vm-ubuntu-web",
-    name: "Ubuntu 22.04 LTS — Web",
-    os: "Ubuntu 22.04 LTS",
-    osIcon: "🟠",
-    tp: "INF202 — Développement web",
-    cpu: 2, ram: 2, disk: 15,
-    status: "running",
-    ip: "10.10.1.44",
-    connModes: ["vnc", "ssh"],
-    desc: "Stack LAMP pré-installée, Node.js 20, VS Code Server accessible via navigateur.",
-  },
-];
-
-const REMOTE_MACHINES: RemoteMachine[] = [
-  { id: "rm-cisco-1", label: "Routeur Cisco ISR 4331", host: "cisco-lab1.jfn.cm", port: 22, mode: "ssh", status: "up",   desc: "Lab Cisco pour TP routage dynamique OSPF/BGP" },
-  { id: "rm-nas",     label: "NAS de stockage TP",     host: "nas.jfn.cm",        port: 22, mode: "ssh", status: "up",   desc: "Dépôt de rendus, rapports et captures Wireshark" },
-  { id: "rm-esxi",    label: "Hyperviseur ESXi TP",    host: "esxi.jfn.cm",       port: 443, mode: "vnc", status: "down", desc: "En maintenance — reprise estimée 12 juin" },
-];
-
-const STATUS_STYLE: Record<VMStatus, string> = {
-  running:  "bg-green-500",
-  stopped:  "bg-border",
-  starting: "bg-gold animate-pulse",
-  error:    "bg-red-500",
-};
-const STATUS_LABEL: Record<VMStatus, string> = {
-  running:  "En ligne",
-  stopped:  "Arrêtée",
-  starting: "Démarrage…",
-  error:    "Erreur",
-};
-const CONN_COLOR: Record<ConnMode, string> = {
-  vnc: "bg-purple-100 text-purple-700",
-  ssh: "bg-green-50 text-green-700",
-  rdp: "bg-blue-50 text-blue-700",
+const EMPTY_MACHINE: Partial<DBRemoteMachine> = {
+  name: "", os: "Ubuntu 22.04", kind: "ttyd", web_url: "", description: "", status: "unknown",
 };
 
 export default function TPPage() {
-  const [vmStates, setVmStates]   = useState<Record<string, VMStatus>>(
-    Object.fromEntries(VMS.map((v) => [v.id, v.status]))
-  );
-  const [copiedId, setCopiedId]   = useState<string | null>(null);
-  const [activeVM, setActiveVM]   = useState<VM | null>(null);
-  const [activeMode, setActiveMode] = useState<ConnMode>("vnc");
-  const [activeTab, setActiveTab]   = useState<"vm" | "remote">("vm");
+  const { user } = useAuth();
+  const [mode, setMode] = useState<"remote" | "sandbox">("remote");
 
-  const toggleVM = (id: string) => {
-    setVmStates((prev) => {
-      const s = prev[id];
-      if (s === "running") return { ...prev, [id]: "stopped" };
-      if (s === "stopped") {
-        setTimeout(() => setVmStates((p) => ({ ...p, [id]: "running" })), 2000);
-        return { ...prev, [id]: "starting" };
-      }
-      return prev;
-    });
-  };
-
-  const copyText = (text: string, id: string) => {
-    navigator.clipboard.writeText(text);
-    setCopiedId(id);
-    setTimeout(() => setCopiedId(null), 1500);
-  };
+  const canManage = user?.role === "admin" || user?.role === "enseignant";
 
   return (
-    <div className="min-h-screen bg-surface">
-
-      {/* Top bar */}
-      <header className="bg-white border-b border-border sticky top-0 z-40">
-        <div className="max-w-[1200px] mx-auto px-4 sm:px-6 flex items-center gap-3 h-12">
-
-          {/* Retour + identité */}
-          <Link href="/dashboard" className="flex items-center gap-2 text-sm text-muted hover:text-ink transition-colors flex-shrink-0">
-            <ArrowLeft className="w-4 h-4" />
-            <span className="hidden sm:block">Dashboard</span>
-          </Link>
-          <div className="w-px h-5 bg-border flex-shrink-0" />
-          <div className="flex items-center gap-2 flex-shrink-0">
-            <div className="w-7 h-7 bg-ink flex items-center justify-center">
-              <Terminal className="w-3.5 h-3.5 text-green-400" />
-            </div>
-            <div className="hidden sm:block leading-tight">
-              <p className="text-[11px] font-black text-ink leading-none">TP Labs</p>
-              <p className="text-[9px] text-subtle leading-none">Institut JFN</p>
-            </div>
-          </div>
-          <div className="w-px h-5 bg-border flex-shrink-0 hidden md:block" />
-
-          {/* Onglets principaux */}
-          <nav className="hidden md:flex items-center h-12">
-            {([
-              { id: "vm",     icon: Monitor,  label: "Machines virtuelles" },
-              { id: "remote", icon: Server,   label: "Machines distantes" },
-            ] as const).map((t) => (
-              <button key={t.id} onClick={() => setActiveTab(t.id)}
-                className={`flex items-center gap-1.5 px-4 h-full text-xs font-bold border-b-2 transition-all whitespace-nowrap ${
-                  activeTab === t.id
-                    ? "border-cama text-cama"
-                    : "border-transparent text-muted hover:text-ink"
-                }`}>
-                <t.icon className="w-3.5 h-3.5" />
-                {t.label}
-              </button>
-            ))}
-          </nav>
-
-          {/* Recherche */}
-          <div className="hidden lg:flex flex-1 max-w-[220px] items-center gap-2 bg-surface px-3 py-1.5 border border-border focus-within:border-cama transition-colors ml-1">
-            <Search className="w-3.5 h-3.5 text-subtle flex-shrink-0" />
-            <input type="text" placeholder="Chercher une VM..."
-              className="bg-transparent text-xs text-ink placeholder-subtle outline-none w-full" />
-          </div>
-
-          <div className="flex-1" />
-
-          {/* Statut hyperviseur */}
-          <div className="hidden sm:flex items-center gap-1.5 px-3 py-1 border border-green-200 bg-green-50">
-            <Activity className="w-3 h-3 text-green-600" />
-            <span className="text-[10px] font-bold text-green-700">Hyperviseur actif</span>
-            <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-          </div>
-
-          {/* Icônes actions */}
-          <div className="flex items-center gap-0.5 ml-1">
-            <button title="Mes crédits TP"
-              className="flex items-center gap-1 px-2 py-1.5 text-muted hover:text-cama hover:bg-surface transition-colors text-[10px] font-bold">
-              <Layers className="w-3.5 h-3.5" />
-              <span className="hidden lg:block">Crédits</span>
-            </button>
-            <button title="Clé SSH enregistrée"
-              className="p-1.5 text-muted hover:text-cama hover:bg-surface transition-colors">
-              <KeyRound className="w-4 h-4" />
-            </button>
-            <button title="Notifications" className="relative p-1.5 text-muted hover:text-cama hover:bg-surface transition-colors">
-              <Bell className="w-4 h-4" />
-              <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-red-500" />
-            </button>
-            <Link href="/guide" title="Aide connexion"
-              className="p-1.5 text-muted hover:text-cama hover:bg-surface transition-colors">
-              <HelpCircle className="w-4 h-4" />
-            </Link>
-          </div>
-
-          {/* Onglets mobile */}
-          <div className="flex md:hidden gap-px border border-border overflow-hidden ml-1">
-            {(["vm", "remote"] as const).map((t) => (
-              <button key={t} onClick={() => setActiveTab(t)}
-                className={`px-3 py-1.5 text-[10px] font-bold transition-colors ${
-                  activeTab === t ? "bg-cama text-white" : "bg-white text-muted"
-                }`}>
-                {t === "vm" ? "VMs" : "Dist."}
-              </button>
-            ))}
-          </div>
-
+    <div className="h-screen flex flex-col bg-[#1e1e1e]">
+      <header className="flex items-center gap-3 px-4 h-12 bg-[#252526] border-b border-black/30 flex-shrink-0">
+        <Link href="/dashboard" className="flex items-center gap-1.5 text-sm text-white/70 hover:text-white transition-colors">
+          <ArrowLeft className="w-4 h-4" /> Dashboard
+        </Link>
+        <div className="w-px h-5 bg-white/15" />
+        <span className="text-sm font-bold text-white flex items-center gap-1.5">
+          <Cpu className="w-4 h-4 text-cama" /> TP — Travaux pratiques
+        </span>
+        <div className="flex gap-0.5 ml-3 bg-[#3c3c3c] rounded-lg p-0.5">
+          <button onClick={() => setMode("remote")}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-bold transition-colors ${
+              mode === "remote" ? "bg-cama text-white" : "text-white/60 hover:text-white"}`}>
+            <Server className="w-3.5 h-3.5" /> Machine distante
+          </button>
+          <button onClick={() => setMode("sandbox")}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-bold transition-colors ${
+              mode === "sandbox" ? "bg-cama text-white" : "text-white/60 hover:text-white"}`}>
+            <Code2 className="w-3.5 h-3.5" /> Bac à sable
+          </button>
         </div>
       </header>
 
-      <div className="max-w-[1400px] mx-auto grid lg:grid-cols-[1fr_320px_260px] gap-0 items-start border-x border-border bg-white">
+      <div className="flex-1 min-h-0">
+        {mode === "remote" ? <RemoteMode canManage={canManage} userId={user?.id ?? null} /> : <SandboxMode />}
+      </div>
+    </div>
+  );
+}
 
-        {/* ══ COLONNE PRINCIPALE ══ */}
-        <div className="border-r border-border min-h-[calc(100vh-48px)]">
+/* ════════════════════════════════════════════════════════════
+   MODE 1 — Machine Linux distante (terminal web embarqué)
+════════════════════════════════════════════════════════════ */
+function RemoteMode({ canManage, userId }: { canManage: boolean; userId: string | null }) {
+  const [machines, setMachines] = useState<DBRemoteMachine[]>([]);
+  const [selected, setSelected] = useState<DBRemoteMachine | null>(null);
+  const [loading, setLoading]   = useState(true);
+  const [addOpen, setAddOpen]   = useState(false);
+  const [form, setForm]         = useState<Partial<DBRemoteMachine>>(EMPTY_MACHINE);
+  const [saving, setSaving]     = useState(false);
+  const [err, setErr]           = useState<string | null>(null);
 
-          {/* Info banner */}
-          <div className="flex items-start gap-3 p-3 bg-cama/5 border-b border-border">
-            <Info className="w-4 h-4 text-cama flex-shrink-0 mt-0.5" />
-            <p className="text-[11px] text-ink leading-relaxed">
-              Les VMs sont des environnements isolés fournis par l&apos;Institut JFN. Elles sont réinitialisées après chaque séance TP.
-              <strong> Sauvegardez vos travaux</strong> sur le NAS ou votre espace CAMA avant de fermer.
-            </p>
-          </div>
+  const reload = async () => {
+    setLoading(true);
+    const m = await fetchMachines();
+    setMachines(m);
+    setSelected((s) => s ?? m[0] ?? null);
+    setLoading(false);
+  };
+  useEffect(() => { reload(); }, []);
 
-          {/* ── VMs ── */}
-          {activeTab === "vm" && (
-            <div className="divide-y divide-border">
-              {VMS.map((vm) => {
-                const st = vmStates[vm.id];
-                return (
-                  <div key={vm.id} className={`p-4 transition-colors ${activeVM?.id === vm.id ? "bg-cama/5" : "hover:bg-surface"}`}>
-                    <div className="flex items-start gap-3">
-                      {/* OS icon + statut */}
-                      <div className="w-10 h-10 bg-ink flex items-center justify-center text-xl flex-shrink-0">
-                        {vm.osIcon}
-                      </div>
-                      {/* Info */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap mb-0.5">
-                          <p className="text-sm font-bold text-ink">{vm.name}</p>
-                          <span className={`inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 ${
-                            st === "running" ? "bg-green-50 text-green-700" :
-                            st === "starting" ? "bg-gold/10 text-gold-dark" :
-                            st === "error"   ? "bg-red-50 text-red-600" :
-                            "bg-surface text-subtle"
-                          }`}>
-                            <span className={`w-1.5 h-1.5 rounded-full ${STATUS_STYLE[st]}`} />
-                            {STATUS_LABEL[st]}
-                          </span>
-                        </div>
-                        <p className="text-[10px] text-cama font-bold">{vm.tp}</p>
-                        <p className="text-[11px] text-muted mt-1 leading-relaxed">{vm.desc}</p>
-                        {/* Specs */}
-                        <div className="flex items-center gap-3 mt-2">
-                          <span className="flex items-center gap-1 text-[10px] text-subtle"><Cpu className="w-3 h-3" />{vm.cpu} vCPU</span>
-                          <span className="flex items-center gap-1 text-[10px] text-subtle"><MemoryStick className="w-3 h-3" />{vm.ram} Go RAM</span>
-                          <span className="flex items-center gap-1 text-[10px] text-subtle"><HardDrive className="w-3 h-3" />{vm.disk} Go</span>
-                          <span className="flex items-center gap-1 text-[10px] text-subtle"><Globe className="w-3 h-3" />{vm.ip}</span>
-                        </div>
-                        {/* Modes de connexion */}
-                        <div className="flex items-center gap-1.5 mt-2 flex-wrap">
-                          {vm.connModes.map((m) => (
-                            <span key={m} className={`text-[9px] font-bold px-1.5 py-0.5 ${CONN_COLOR[m]}`}>{m.toUpperCase()}</span>
-                          ))}
-                        </div>
-                      </div>
-                      {/* Actions */}
-                      <div className="flex flex-col gap-1.5 flex-shrink-0">
-                        <button
-                          onClick={() => toggleVM(vm.id)}
-                          className={`flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold transition-colors ${
-                            st === "running"
-                              ? "bg-red-50 text-red-600 hover:bg-red-100"
-                              : st === "starting"
-                              ? "bg-gold/10 text-gold-dark cursor-wait"
-                              : "bg-green-50 text-green-700 hover:bg-green-100"
-                          }`}
-                          disabled={st === "starting"}>
-                          {st === "running" ? <><Square className="w-3 h-3" /> Arrêter</> :
-                           st === "starting" ? <><RefreshCw className="w-3 h-3 animate-spin" /> Démarrage</> :
-                           <><Play className="w-3 h-3" /> Démarrer</>}
-                        </button>
-                        {st === "running" && (
-                          <button
-                            onClick={() => { setActiveVM(vm); setActiveMode(vm.connModes[0]); }}
-                            className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold bg-cama text-white hover:bg-cama-600 transition-colors">
-                            <Monitor className="w-3 h-3" /> Se connecter
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+  const save = async () => {
+    if (!form.name || !form.web_url) { setErr("Nom et URL du terminal obligatoires."); return; }
+    if (!/^https:\/\//.test(form.web_url)) { setErr("L'URL doit être en HTTPS."); return; }
+    setSaving(true);
+    const { error } = await addMachine({ ...form, added_by: userId });
+    setSaving(false);
+    if (error) setErr(error.message);
+    else { setAddOpen(false); setForm(EMPTY_MACHINE); setErr(null); reload(); }
+  };
 
-          {/* ── Machines distantes ── */}
-          {activeTab === "remote" && (
-            <div className="divide-y divide-border">
-              {REMOTE_MACHINES.map((rm) => (
-                <div key={rm.id} className="p-4 hover:bg-surface transition-colors">
-                  <div className="flex items-start gap-3">
-                    <div className={`w-10 h-10 flex items-center justify-center flex-shrink-0 ${rm.status === "up" ? "bg-ink" : "bg-border"}`}>
-                      <Server className={`w-5 h-5 ${rm.status === "up" ? "text-white" : "text-subtle"}`} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-0.5">
-                        <p className="text-sm font-bold text-ink">{rm.label}</p>
-                        {rm.status === "up"
-                          ? <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 bg-green-50 text-green-700"><Wifi className="w-2.5 h-2.5" /> Accessible</span>
-                          : <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 bg-red-50 text-red-600"><WifiOff className="w-2.5 h-2.5" /> Hors ligne</span>}
-                      </div>
-                      <p className="text-[11px] text-muted leading-relaxed">{rm.desc}</p>
-                      {/* Commande de connexion */}
-                      {rm.status === "up" && rm.mode === "ssh" && (
-                        <div className="flex items-center gap-2 mt-2 bg-ink px-3 py-1.5 w-fit">
-                          <code className="text-[10px] text-green-400 font-mono">{`ssh etudiant@${rm.host} -p ${rm.port}`}</code>
-                          <button onClick={() => copyText(`ssh etudiant@${rm.host} -p ${rm.port}`, rm.id)}
-                            className="text-white/50 hover:text-white transition-colors flex-shrink-0">
-                            {copiedId === rm.id ? <CheckCheck className="w-3 h-3 text-green-400" /> : <Copy className="w-3 h-3" />}
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                    <span className={`text-[9px] font-bold px-1.5 py-0.5 ${CONN_COLOR[rm.mode]}`}>{rm.mode.toUpperCase()}</span>
-                  </div>
-                </div>
-              ))}
-              {/* Avertissement */}
-              <div className="flex items-start gap-2.5 p-4 bg-gold/5">
-                <AlertTriangle className="w-4 h-4 text-gold-dark flex-shrink-0 mt-0.5" />
-                <p className="text-[10px] text-muted leading-relaxed">
-                  Connexion aux équipements réseaux autorisée uniquement pendant les créneaux TP encadrés.
-                  Toute intrusion non autorisée est journalisée et transmise au jury d&apos;intégrité académique.
-                </p>
-              </div>
-            </div>
+  const del = async (id: string) => {
+    if (!confirm("Supprimer cette machine ?")) return;
+    await deleteMachine(id);
+    setSelected((s) => s?.id === id ? null : s);
+    reload();
+  };
+
+  return (
+    <div className="h-full grid lg:grid-cols-[300px_1fr]">
+      {/* Liste machines */}
+      <aside className="bg-[#252526] border-r border-black/30 flex flex-col overflow-y-auto">
+        <div className="px-4 py-3 border-b border-black/30 flex items-center justify-between">
+          <span className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
+            <Server className="w-4 h-4 text-cama" /> Machines
+          </span>
+          {canManage && (
+            <button onClick={() => { setAddOpen(true); setErr(null); }} title="Ajouter une machine"
+              className="text-white/60 hover:text-cama transition-colors">
+              <Plus className="w-4 h-4" />
+            </button>
           )}
         </div>
 
-        {/* ══ SIDEBAR DROITE 1 STICKY ══ */}
-        <aside className="lg:sticky lg:top-12 lg:h-[calc(100vh-48px)] lg:overflow-y-auto divide-y divide-border border-r border-border">
-
-          {/* Panneau connexion VNC/SSH/RDP */}
-          <div className="bg-white">
-            <div className="flex items-center gap-2 px-4 py-3 border-b border-border bg-ink">
-              <Terminal className="w-4 h-4 text-green-400" />
-              <p className="text-xs font-bold text-white">Connexion rapide</p>
-            </div>
-
-            {activeVM ? (
-              <div className="p-4">
-                <p className="text-xs font-bold text-ink mb-1">{activeVM.name}</p>
-                <p className="text-[10px] text-muted mb-3 flex items-center gap-1"><Globe className="w-3 h-3" /> {activeVM.ip}</p>
-                {/* Sélecteur de mode */}
-                <div className="flex gap-px mb-3 border border-border overflow-hidden">
-                  {activeVM.connModes.map((m) => (
-                    <button key={m} onClick={() => setActiveMode(m)}
-                      className={`flex-1 py-1.5 text-[10px] font-bold transition-colors ${activeMode === m ? "bg-cama text-white" : "bg-white text-muted hover:text-ink"}`}>
-                      {m.toUpperCase()}
-                    </button>
-                  ))}
+        {loading ? (
+          <div className="py-10 text-center"><Loader2 className="w-5 h-5 animate-spin text-cama mx-auto" /></div>
+        ) : machines.length === 0 ? (
+          <div className="p-4 text-xs text-white/50 leading-relaxed">
+            Aucune machine enregistrée.
+            {canManage && <> Cliquez sur <strong className="text-white">+</strong> pour en ajouter une.</>}
+          </div>
+        ) : (
+          <div className="divide-y divide-black/20">
+            {machines.map((m) => (
+              <button key={m.id} onClick={() => setSelected(m)}
+                className={`w-full text-left p-3 hover:bg-white/5 transition-colors flex items-center gap-2 ${
+                  selected?.id === m.id ? "bg-white/10" : ""}`}>
+                <div className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                  m.status === "up" ? "bg-green-500" : m.status === "down" ? "bg-red-500" : "bg-white/30"}`} />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-bold text-white truncate">{m.name}</p>
+                  <p className="text-[11px] text-white/50 truncate">{m.os} · {m.kind}</p>
                 </div>
+                {canManage && (
+                  <span onClick={(e) => { e.stopPropagation(); del(m.id); }}
+                    className="text-white/30 hover:text-red-400 transition-colors cursor-pointer">
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+        )}
 
-                {/* Commande selon mode */}
-                {activeMode === "ssh" && (
-                  <div>
-                    <p className="text-[9px] text-subtle uppercase tracking-widest mb-1.5">Commande SSH</p>
-                    <div className="flex items-center gap-2 bg-ink px-3 py-2">
-                      <code className="text-[10px] text-green-400 font-mono flex-1 break-all">{`ssh etudiant@${activeVM.ip}`}</code>
-                      <button onClick={() => copyText(`ssh etudiant@${activeVM.ip}`, "cmd-ssh")}
-                        className="text-white/50 hover:text-white transition-colors flex-shrink-0">
-                        {copiedId === "cmd-ssh" ? <CheckCheck className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
-                      </button>
-                    </div>
-                    <p className="text-[9px] text-subtle mt-1.5">Mot de passe : <code className="font-mono">etudiant123</code> (modifiable)</p>
-                  </div>
-                )}
-                {activeMode === "vnc" && (
-                  <div>
-                    <p className="text-[9px] text-subtle uppercase tracking-widest mb-1.5">Adresse VNC</p>
-                    <div className="flex items-center gap-2 bg-ink px-3 py-2">
-                      <code className="text-[10px] text-green-400 font-mono flex-1">{`${activeVM.ip}:5900`}</code>
-                      <button onClick={() => copyText(`${activeVM.ip}:5900`, "cmd-vnc")}
-                        className="text-white/50 hover:text-white transition-colors flex-shrink-0">
-                        {copiedId === "cmd-vnc" ? <CheckCheck className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
-                      </button>
-                    </div>
-                    <button className="w-full flex items-center justify-center gap-1.5 mt-2 py-2 bg-cama text-white text-xs font-bold hover:bg-cama-600 transition-colors">
-                      <Monitor className="w-3.5 h-3.5" /> Ouvrir dans le navigateur
-                    </button>
-                  </div>
-                )}
-                {activeMode === "rdp" && (
-                  <div>
-                    <p className="text-[9px] text-subtle uppercase tracking-widest mb-1.5">Adresse RDP</p>
-                    <div className="flex items-center gap-2 bg-ink px-3 py-2">
-                      <code className="text-[10px] text-green-400 font-mono flex-1">{`${activeVM.ip}:3389`}</code>
-                      <button onClick={() => copyText(`${activeVM.ip}:3389`, "cmd-rdp")}
-                        className="text-white/50 hover:text-white transition-colors flex-shrink-0">
-                        {copiedId === "cmd-rdp" ? <CheckCheck className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
-                      </button>
-                    </div>
-                    <a href={`rdp://full%20address=s:${activeVM.ip}:3389`}
-                      className="w-full flex items-center justify-center gap-1.5 mt-2 py-2 bg-blue-600 text-white text-xs font-bold hover:bg-blue-700 transition-colors">
-                      <Download className="w-3.5 h-3.5" /> Télécharger le fichier .rdp
-                    </a>
-                  </div>
-                )}
+        {/* Aide setup */}
+        <div className="mt-auto p-3 border-t border-black/30 text-[10px] text-white/40 leading-relaxed">
+          <p className="font-bold text-white/60 mb-1">Exposer un vrai PC Linux :</p>
+          <code className="block bg-black/30 rounded p-1.5 mb-1 text-white/70">ttyd -p 7681 bash</code>
+          <p>puis tunnel HTTPS (Cloudflare Tunnel / ngrok) et collez l&apos;URL ici.</p>
+        </div>
+      </aside>
 
-                <button onClick={() => setActiveVM(null)} className="w-full mt-3 text-[10px] text-subtle hover:text-ink transition-colors text-center">
-                  ← Fermer
-                </button>
+      {/* Terminal embarqué */}
+      <div className="flex flex-col min-h-0 bg-black">
+        {!selected ? (
+          <div className="flex-1 flex items-center justify-center text-white/50 text-sm">
+            Sélectionnez une machine pour vous y connecter.
+          </div>
+        ) : (
+          <>
+            <div className="flex items-center gap-2 px-4 h-10 bg-[#252526] border-b border-black/30 flex-shrink-0">
+              <Wifi className={`w-3.5 h-3.5 ${selected.status === "up" ? "text-green-500" : "text-white/40"}`} />
+              <span className="text-xs font-bold text-white">{selected.name}</span>
+              <span className="text-[11px] text-white/50">· {selected.os}</span>
+              <div className="flex-1" />
+              <a href={selected.web_url} target="_blank" rel="noopener noreferrer"
+                className="flex items-center gap-1 text-[11px] text-white/60 hover:text-white transition-colors">
+                <Maximize2 className="w-3.5 h-3.5" /> Plein écran
+              </a>
+              <a href={selected.web_url} target="_blank" rel="noopener noreferrer"
+                className="flex items-center gap-1 text-[11px] text-white/60 hover:text-white transition-colors">
+                <ExternalLink className="w-3.5 h-3.5" /> Nouvel onglet
+              </a>
+            </div>
+            <iframe
+              key={selected.id}
+              src={selected.web_url}
+              title={selected.name}
+              className="flex-1 w-full bg-black"
+              allow="clipboard-read; clipboard-write"
+            />
+            <div className="px-4 py-1.5 bg-[#252526] border-t border-black/30 text-[10px] text-white/40 flex-shrink-0">
+              Si le terminal reste noir, la machine bloque peut-être l&apos;intégration (X-Frame-Options). Utilisez « Nouvel onglet ».
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* Modal ajout machine */}
+      {addOpen && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-base font-bold text-ink">Ajouter une machine distante</h2>
+              <button onClick={() => setAddOpen(false)} className="text-muted hover:text-ink"><X className="w-5 h-5" /></button>
+            </div>
+            {err && <div className="flex items-center gap-2 text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2 mb-3"><AlertCircle className="w-4 h-4" /> {err}</div>}
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-semibold text-ink mb-1">Nom *</label>
+                <input value={form.name ?? ""} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                  placeholder="Serveur TP Réseau" className="input-auth text-sm" />
               </div>
-            ) : (
-              <div className="p-4 text-center">
-                <Monitor className="w-8 h-8 text-border mx-auto mb-2" />
-                <p className="text-xs text-muted">Démarrez une VM et cliquez sur<br /><strong>Se connecter</strong> pour voir les options.</p>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-ink mb-1">OS</label>
+                  <input value={form.os ?? ""} onChange={(e) => setForm((f) => ({ ...f, os: e.target.value }))}
+                    placeholder="Ubuntu 22.04" className="input-auth text-sm" />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-ink mb-1">Type de terminal</label>
+                  <select value={form.kind ?? "ttyd"} onChange={(e) => setForm((f) => ({ ...f, kind: e.target.value as DBRemoteMachine["kind"] }))}
+                    className="input-auth text-sm bg-white">
+                    <option value="ttyd">ttyd</option>
+                    <option value="wetty">wetty</option>
+                    <option value="guacamole">Guacamole</option>
+                    <option value="vnc">noVNC</option>
+                    <option value="other">Autre</option>
+                  </select>
+                </div>
               </div>
-            )}
-          </div>
-
-          {/* Crédits TP */}
-          <div className="bg-white px-4 py-3">
-            <p className="text-[9px] font-black text-subtle uppercase tracking-widest mb-3 flex items-center gap-1"><Clock className="w-3 h-3" /> Mes crédits TP</p>
-            <div className="space-y-2">
-              {[
-                { label: "Heures consommées", value: "12h / 40h", pct: 30 },
-                { label: "Sessions actives",   value: "1 / 2 max", pct: 50 },
-                { label: "Stockage utilisé",   value: "8 Go / 20 Go", pct: 40 },
-              ].map((r) => (
-                <div key={r.label}>
-                  <div className="flex justify-between text-[10px] mb-0.5">
-                    <span className="text-muted font-semibold">{r.label}</span>
-                    <span className="text-ink font-bold">{r.value}</span>
-                  </div>
-                  <div className="h-1 bg-surface">
-                    <div className="h-full bg-cama transition-all" style={{ width: `${r.pct}%` }} />
-                  </div>
-                </div>
-              ))}
+              <div>
+                <label className="block text-xs font-semibold text-ink mb-1">URL du terminal web (HTTPS) *</label>
+                <input value={form.web_url ?? ""} onChange={(e) => setForm((f) => ({ ...f, web_url: e.target.value }))}
+                  placeholder="https://machine.trycloudflare.com" className="input-auth text-sm" />
+                <p className="text-[10px] text-muted mt-1">Doit servir un terminal web (ttyd/wetty/Guacamole) et autoriser l&apos;intégration iframe.</p>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-ink mb-1">Description</label>
+                <input value={form.description ?? ""} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+                  placeholder="TP configuration réseau Cisco" className="input-auth text-sm" />
+              </div>
+            </div>
+            <div className="flex gap-2 mt-5">
+              <button onClick={() => setAddOpen(false)} className="flex-1 border border-border rounded-xl py-2.5 text-sm font-semibold text-muted">Annuler</button>
+              <button onClick={save} disabled={saving}
+                className="flex-1 bg-cama text-white rounded-xl py-2.5 text-sm font-bold flex items-center justify-center gap-2 hover:bg-cama-700 disabled:opacity-60">
+                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />} Enregistrer
+              </button>
             </div>
           </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
-          {/* Sécurité */}
-          <div className="bg-white px-4 py-3">
-            <p className="text-[9px] font-black text-subtle uppercase tracking-widest mb-2 flex items-center gap-1"><Lock className="w-3 h-3" /> Sécurité &amp; Accès</p>
-            <div className="space-y-1.5">
-              {[
-                { icon: Lock, text: "Tunnel VPN JFN activé", ok: true },
-                { icon: ShieldCheck, text: "Clé SSH enregistrée", ok: true },
-                { icon: Zap, text: "Authentification 2FA", ok: false },
-              ].map((s, i) => (
-                <div key={i} className="flex items-center gap-2">
-                  <s.icon className={`w-3.5 h-3.5 flex-shrink-0 ${s.ok ? "text-green-600" : "text-subtle"}`} />
-                  <p className={`text-[10px] font-semibold ${s.ok ? "text-ink" : "text-subtle"}`}>{s.text}</p>
-                  {!s.ok && <span className="text-[9px] font-bold text-gold-dark ml-auto">Activer</span>}
-                </div>
-              ))}
-            </div>
-          </div>
+/* ════════════════════════════════════════════════════════════
+   MODE 2 — Bac à sable : éditeur Monaco + exécution Piston
+════════════════════════════════════════════════════════════ */
+const ENONCE = `## TP — Premiers pas
 
-          {/* Ressources */}
-          <div className="bg-white px-4 py-3">
-            <p className="text-[9px] font-black text-subtle uppercase tracking-widest mb-2 flex items-center gap-1"><BookOpen className="w-3 h-3" /> Ressources TP</p>
-            <div className="space-y-0.5">
-              {[
-                { label: "Guide de connexion VNC/SSH", href: "/guide" },
-                { label: "Énoncés & Sujets TP S4",     href: "#" },
-                { label: "Politique d'utilisation VMs", href: "#" },
-                { label: "Support technique",           href: "#" },
-              ].map((l) => (
-                <Link key={l.label} href={l.href}
-                  className="flex items-center gap-1.5 py-1.5 text-[11px] text-muted hover:text-cama transition-colors group">
-                  <ChevronRight className="w-3 h-3 flex-shrink-0 group-hover:text-cama" /> {l.label}
-                </Link>
-              ))}
-            </div>
-          </div>
+Implémentez la fonction somme(a, b) qui retourne la somme de deux nombres,
+puis affichez le résultat de somme(2, 3) (doit afficher 5).
 
-          {/* Sessions actives */}
-          <div className="bg-white px-4 py-3">
-            <p className="text-[9px] font-black text-subtle uppercase tracking-widest mb-2 flex items-center gap-1"><Activity className="w-3 h-3" /> Sessions actives</p>
-            <div className="space-y-2">
-              {Object.entries(vmStates).filter(([, s]) => s === "running").map(([id]) => {
-                const vm = VMS.find((v) => v.id === id)!;
-                return (
-                  <div key={id} className="flex items-center gap-2.5 border border-green-200 bg-green-50/50 p-2">
-                    <span className="text-base flex-shrink-0">{vm.osIcon}</span>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[10px] font-bold text-ink truncate">{vm.name}</p>
-                      <p className="text-[9px] text-green-700 font-mono">{vm.ip} · connectée</p>
-                    </div>
-                    <button onClick={() => toggleVM(id)} title="Arrêter"
-                      className="p-1 text-red-500 hover:bg-red-50 transition-colors flex-shrink-0">
-                      <Square className="w-3 h-3" />
-                    </button>
-                  </div>
-                );
-              })}
-              {Object.values(vmStates).every((s) => s !== "running") && (
-                <p className="text-[10px] text-subtle text-center py-1">Aucune session active.</p>
-              )}
-            </div>
-          </div>
+Choisissez un langage, écrivez votre solution, puis cliquez sur Exécuter.`;
 
-          {/* Prochaines séances TP */}
-          <div className="bg-white px-4 py-3">
-            <p className="text-[9px] font-black text-subtle uppercase tracking-widest mb-2 flex items-center gap-1"><Clock className="w-3 h-3" /> Prochaines séances TP</p>
-            <div className="space-y-2">
-              {[
-                { date: "Jeu. 12 juin · 8h",  label: "TP Réseaux — OSPF",   room: "Lab B2 + distanciel", color: "border-cama" },
-                { date: "Ven. 13 juin · 14h", label: "TP Web — API REST",   room: "100% distanciel",     color: "border-gold" },
-                { date: "Mar. 17 juin · 10h", label: "TP AD & PowerShell",  room: "Lab B1 + distanciel", color: "border-purple-400" },
-              ].map((s, i) => (
-                <div key={i} className={`border-l-2 ${s.color} pl-2.5`}>
-                  <p className="text-[9px] text-subtle font-bold">{s.date}</p>
-                  <p className="text-[11px] font-bold text-ink leading-tight">{s.label}</p>
-                  <p className="text-[9px] text-muted">{s.room}</p>
-                </div>
-              ))}
-            </div>
-            <Link href="/calendrier" className="text-[9px] font-bold text-cama hover:underline mt-2 inline-flex items-center gap-0.5">
-              Calendrier complet <ChevronRight className="w-2.5 h-2.5" />
-            </Link>
-          </div>
+function SandboxMode() {
+  const [runtimes, setRuntimes] = useState<Runtime[]>([]);
+  const [langId, setLangId]     = useState(LANGS[0].id);
+  const [code, setCode]         = useState(LANGS[0].template);
+  const [stdin, setStdin]       = useState("");
+  const [output, setOutput]     = useState("");
+  const [status, setStatus]     = useState<"idle" | "running" | "ok" | "error">("idle");
+  const [rtErr, setRtErr]       = useState<string | null>(null);
+  const edited = useRef<Set<string>>(new Set());
 
-          {/* Journal d'activité */}
-          <div className="bg-ink px-4 py-3">
-            <p className="text-[9px] font-black text-white/40 uppercase tracking-widest mb-2 flex items-center gap-1"><Terminal className="w-3 h-3" /> Journal d&apos;activité</p>
-            <div className="font-mono text-[9px] space-y-1 leading-relaxed">
-              <p className="text-green-400">[13:02] vm-linux-1 démarrée (snapshot TP4)</p>
-              <p className="text-white/60">[13:03] Connexion SSH depuis 154.72.x.x</p>
-              <p className="text-white/60">[13:18] Sauvegarde auto → NAS /rendus/INF301</p>
-              <p className="text-gold">[13:40] Quota stockage à 40 % — pensez à nettoyer</p>
-              <p className="text-white/60">[14:05] vm-ubuntu-web : VS Code Server ouvert</p>
-            </div>
+  const lang = LANGS.find((l) => l.id === langId)!;
+
+  useEffect(() => { fetchRuntimes().then(setRuntimes).catch((e) => setRtErr(e.message)); }, []);
+
+  const changeLang = (id: string) => {
+    setLangId(id);
+    if (!edited.current.has(id)) setCode(LANGS.find((x) => x.id === id)!.template);
+  };
+  const onChange = (v?: string) => { setCode(v ?? ""); edited.current.add(langId); };
+  const reset = () => { setCode(lang.template); edited.current.delete(langId); setOutput(""); setStatus("idle"); };
+
+  const run = async () => {
+    setStatus("running"); setOutput("");
+    try {
+      const version = versionFor(runtimes, lang.id);
+      if (!version) throw new Error("Langage indisponible.");
+      const res = await executeCode({ language: lang.id, version, content: code, stdin, filename: lang.filename });
+      setOutput(res.output || res.stdout || res.stderr || "(aucune sortie)");
+      setStatus(res.code === 0 && !res.stderr ? "ok" : "error");
+    } catch (e) {
+      setOutput(e instanceof Error ? e.message : "Erreur"); setStatus("error");
+    }
+  };
+
+  return (
+    <div className="h-full flex flex-col">
+      <div className="flex items-center gap-3 px-4 h-10 bg-[#252526] border-b border-black/30 flex-shrink-0">
+        <div className="relative">
+          <select value={langId} onChange={(e) => changeLang(e.target.value)}
+            className="appearance-none bg-[#3c3c3c] text-white text-xs font-semibold rounded-lg pl-3 pr-8 py-1.5 outline-none border border-white/10 focus:border-cama cursor-pointer">
+            {LANGS.map((l) => <option key={l.id} value={l.id}>{l.label}</option>)}
+          </select>
+          <ChevronDown className="w-3.5 h-3.5 text-white/50 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+        </div>
+        <div className="flex-1" />
+        <button onClick={reset} className="flex items-center gap-1.5 text-xs font-semibold text-white/60 hover:text-white border border-white/10 rounded-lg px-2.5 py-1.5">
+          <RotateCcw className="w-3.5 h-3.5" /> Reset
+        </button>
+        <button onClick={run} disabled={status === "running" || runtimes.length === 0}
+          className="flex items-center gap-1.5 text-xs font-bold bg-green-600 text-white px-4 py-1.5 rounded-lg hover:bg-green-700 disabled:opacity-50">
+          {status === "running" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />} Exécuter
+        </button>
+      </div>
+
+      {rtErr && <div className="bg-red-900/40 text-red-200 text-xs px-4 py-2 flex items-center gap-2"><AlertCircle className="w-4 h-4" /> {rtErr}</div>}
+
+      <div className="flex-1 min-h-0 grid lg:grid-cols-[280px_1fr_1fr]">
+        <aside className="hidden lg:flex flex-col bg-[#252526] border-r border-black/30 overflow-y-auto">
+          <div className="px-4 py-3 border-b border-black/30 flex items-center gap-2">
+            <FileCode2 className="w-4 h-4 text-cama" />
+            <span className="text-xs font-bold text-white uppercase tracking-wider">Énoncé</span>
           </div>
+          <div className="p-4 text-[13px] text-white/80 leading-relaxed whitespace-pre-wrap">{ENONCE}</div>
         </aside>
 
-        {/* ══ SIDEBAR DROITE 2 STICKY ══ */}
-        <aside className="hidden lg:block lg:sticky lg:top-12 lg:h-[calc(100vh-48px)] lg:overflow-y-auto divide-y divide-border">
+        <div className="min-h-0 border-r border-black/30">
+          <MonacoEditor height="100%" theme="vs-dark" language={lang.monaco} value={code} onChange={onChange}
+            options={{ fontSize: 14, minimap: { enabled: false }, scrollBeyondLastLine: false, tabSize: 2, automaticLayout: true, padding: { top: 12 } }} />
+        </div>
 
-          {/* État du cluster */}
-          <div className="bg-white px-3 py-3">
-            <p className="text-[9px] font-black text-subtle uppercase tracking-widest mb-2 flex items-center gap-1"><Server className="w-3 h-3" /> État du cluster JFN</p>
-            <div className="space-y-2">
-              {[
-                { label: "CPU global",     pct: 42, color: "bg-green-500" },
-                { label: "Mémoire",        pct: 67, color: "bg-gold" },
-                { label: "Stockage SAN",   pct: 38, color: "bg-green-500" },
-                { label: "Bande passante", pct: 81, color: "bg-red-400" },
-              ].map((r) => (
-                <div key={r.label}>
-                  <div className="flex justify-between text-[9px] mb-0.5">
-                    <span className="text-muted font-semibold">{r.label}</span>
-                    <span className="text-ink font-bold">{r.pct}%</span>
-                  </div>
-                  <div className="h-1 bg-surface">
-                    <div className={`h-full ${r.color}`} style={{ width: `${r.pct}%` }} />
-                  </div>
-                </div>
-              ))}
-            </div>
-            <p className="text-[9px] text-subtle mt-2">14 VMs actives · 96 étudiants connectés</p>
+        <div className="flex flex-col min-h-0 bg-[#1e1e1e]">
+          <div className="px-4 py-2 border-b border-black/30 flex items-center gap-2 flex-shrink-0">
+            <Terminal className="w-4 h-4 text-white/70" />
+            <span className="text-xs font-bold text-white uppercase tracking-wider">Console</span>
+            {status === "ok" && <span className="ml-auto text-[11px] text-green-400 flex items-center gap-1"><CheckCircle2 className="w-3.5 h-3.5" /> Exécuté</span>}
+            {status === "error" && <span className="ml-auto text-[11px] text-red-400 flex items-center gap-1"><AlertCircle className="w-3.5 h-3.5" /> Erreur</span>}
           </div>
-
-          {/* Modèles de VM */}
-          <div className="bg-white px-3 py-3">
-            <p className="text-[9px] font-black text-subtle uppercase tracking-widest mb-2 flex items-center gap-1"><Layers className="w-3 h-3" /> Modèles disponibles</p>
-            <div className="space-y-0.5">
-              {[
-                { icon: "🐧", label: "Debian 12 minimal",    spec: "1 vCPU · 1 Go" },
-                { icon: "🟠", label: "Ubuntu Desktop 24.04", spec: "2 vCPU · 4 Go" },
-                { icon: "🪟", label: "Windows 11 Edu",       spec: "4 vCPU · 8 Go" },
-                { icon: "🐳", label: "Docker Lab",           spec: "2 vCPU · 2 Go" },
-                { icon: "🤖", label: "ML Lab (Jupyter)",     spec: "4 vCPU · 8 Go" },
-              ].map((m) => (
-                <button key={m.label}
-                  className="w-full flex items-center gap-2 px-1.5 py-1.5 hover:bg-cama-50/40 transition-colors text-left group">
-                  <span className="text-sm flex-shrink-0">{m.icon}</span>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[10px] font-bold text-ink group-hover:text-cama transition-colors truncate">{m.label}</p>
-                    <p className="text-[9px] text-subtle">{m.spec}</p>
-                  </div>
-                  <Play className="w-3 h-3 text-subtle group-hover:text-cama transition-colors flex-shrink-0" />
-                </button>
-              ))}
-            </div>
-            <p className="text-[9px] text-subtle mt-1.5">Déployée en ~90 s sur le cluster.</p>
+          <pre className="flex-1 min-h-0 overflow-auto p-4 text-[13px] font-mono text-white/90 whitespace-pre-wrap">
+{status === "idle" ? "▶ La sortie de votre programme apparaîtra ici."
+ : status === "running" ? "Exécution en cours…" : output}
+          </pre>
+          <div className="border-t border-black/30 flex-shrink-0">
+            <div className="px-4 py-1.5 text-[10px] font-bold text-white/50 uppercase tracking-wider">Entrée standard (stdin)</div>
+            <textarea value={stdin} onChange={(e) => setStdin(e.target.value)} rows={3}
+              placeholder="Données passées via stdin…"
+              className="w-full bg-[#252526] text-white/90 text-[13px] font-mono px-4 py-2 outline-none resize-none" />
           </div>
-
-          {/* Raccourcis clavier */}
-          <div className="bg-white px-3 py-3">
-            <p className="text-[9px] font-black text-subtle uppercase tracking-widest mb-2 flex items-center gap-1"><KeyRound className="w-3 h-3" /> Raccourcis console</p>
-            <div className="space-y-1.5">
-              {[
-                { keys: "Ctrl+Alt+Suppr", desc: "Envoyer à la VM" },
-                { keys: "Ctrl+Alt+F",     desc: "Plein écran" },
-                { keys: "Ctrl+Alt+C",     desc: "Presse-papier partagé" },
-                { keys: "Ctrl+Alt+R",     desc: "Reconnexion rapide" },
-              ].map((k) => (
-                <div key={k.keys} className="flex items-center gap-2">
-                  <kbd className="text-[8px] font-mono font-bold bg-surface border border-border px-1.5 py-0.5 text-ink flex-shrink-0">{k.keys}</kbd>
-                  <span className="text-[9px] text-muted">{k.desc}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Entraide TP */}
-          <div className="bg-white px-3 py-3">
-            <p className="text-[9px] font-black text-subtle uppercase tracking-widest mb-2 flex items-center gap-1"><Wifi className="w-3 h-3" /> Entraide en direct</p>
-            <div className="space-y-2">
-              {[
-                { who: "Aïcha M.", txt: "Quelqu'un a réussi l'exo 3 OSPF ?", time: "il y a 4 min" },
-                { who: "Brice T.", txt: "Vérifiez le subnet sur eth1 👍",     time: "il y a 2 min" },
-                { who: "Tuteur — Karim", txt: "Permanence visio à 15h pour le TP réseau.", time: "il y a 1 min" },
-              ].map((m, i) => (
-                <div key={i} className="border-l-2 border-border pl-2">
-                  <p className="text-[9px] font-bold text-cama">{m.who}</p>
-                  <p className="text-[10px] text-ink leading-snug">{m.txt}</p>
-                  <p className="text-[8px] text-subtle">{m.time}</p>
-                </div>
-              ))}
-            </div>
-            <button className="w-full mt-2 py-1.5 text-[10px] font-bold bg-ink text-white hover:bg-cama transition-colors">
-              Rejoindre le canal TP
-            </button>
-          </div>
-
-          {/* Astuce du jour */}
-          <div className="px-3 py-3" style={{ background: "linear-gradient(135deg, #1E1B4B, #312E81)" }}>
-            <p className="text-[9px] font-black text-gold uppercase tracking-widest mb-1.5 flex items-center gap-1"><Zap className="w-3 h-3" /> Astuce du jour</p>
-            <p className="text-[10px] text-white/80 leading-relaxed">
-              Utilisez <code className="font-mono text-green-400">tmux</code> dans vos sessions SSH : si votre connexion coupe,
-              votre travail continue côté serveur et vous le retrouvez avec <code className="font-mono text-green-400">tmux attach</code>.
-            </p>
-          </div>
-        </aside>
+        </div>
       </div>
     </div>
   );

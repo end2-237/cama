@@ -124,6 +124,21 @@ create table if not exists public.chapter_progress (
 create index if not exists idx_cp_student on public.chapter_progress(student_id);
 
 -- ════════════════════════════════════════════════════════════
+-- 7. TP — MACHINES LINUX DISTANTES (terminal web embarqué)
+-- ════════════════════════════════════════════════════════════
+create table if not exists public.remote_machines (
+  id          uuid primary key default gen_random_uuid(),
+  name        text not null,
+  os          text not null default 'Linux',
+  kind        text not null default 'ttyd',   -- ttyd|wetty|guacamole|vnc|other
+  web_url     text not null,                  -- URL HTTPS du terminal web
+  description text,
+  status      text not null default 'unknown',-- up|down|unknown
+  added_by    uuid references public.users(id) on delete set null,
+  created_at  timestamptz not null default now()
+);
+
+-- ════════════════════════════════════════════════════════════
 -- RLS désactivée (prototype — clé anon en accès direct)
 -- ════════════════════════════════════════════════════════════
 alter table public.inscriptions    disable row level security;
@@ -131,3 +146,4 @@ alter table public.program_courses disable row level security;
 alter table public.course_chapters disable row level security;
 alter table public.course_sessions disable row level security;
 alter table public.chapter_progress disable row level security;
+alter table public.remote_machines disable row level security;

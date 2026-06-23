@@ -108,3 +108,17 @@ export interface DBChapterProgress {
   chapter_id: string;
   done_at: string;
 }
+
+// Machine Linux distante : expose un terminal web (ttyd/wetty/guacamole)
+// accessible en HTTPS. CAMA embarque ce terminal pour s'y connecter.
+export interface DBRemoteMachine {
+  id: string;
+  name: string;
+  os: string;
+  kind: "ttyd" | "wetty" | "guacamole" | "vnc" | "other";
+  web_url: string;          // URL HTTPS du terminal web
+  description: string | null;
+  status: "up" | "down" | "unknown";
+  added_by: string | null;
+  created_at: string;
+}
