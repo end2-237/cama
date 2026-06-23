@@ -1,5 +1,5 @@
 import { supabase } from "@/lib/supabase";
-import type { DBProgramCourse, DBSession } from "@/lib/supabase";
+import type { DBProgramCourse, DBSession, DBChapter, DBChapterProgress } from "@/lib/supabase";
 import { PARCOURS } from "@/lib/parcours";
 
 /** Heuristique volume horaire par défaut : ~10h de contact par crédit ECTS. */
@@ -61,6 +61,69 @@ export async function assignTeacher(courseId: string, teacherId: string | null) 
 
 export async function updateHours(courseId: string, hours: number) {
   return supabase.from("program_courses").update({ hours }).eq("id", courseId);
+}
+
+// ════════════════════════════════════════════════════════════
+// ENSEIGNANT — matières assignées + contenu
+// ════════════════════════════════════════════════════════════
+export async function fetchTeacherCourses(teacherId: string): Promise<DBProgramCourse[]> {
+  const { data } = await supabase.from("program_courses").select("*")
+    .eq("teacher_id", teacherId).order("semestre").order("ordre");
+  return (data as DBProgramCourse[]) ?? [];
+}
+
+export async function updateCourseContent(courseId: string, patch: Partial<DBProgramCourse>) {
+  return supabase.from("program_courses").update(patch).eq("id", courseId);
+}
+
+// ── Chapitres ──
+export async function fetchChapters(courseId: string): Promise<DBChapter[]> {
+  const { data } = await supabase.from("course_chapters").select("*")
+    .eq("program_course_id", courseId).order("ordre");
+  return (data as DBChapter[]) ?? [];
+}
+
+export async function addChapter(courseId: string, title: string, ordre: number) {
+  return supabase.from("course_chapters").insert({ program_course_id: courseId, title, ordre });
+}
+
+export async function updateChapter(id: string, patch: Partial<DBChapter>) {
+  return supabase.from("course_chapters").update(patch).eq("id", id);
+}
+
+export async function deleteChapter(id: string) {
+  return supabase.from("course_chapters").delete().eq("id", id);
+}
+
+// ════════════════════════════════════════════════════════════
+// ÉTUDIANT — programme + progression
+// ════════════════════════════════════════════════════════════
+/** Matières du programme de l'étudiant (sa filière), publiées. */
+export async function fetchStudentProgram(parcoursSlug: string): Promise<DBProgramCourse[]> {
+  const { data } = await supabase.from("program_courses").select("*")
+    .eq("parcours_slug", parcoursSlug).eq("published", true)
+    .order("semestre").order("ordre");
+  return (data as DBProgramCourse[]) ?? [];
+}
+
+export async function fetchProgress(studentId: string): Promise<DBChapterProgress[]> {
+  const { data } = await supabase.from("chapter_progress").select("*").eq("student_id", studentId);
+  return (data as DBChapterProgress[]) ?? [];
+}
+
+export async function markChapter(studentId: string, chapterId: string, done: boolean) {
+  if (done) {
+    return supabase.from("chapter_progress").upsert(
+      { student_id: studentId, chapter_id: chapterId },
+      { onConflict: "student_id,chapter_id" });
+  }
+  return supabase.from("chapter_progress").delete()
+    .eq("student_id", studentId).eq("chapter_id", chapterId);
+}
+
+/** Séances de la filière (pour la vue programme/semaine de l'étudiant). */
+export async function fetchSessionsForCourses(courseIds: string[]) {
+  return fetchSessions(courseIds);
 }
 
 // ── Horaires (course_sessions) ──
@@ -130,8 +193,11 @@ export async function fetchAnalytics(slug: string): Promise<ProgramAnalytics> {
     };
   });
 
-  const completions = Object.values(perCourse).map((p) => p.completion).filter((_, i) => chapters.length > 0);
-  const avgCompletion = completions.length ? Math.round(completions.reduce((a, b) => a + b, 0) / completions.length) : 0;
+  // Moyenne de complétion sur les matières qui ont au moins un chapitre
+  const withChapters = courses.filter((c) => (perCourse[c.id]?.chapters ?? 0) > 0);
+  const avgCompletion = withChapters.length
+    ? Math.round(withChapters.reduce((a, c) => a + perCourse[c.id].completion, 0) / withChapters.length)
+    : 0;
 
   return {
     students: nbStudents,

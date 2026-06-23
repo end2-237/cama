@@ -91,13 +91,29 @@ export default function DashNav({ activeTab, onTab, tabs }: DashNavProps) {
                 {t}
               </button>
             ))}
-            {/* Lien Programme — admin & enseignant */}
-            {(user.role === "admin" || user.role === "enseignant") && (
-              <Link
-                href="/admin/programme"
-                className="px-3 h-16 flex items-center text-[13px] font-semibold border-b-2 border-transparent text-muted hover:text-cama transition-all duration-200 whitespace-nowrap"
-              >
-                Programme
+            {/* Liens BD réels par rôle */}
+            {user.role === "admin" && (
+              <>
+                <Link href="/admin/programme"
+                  className="px-3 h-16 flex items-center text-[13px] font-semibold border-b-2 border-transparent text-muted hover:text-cama transition-all duration-200 whitespace-nowrap">
+                  Programme
+                </Link>
+                <Link href="/admin/utilisateurs"
+                  className="px-3 h-16 flex items-center text-[13px] font-semibold border-b-2 border-transparent text-muted hover:text-cama transition-all duration-200 whitespace-nowrap">
+                  Utilisateurs
+                </Link>
+              </>
+            )}
+            {user.role === "enseignant" && (
+              <Link href="/enseignant/cours"
+                className="px-3 h-16 flex items-center text-[13px] font-semibold border-b-2 border-transparent text-muted hover:text-cama transition-all duration-200 whitespace-nowrap">
+                Mes matières
+              </Link>
+            )}
+            {user.role === "etudiant" && (
+              <Link href="/etudiant/programme"
+                className="px-3 h-16 flex items-center text-[13px] font-semibold border-b-2 border-transparent text-muted hover:text-cama transition-all duration-200 whitespace-nowrap">
+                Mon programme
               </Link>
             )}
           </nav>
