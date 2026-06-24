@@ -4,8 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   ArrowLeft, Newspaper, Radio, Play, Heart, Bookmark, Share2, Eye,
-  Search, Flame, Clock, ChevronRight, Volume2, Hash, TrendingUp,
-  BookOpen, Sparkles, X,
+  Search, Flame, Clock, ChevronRight, ChevronUp, ChevronDown, Volume2, Hash, TrendingUp,
+  BookOpen, Sparkles, X, Sun, Moon, MessageCircle, Users, Send, Award, Pause,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import {
@@ -14,10 +14,15 @@ import {
 } from "@/lib/journal";
 
 const FALLBACK_COVER = "https://images.unsplash.com/photo-1504384308090-c894fdcc538d?w=1200&q=70";
+function cover(a: DBJournalArticle) { return a.cover_url || a.media_src || FALLBACK_COVER; }
 
-function cover(a: DBJournalArticle) {
-  return a.cover_url || a.media_src || FALLBACK_COVER;
-}
+const COMMUNITY_SEED = [
+  { name: "Amine B.", avatar: "#7C3AED", msg: "Quelqu'un a les corrigés du TP3 réseaux ?", time: "Il y a 12 min", likes: 4 },
+  { name: "Fatima N.", avatar: "#0EA5E9", msg: "Le hackathon c'est trop bien organisé cette année !", time: "Il y a 28 min", likes: 12 },
+  { name: "Jean-Paul M.", avatar: "#16A34A", msg: "Qui participe au live INF201 demain ?", time: "Il y a 45 min", likes: 7 },
+  { name: "Diane A.", avatar: "#DB2777", msg: "La certification AWS vaut le coup, je l'ai passée le mois dernier.", time: "Il y a 1 h", likes: 19 },
+  { name: "Yves K.", avatar: "#D97706", msg: "RDV à la cafet à 12h30 pour le club dev mobile", time: "Il y a 2 h", likes: 3 },
+];
 
 export default function JournalPage() {
   const { user } = useAuth();
@@ -29,6 +34,10 @@ export default function JournalPage() {
   const [rub, setRub] = useState("Toutes");
   const [q, setQ] = useState("");
   const [reader, setReader] = useState<DBJournalArticle | null>(null);
+  const [dark, setDark] = useState(true);
+  const [reelIdx, setReelIdx] = useState(0);
+  const [reelPlaying, setReelPlaying] = useState(true);
+  const [showComm, setShowComm] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -79,57 +88,66 @@ export default function JournalPage() {
     setSaves((s) => { const n = new Set(s); if (on) n.add(a.id); else n.delete(a.id); return n; });
     await toggleReaction(a.id, user.id, "save", on);
   };
-  const openReader = (a: DBJournalArticle) => {
-    setReader(a);
-    bumpJournalViews(a.id, a.views);
-  };
+  const openReader = (a: DBJournalArticle) => { setReader(a); bumpJournalViews(a.id, a.views); };
+
+  const bg = dark ? "bg-[#0b0b0f]" : "bg-gray-50";
+  const fg = dark ? "text-white" : "text-gray-900";
+  const card = dark ? "bg-white/[0.03] border-white/10" : "bg-white border-gray-200 shadow-sm";
+  const sub = dark ? "text-white/50" : "text-gray-500";
+  const subBg = dark ? "bg-white/5" : "bg-gray-100";
+  const headerBg = dark ? "bg-[#0b0b0f]/95 border-white/10" : "bg-white/95 border-gray-200";
 
   return (
-    <div className="min-h-screen bg-[#0b0b0f] text-white">
-      {/* ── BANDEAU FRANCE24 : ticker breaking ── */}
+    <div className={`min-h-screen ${bg} ${fg} transition-colors duration-300`}>
+      {/* ── TICKER ── */}
       <div className="bg-red-600 overflow-hidden">
-        <div className="flex items-center gap-3 px-4 py-1.5 text-[11px] font-bold whitespace-nowrap">
+        <div className="flex items-center gap-3 px-4 py-1.5 text-[11px] font-bold whitespace-nowrap text-white">
           <span className="flex items-center gap-1 bg-white text-red-600 px-2 py-0.5 uppercase tracking-wider shrink-0">
             <Radio className="w-3 h-3" /> En continu
           </span>
           <div className="relative flex-1 overflow-hidden">
             <div className="flex gap-8 animate-[ticker_30s_linear_infinite] whitespace-nowrap">
-              {[...articles, ...articles].map((a, i) => (
-                <span key={i} className="text-white/90">• {a.title}</span>
-              ))}
+              {[...articles, ...articles].map((a, i) => <span key={i} className="text-white/90">• {a.title}</span>)}
             </div>
           </div>
         </div>
       </div>
 
-      {/* ── ENTÊTE MASTHEAD ── */}
-      <header className="border-b border-white/10 bg-[#0b0b0f]/95 backdrop-blur sticky top-0 z-30">
-        <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-3 flex items-center gap-4">
-          <Link href="/dashboard" className="flex items-center gap-1.5 text-white/50 text-xs hover:text-white transition-colors shrink-0">
+      {/* ── MASTHEAD ── */}
+      <header className={`border-b ${headerBg} backdrop-blur sticky top-0 z-30`}>
+        <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-3 flex items-center gap-3">
+          <Link href="/dashboard" className={`flex items-center gap-1.5 text-xs ${sub} hover:opacity-80 shrink-0`}>
             <ArrowLeft className="w-4 h-4" /> Dashboard
           </Link>
           <div className="flex items-center gap-2 shrink-0">
             <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-cama to-violet-600 flex items-center justify-center">
-              <Newspaper className="w-5 h-5" />
+              <Newspaper className="w-5 h-5 text-white" />
             </div>
             <div>
               <p className="font-black text-lg tracking-tight leading-none">JFN<span className="text-cama">.</span>news</p>
-              <p className="text-[9px] text-white/40 uppercase tracking-widest">Le média du campus</p>
+              <p className={`text-[9px] ${sub} uppercase tracking-widest`}>Le média du campus</p>
             </div>
           </div>
           <div className="flex-1 max-w-md ml-auto relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30" />
-            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Rechercher dans le journal…"
-              className="w-full bg-white/5 border border-white/10 rounded-full pl-9 pr-4 py-2 text-sm placeholder:text-white/30 focus:outline-none focus:border-cama/50" />
+            <Search className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 ${sub}`} />
+            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Rechercher…"
+              className={`w-full ${subBg} border ${dark ? "border-white/10" : "border-gray-300"} rounded-full pl-9 pr-4 py-2 text-sm ${dark ? "placeholder:text-white/30" : "placeholder:text-gray-400"} focus:outline-none focus:border-cama/50`} />
           </div>
-          <span className="hidden sm:block text-[11px] text-white/40">{new Date().toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}</span>
+          {/* Dark / Light toggle */}
+          <button onClick={() => setDark(!dark)} className={`w-9 h-9 rounded-full ${subBg} flex items-center justify-center hover:opacity-80 transition-colors`} title={dark ? "Mode clair" : "Mode sombre"}>
+            {dark ? <Sun className="w-4 h-4 text-yellow-400" /> : <Moon className="w-4 h-4 text-gray-600" />}
+          </button>
+          {/* Community toggle */}
+          <button onClick={() => setShowComm(!showComm)} className={`w-9 h-9 rounded-full ${showComm ? "bg-cama text-white" : subBg} flex items-center justify-center hover:opacity-80 transition-colors`} title="Communauté">
+            <Users className="w-4 h-4" />
+          </button>
+          <span className={`hidden lg:block text-[11px] ${sub}`}>{new Date().toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}</span>
         </div>
-        {/* Rubriques */}
         <div className="max-w-[1400px] mx-auto px-4 sm:px-6 flex gap-1 overflow-x-auto pb-2 scrollbar-none">
           {rubriques.map((r) => (
             <button key={r} onClick={() => setRub(r)}
               className={`px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap transition-colors ${
-                rub === r ? "bg-cama text-white" : "text-white/50 hover:text-white hover:bg-white/5"}`}>
+                rub === r ? "bg-cama text-white" : `${sub} hover:opacity-80 ${dark ? "hover:bg-white/5" : "hover:bg-gray-200"}`}`}>
               {r}
             </button>
           ))}
@@ -141,10 +159,10 @@ export default function JournalPage() {
       ) : (
         <main className="max-w-[1400px] mx-auto px-4 sm:px-6 py-6 space-y-8">
 
-          {/* ── STORIES / REELS (TikTok × Insta) ── */}
+          {/* ── REELS / STORIES (horizontal) ── */}
           {reels.length > 0 && (
             <section>
-              <h2 className="flex items-center gap-2 text-sm font-black uppercase tracking-widest text-white/70 mb-3">
+              <h2 className={`flex items-center gap-2 text-sm font-black uppercase tracking-widest ${sub} mb-3`}>
                 <Flame className="w-4 h-4 text-orange-500" /> Reels & Directs
               </h2>
               <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-none">
@@ -152,7 +170,7 @@ export default function JournalPage() {
                   <button key={a.id} onClick={() => openReader(a)} className="group relative w-[130px] h-[210px] shrink-0 rounded-2xl overflow-hidden">
                     <img src={cover(a)} alt="" className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/10 to-black/30" />
-                    <div className={`absolute top-2 left-2 flex items-center gap-1 text-[8px] font-black uppercase px-1.5 py-0.5 rounded ${a.media_kind === "live" ? "bg-red-600" : "bg-white/20 backdrop-blur"}`}>
+                    <div className={`absolute top-2 left-2 flex items-center gap-1 text-[8px] font-black uppercase px-1.5 py-0.5 rounded text-white ${a.media_kind === "live" ? "bg-red-600" : "bg-white/20 backdrop-blur"}`}>
                       {a.media_kind === "live" ? <><span className="w-1 h-1 rounded-full bg-white animate-pulse" /> Live</> : a.media_kind === "reel" ? "Reel" : "Vidéo"}
                     </div>
                     <div className="absolute inset-0 flex items-center justify-center">
@@ -160,15 +178,91 @@ export default function JournalPage() {
                         <Play className="w-4 h-4 text-black fill-black ml-0.5" />
                       </div>
                     </div>
-                    <p className="absolute bottom-2 left-2 right-2 text-[10px] font-bold leading-tight text-left line-clamp-2">{a.title}</p>
-                    {a.media_duration && <span className="absolute bottom-2 right-2 text-[8px] font-bold bg-black/60 px-1 rounded">{a.media_duration}</span>}
+                    <p className="absolute bottom-2 left-2 right-2 text-[10px] font-bold leading-tight text-left line-clamp-2 text-white">{a.title}</p>
+                    {a.media_duration && <span className="absolute bottom-2 right-2 text-[8px] font-bold bg-black/60 px-1 rounded text-white">{a.media_duration}</span>}
                   </button>
                 ))}
               </div>
             </section>
           )}
 
-          <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-6 items-start">
+          {/* ── TIKTOK-STYLE VERTICAL VIDEO FEED ── */}
+          {reels.length > 0 && (
+            <section>
+              <h2 className={`flex items-center gap-2 text-sm font-black uppercase tracking-widest ${sub} mb-3`}>
+                <Play className="w-4 h-4 text-cama" /> Feed Vidéo
+              </h2>
+              <div className="flex gap-4 items-start">
+                <div className="relative w-full max-w-[360px] mx-auto aspect-[9/16] rounded-3xl overflow-hidden bg-black">
+                  {reels.map((a, i) => (
+                    <div key={a.id} className={`absolute inset-0 transition-opacity duration-500 ${i === reelIdx ? "opacity-100" : "opacity-0 pointer-events-none"}`}>
+                      <img src={cover(a)} alt="" className="w-full h-full object-cover" />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/30" />
+                      {a.media_kind === "live" && (
+                        <span className="absolute top-4 left-4 flex items-center gap-1.5 bg-red-600 text-white text-[10px] font-black uppercase px-2.5 py-1 rounded-full">
+                          <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" /> Live
+                        </span>
+                      )}
+                      <div className="absolute bottom-0 left-0 right-14 p-5">
+                        <p className="text-white text-xs font-bold flex items-center gap-2 mb-1">
+                          <span className="w-7 h-7 rounded-full bg-gradient-to-br from-cama to-violet-500 flex items-center justify-center text-[10px] font-black">{a.author[0]}</span>
+                          {a.author}
+                        </p>
+                        <p className="text-white text-sm font-bold leading-snug line-clamp-3">{a.title}</p>
+                        {a.tags && a.tags.length > 0 && (
+                          <p className="text-white/60 text-[11px] mt-1">
+                            {a.tags.slice(0, 3).map((t) => `#${t}`).join(" ")}
+                          </p>
+                        )}
+                      </div>
+                      {/* Right side actions (TikTok style) */}
+                      <div className="absolute right-3 bottom-20 flex flex-col items-center gap-5">
+                        <button onClick={(e) => { e.stopPropagation(); like(a); }} className="flex flex-col items-center gap-0.5">
+                          <div className={`w-10 h-10 rounded-full flex items-center justify-center ${likes.has(a.id) ? "bg-pink-500/30" : "bg-black/40 backdrop-blur"}`}>
+                            <Heart className={`w-5 h-5 text-white ${likes.has(a.id) ? "fill-pink-500" : ""}`} />
+                          </div>
+                          <span className="text-white text-[10px] font-bold">{counts[a.id] ?? 0}</span>
+                        </button>
+                        <button className="flex flex-col items-center gap-0.5">
+                          <div className="w-10 h-10 rounded-full bg-black/40 backdrop-blur flex items-center justify-center">
+                            <MessageCircle className="w-5 h-5 text-white" />
+                          </div>
+                          <span className="text-white text-[10px] font-bold">{a.views}</span>
+                        </button>
+                        <button onClick={(e) => { e.stopPropagation(); save(a); }} className="flex flex-col items-center gap-0.5">
+                          <div className={`w-10 h-10 rounded-full flex items-center justify-center ${saves.has(a.id) ? "bg-cama/30" : "bg-black/40 backdrop-blur"}`}>
+                            <Bookmark className={`w-5 h-5 text-white ${saves.has(a.id) ? "fill-cama" : ""}`} />
+                          </div>
+                          <span className="text-white text-[10px] font-bold">{saves.has(a.id) ? "Saved" : "Save"}</span>
+                        </button>
+                        <button className="flex flex-col items-center gap-0.5">
+                          <div className="w-10 h-10 rounded-full bg-black/40 backdrop-blur flex items-center justify-center">
+                            <Share2 className="w-5 h-5 text-white" />
+                          </div>
+                          <span className="text-white text-[10px] font-bold">Share</span>
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                  {/* Nav up/down */}
+                  <button onClick={() => setReelIdx((i) => Math.max(0, i - 1))} disabled={reelIdx === 0}
+                    className="absolute top-4 right-4 w-8 h-8 rounded-full bg-black/40 backdrop-blur flex items-center justify-center text-white disabled:opacity-30"><ChevronUp className="w-5 h-5" /></button>
+                  <button onClick={() => setReelIdx((i) => Math.min(reels.length - 1, i + 1))} disabled={reelIdx >= reels.length - 1}
+                    className="absolute top-14 right-4 w-8 h-8 rounded-full bg-black/40 backdrop-blur flex items-center justify-center text-white disabled:opacity-30"><ChevronDown className="w-5 h-5" /></button>
+                  {/* Play/Pause */}
+                  <button onClick={() => setReelPlaying(!reelPlaying)} className="absolute top-4 left-4 w-8 h-8 rounded-full bg-black/40 backdrop-blur flex items-center justify-center text-white">
+                    {reelPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 fill-white ml-0.5" />}
+                  </button>
+                  {/* Progress dots */}
+                  <div className="absolute left-4 top-1/2 -translate-y-1/2 flex flex-col gap-1">
+                    {reels.map((_, i) => <div key={i} className={`w-1 rounded-full transition-all ${i === reelIdx ? "h-5 bg-white" : "h-1.5 bg-white/40"}`} />)}
+                  </div>
+                </div>
+              </div>
+            </section>
+          )}
+
+          <div className={`grid grid-cols-1 ${showComm ? "lg:grid-cols-[1fr_300px_280px]" : "lg:grid-cols-[1fr_300px]"} gap-6 items-start`}>
             {/* ── COLONNE PRINCIPALE ── */}
             <div className="space-y-6">
               {/* À la une */}
@@ -176,7 +270,7 @@ export default function JournalPage() {
                 <button onClick={() => openReader(featured)} className="group relative block w-full rounded-3xl overflow-hidden text-left">
                   <img src={cover(featured)} alt="" className="w-full h-[340px] sm:h-[420px] object-cover group-hover:scale-[1.02] transition-transform duration-700" />
                   <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent" />
-                  <div className="absolute bottom-0 p-6 sm:p-8 max-w-2xl">
+                  <div className="absolute bottom-0 p-6 sm:p-8 max-w-2xl text-white">
                     <span className="inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-widest bg-cama px-2.5 py-1 rounded-full mb-3">
                       <Sparkles className="w-3 h-3" /> À la une · {featured.rubrique}
                     </span>
@@ -184,6 +278,7 @@ export default function JournalPage() {
                     {featured.subtitle && <p className="text-white/70 text-sm sm:text-base mt-2 max-w-xl">{featured.subtitle}</p>}
                     <p className="text-white/40 text-xs mt-3 flex items-center gap-3">
                       <span>{featured.author}</span><span className="flex items-center gap-1"><Eye className="w-3 h-3" /> {featured.views}</span>
+                      <span className="flex items-center gap-1"><Heart className="w-3 h-3" /> {counts[featured.id] ?? 0}</span>
                     </p>
                   </div>
                 </button>
@@ -192,11 +287,11 @@ export default function JournalPage() {
               {/* Grille d'articles */}
               <div className="grid sm:grid-cols-2 gap-4">
                 {filtered.filter((a) => !(featured && a.id === featured.id && rub === "Toutes" && !q)).map((a) => (
-                  <article key={a.id} className="group bg-white/[0.03] border border-white/10 rounded-2xl overflow-hidden flex flex-col hover:border-white/25 transition-colors">
+                  <article key={a.id} className={`group border rounded-2xl overflow-hidden flex flex-col transition-all ${card}`}>
                     <button onClick={() => openReader(a)} className="relative h-44 overflow-hidden text-left">
                       <img src={cover(a)} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                       <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
-                      <span className="absolute top-3 left-3 text-[9px] font-black uppercase tracking-widest bg-black/50 backdrop-blur px-2 py-1 rounded-full">{a.rubrique}</span>
+                      <span className="absolute top-3 left-3 text-[9px] font-black uppercase tracking-widest bg-black/50 backdrop-blur px-2 py-1 rounded-full text-white">{a.rubrique}</span>
                       {a.media_kind !== "none" && a.media_kind !== "image" && (
                         <span className="absolute top-3 right-3 w-7 h-7 rounded-full bg-white/90 flex items-center justify-center">
                           {a.media_kind === "audio" ? <Volume2 className="w-3.5 h-3.5 text-black" /> : a.media_kind === "live" ? <Radio className="w-3.5 h-3.5 text-red-600" /> : <Play className="w-3.5 h-3.5 text-black fill-black" />}
@@ -206,15 +301,15 @@ export default function JournalPage() {
                     <div className="p-4 flex-1 flex flex-col">
                       <button onClick={() => openReader(a)} className="text-left">
                         <h3 className="font-bold leading-snug group-hover:text-cama transition-colors line-clamp-2">{a.title}</h3>
-                        {a.subtitle && <p className="text-white/50 text-xs mt-1 line-clamp-2">{a.subtitle}</p>}
+                        {a.subtitle && <p className={`${sub} text-xs mt-1 line-clamp-2`}>{a.subtitle}</p>}
                       </button>
                       <div className="mt-auto pt-3 flex items-center justify-between">
-                        <span className="text-[10px] text-white/30 flex items-center gap-1"><Clock className="w-3 h-3" /> {a.author}</span>
+                        <span className={`text-[10px] ${sub} flex items-center gap-1`}><Clock className="w-3 h-3" /> {a.author}</span>
                         <div className="flex items-center gap-1">
-                          <button onClick={() => like(a)} className={`flex items-center gap-1 text-[11px] px-2 py-1 rounded-full transition-colors ${likes.has(a.id) ? "text-pink-500" : "text-white/40 hover:text-white"}`}>
+                          <button onClick={() => like(a)} className={`flex items-center gap-1 text-[11px] px-2 py-1 rounded-full transition-colors ${likes.has(a.id) ? "text-pink-500" : `${sub} hover:opacity-80`}`}>
                             <Heart className={`w-3.5 h-3.5 ${likes.has(a.id) ? "fill-pink-500" : ""}`} /> {counts[a.id] ?? 0}
                           </button>
-                          <button onClick={() => save(a)} className={`p-1 rounded-full transition-colors ${saves.has(a.id) ? "text-cama" : "text-white/40 hover:text-white"}`}>
+                          <button onClick={() => save(a)} className={`p-1 rounded-full transition-colors ${saves.has(a.id) ? "text-cama" : `${sub} hover:opacity-80`}`}>
                             <Bookmark className={`w-3.5 h-3.5 ${saves.has(a.id) ? "fill-cama" : ""}`} />
                           </button>
                         </div>
@@ -223,67 +318,122 @@ export default function JournalPage() {
                   </article>
                 ))}
               </div>
-              {filtered.length === 0 && <p className="text-center text-white/40 py-16 text-sm">Aucun article pour ce filtre.</p>}
+              {filtered.length === 0 && <p className={`text-center ${sub} py-16 text-sm`}>Aucun article pour ce filtre.</p>}
             </div>
 
             {/* ── SIDEBAR WIKIPEDIA-NEWGEN ── */}
             <aside className="space-y-4 lg:sticky lg:top-[140px]">
-              {/* Infobox style Wikipedia */}
-              <div className="bg-white/[0.03] border border-white/10 rounded-2xl overflow-hidden">
-                <div className="px-4 py-3 bg-white/5 border-b border-white/10 flex items-center gap-2">
+              <div className={`border rounded-2xl overflow-hidden ${card}`}>
+                <div className={`px-4 py-3 ${subBg} border-b ${dark ? "border-white/10" : "border-gray-200"} flex items-center gap-2`}>
                   <BookOpen className="w-4 h-4 text-cama" />
                   <p className="text-xs font-black uppercase tracking-widest">Institut JFN</p>
                 </div>
                 <dl className="p-4 space-y-2 text-xs">
                   {[["Type", "Institut privé d'enseignement supérieur"], ["Localisation", "Yaoundé, Cameroun"], ["Plateforme", "CAMA — LMS nouvelle génération"], ["Filières", "Génie logiciel, Réseaux, Data, Gestion"], ["Langue", "Français"]].map(([k, v]) => (
                     <div key={k} className="grid grid-cols-[90px_1fr] gap-2">
-                      <dt className="text-white/40">{k}</dt>
-                      <dd className="text-white/80 font-medium">{v}</dd>
+                      <dt className={sub}>{k}</dt>
+                      <dd className="font-medium">{v}</dd>
                     </div>
                   ))}
                 </dl>
               </div>
 
-              {/* Tendances (hashtags) */}
-              <div className="bg-white/[0.03] border border-white/10 rounded-2xl overflow-hidden">
-                <div className="px-4 py-3 bg-white/5 border-b border-white/10 flex items-center gap-2">
+              <div className={`border rounded-2xl overflow-hidden ${card}`}>
+                <div className={`px-4 py-3 ${subBg} border-b ${dark ? "border-white/10" : "border-gray-200"} flex items-center gap-2`}>
                   <TrendingUp className="w-4 h-4 text-orange-500" />
                   <p className="text-xs font-black uppercase tracking-widest">Tendances</p>
                 </div>
                 <div className="p-3 flex flex-wrap gap-1.5">
-                  {tags.length === 0 && <p className="text-[11px] text-white/30">—</p>}
+                  {tags.length === 0 && <p className={`text-[11px] ${sub}`}>—</p>}
                   {tags.map(([t, n]) => (
-                    <button key={t} onClick={() => setQ(t)} className="inline-flex items-center gap-1 text-[11px] bg-white/5 hover:bg-white/10 text-white/70 px-2.5 py-1 rounded-full transition-colors">
-                      <Hash className="w-3 h-3 text-cama" /> {t} <span className="text-white/30">{n}</span>
+                    <button key={t} onClick={() => setQ(t)} className={`inline-flex items-center gap-1 text-[11px] ${subBg} px-2.5 py-1 rounded-full transition-colors hover:opacity-80`}>
+                      <Hash className="w-3 h-3 text-cama" /> {t} <span className={sub}>{n}</span>
                     </button>
                   ))}
                 </div>
               </div>
 
-              {/* Les plus lus */}
-              <div className="bg-white/[0.03] border border-white/10 rounded-2xl overflow-hidden">
-                <div className="px-4 py-3 bg-white/5 border-b border-white/10 flex items-center gap-2">
+              <div className={`border rounded-2xl overflow-hidden ${card}`}>
+                <div className={`px-4 py-3 ${subBg} border-b ${dark ? "border-white/10" : "border-gray-200"} flex items-center gap-2`}>
                   <Eye className="w-4 h-4 text-cama" />
                   <p className="text-xs font-black uppercase tracking-widest">Les plus lus</p>
                 </div>
-                <div className="divide-y divide-white/5">
+                <div className={`divide-y ${dark ? "divide-white/5" : "divide-gray-100"}`}>
                   {[...articles].sort((a, b) => b.views - a.views).slice(0, 5).map((a, i) => (
-                    <button key={a.id} onClick={() => openReader(a)} className="w-full px-4 py-2.5 flex items-center gap-3 text-left hover:bg-white/5 transition-colors">
-                      <span className="text-lg font-black text-white/20 w-5">{i + 1}</span>
+                    <button key={a.id} onClick={() => openReader(a)} className={`w-full px-4 py-2.5 flex items-center gap-3 text-left ${dark ? "hover:bg-white/5" : "hover:bg-gray-50"} transition-colors`}>
+                      <span className={`text-lg font-black w-5 ${sub}`}>{i + 1}</span>
                       <p className="text-[12px] font-semibold leading-tight line-clamp-2 flex-1">{a.title}</p>
-                      <ChevronRight className="w-4 h-4 text-white/20 shrink-0" />
+                      <ChevronRight className={`w-4 h-4 ${sub} shrink-0`} />
                     </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Contributeurs */}
+              <div className={`border rounded-2xl overflow-hidden ${card}`}>
+                <div className={`px-4 py-3 ${subBg} border-b ${dark ? "border-white/10" : "border-gray-200"} flex items-center gap-2`}>
+                  <Award className="w-4 h-4 text-amber-500" />
+                  <p className="text-xs font-black uppercase tracking-widest">Top contributeurs</p>
+                </div>
+                <div className="p-3 space-y-2">
+                  {["Rédaction JFN", "Pr. Amina Bello", "Club Informatique", "Radio Campus JFN", "Dép. Mathématiques"].map((n, i) => (
+                    <div key={n} className="flex items-center gap-2">
+                      <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-[10px] font-black" style={{ background: ["#7C3AED", "#0EA5E9", "#16A34A", "#DB2777", "#D97706"][i] }}>{n[0]}</div>
+                      <p className="text-[11px] font-semibold flex-1 truncate">{n}</p>
+                      <span className={`text-[9px] font-bold ${sub}`}>{[12, 8, 5, 4, 3][i]} articles</span>
+                    </div>
                   ))}
                 </div>
               </div>
             </aside>
+
+            {/* ── COMMUNAUTÉ ÉTUDIANTE ── */}
+            {showComm && (
+              <aside className="space-y-4 lg:sticky lg:top-[140px]">
+                <div className={`border rounded-2xl overflow-hidden ${card}`}>
+                  <div className={`px-4 py-3 ${subBg} border-b ${dark ? "border-white/10" : "border-gray-200"} flex items-center gap-2`}>
+                    <Users className="w-4 h-4 text-cama" />
+                    <p className="text-xs font-black uppercase tracking-widest">Communauté</p>
+                    <span className="ml-auto flex items-center gap-1">
+                      <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                      <span className={`text-[10px] font-bold ${sub}`}>142 en ligne</span>
+                    </span>
+                  </div>
+                  <div className={`divide-y ${dark ? "divide-white/5" : "divide-gray-100"} max-h-[400px] overflow-y-auto`}>
+                    {COMMUNITY_SEED.map((m, i) => (
+                      <div key={i} className={`px-4 py-3 ${dark ? "hover:bg-white/5" : "hover:bg-gray-50"} transition-colors`}>
+                        <div className="flex items-center gap-2 mb-1.5">
+                          <div className="w-6 h-6 rounded-full flex items-center justify-center text-white text-[9px] font-black" style={{ background: m.avatar }}>{m.name[0]}</div>
+                          <p className="text-[11px] font-bold flex-1">{m.name}</p>
+                          <span className={`text-[9px] ${sub}`}>{m.time}</span>
+                        </div>
+                        <p className="text-[12px] leading-relaxed">{m.msg}</p>
+                        <div className="flex items-center gap-3 mt-2">
+                          <button className={`flex items-center gap-1 text-[10px] ${sub} hover:text-pink-500 transition-colors`}>
+                            <Heart className="w-3 h-3" /> {m.likes}
+                          </button>
+                          <button className={`flex items-center gap-1 text-[10px] ${sub} hover:text-cama transition-colors`}>
+                            <MessageCircle className="w-3 h-3" /> Répondre
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className={`px-3 py-2 border-t ${dark ? "border-white/10" : "border-gray-200"} flex items-center gap-2`}>
+                    <input placeholder="Écrire un message…" className={`flex-1 ${subBg} rounded-full px-3 py-1.5 text-xs ${dark ? "placeholder:text-white/30" : "placeholder:text-gray-400"} focus:outline-none`} />
+                    <button className="w-8 h-8 rounded-full bg-cama flex items-center justify-center hover:bg-cama/90 transition-colors">
+                      <Send className="w-3.5 h-3.5 text-white" />
+                    </button>
+                  </div>
+                </div>
+              </aside>
+            )}
           </div>
         </main>
       )}
 
-      {/* ── LECTEUR ARTICLE (reader immersif) ── */}
       {reader && <Reader a={reader} liked={likes.has(reader.id)} saved={saves.has(reader.id)} count={counts[reader.id] ?? 0}
-        onLike={() => like(reader)} onSave={() => save(reader)} onClose={() => setReader(null)} />}
+        onLike={() => like(reader)} onSave={() => save(reader)} onClose={() => setReader(null)} dark={dark} />}
 
       <style jsx global>{`
         @keyframes ticker { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
@@ -294,21 +444,24 @@ export default function JournalPage() {
   );
 }
 
-function Reader({ a, liked, saved, count, onLike, onSave, onClose }: {
+function Reader({ a, liked, saved, count, onLike, onSave, onClose, dark }: {
   a: DBJournalArticle; liked: boolean; saved: boolean; count: number;
-  onLike: () => void; onSave: () => void; onClose: () => void;
+  onLike: () => void; onSave: () => void; onClose: () => void; dark: boolean;
 }) {
+  const bg = dark ? "bg-[#13131a]" : "bg-white";
+  const sub = dark ? "text-white/60" : "text-gray-500";
+  const border = dark ? "border-white/10" : "border-gray-200";
   return (
     <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm overflow-y-auto" onClick={onClose}>
-      <div className="max-w-3xl mx-auto my-6 sm:my-12 bg-[#13131a] rounded-3xl overflow-hidden border border-white/10" onClick={(e) => e.stopPropagation()}>
+      <div className={`max-w-3xl mx-auto my-6 sm:my-12 ${bg} rounded-3xl overflow-hidden border ${border}`} onClick={(e) => e.stopPropagation()}>
         <div className="relative">
           <img src={cover(a)} alt="" className="w-full h-64 sm:h-80 object-cover" />
-          <div className="absolute inset-0 bg-gradient-to-t from-[#13131a] via-transparent to-black/40" />
-          <button onClick={onClose} className="absolute top-4 right-4 w-9 h-9 rounded-full bg-black/50 backdrop-blur flex items-center justify-center hover:bg-black/70 transition-colors">
+          <div className={`absolute inset-0 bg-gradient-to-t ${dark ? "from-[#13131a]" : "from-white"} via-transparent to-black/40`} />
+          <button onClick={onClose} className="absolute top-4 right-4 w-9 h-9 rounded-full bg-black/50 backdrop-blur flex items-center justify-center hover:bg-black/70 transition-colors text-white">
             <X className="w-5 h-5" />
           </button>
           {a.media_kind === "live" && (
-            <span className="absolute top-4 left-4 flex items-center gap-1.5 bg-red-600 text-[10px] font-black uppercase px-2.5 py-1 rounded-full">
+            <span className="absolute top-4 left-4 flex items-center gap-1.5 bg-red-600 text-white text-[10px] font-black uppercase px-2.5 py-1 rounded-full">
               <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" /> Live · {a.media_at}
             </span>
           )}
@@ -316,56 +469,54 @@ function Reader({ a, liked, saved, count, onLike, onSave, onClose }: {
         <div className="p-6 sm:p-8 -mt-12 relative">
           <span className="inline-block text-[10px] font-black uppercase tracking-widest text-cama mb-2">{a.rubrique}</span>
           <h1 className="text-2xl sm:text-3xl font-black leading-tight tracking-tight">{a.title}</h1>
-          {a.subtitle && <p className="text-white/60 text-base mt-2 italic">{a.subtitle}</p>}
-          <div className="flex items-center gap-4 mt-4 text-xs text-white/40 border-y border-white/10 py-3">
+          {a.subtitle && <p className={`${sub} text-base mt-2 italic`}>{a.subtitle}</p>}
+          <div className={`flex items-center gap-4 mt-4 text-xs ${sub} border-y ${border} py-3`}>
             <span>{a.author}</span>
             <span className="flex items-center gap-1"><Eye className="w-3 h-3" /> {a.views} vues</span>
             {a.media_duration && <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {a.media_duration}</span>}
           </div>
 
           {a.media_kind === "audio" && (
-            <div className="mt-4 bg-white/5 rounded-2xl p-4 flex items-center gap-3">
-              <div className="w-12 h-12 rounded-full bg-cama flex items-center justify-center"><Play className="w-5 h-5 fill-white ml-0.5" /></div>
+            <div className={`mt-4 ${dark ? "bg-white/5" : "bg-gray-100"} rounded-2xl p-4 flex items-center gap-3`}>
+              <div className="w-12 h-12 rounded-full bg-cama flex items-center justify-center"><Play className="w-5 h-5 text-white fill-white ml-0.5" /></div>
               <div className="flex-1 flex items-center gap-[2px] h-8">
                 {[5, 9, 14, 18, 12, 20, 16, 8, 13, 19, 11, 15, 7, 17, 10, 14, 6, 12, 18, 9].map((h, i) => (
-                  <div key={i} className={`w-[3px] rounded-full ${i < 7 ? "bg-cama" : "bg-white/20"}`} style={{ height: `${h}px` }} />
+                  <div key={i} className={`w-[3px] rounded-full ${i < 7 ? "bg-cama" : dark ? "bg-white/20" : "bg-gray-300"}`} style={{ height: `${h}px` }} />
                 ))}
               </div>
-              <span className="text-xs text-white/50">{a.media_duration}</span>
+              <span className={`text-xs ${sub}`}>{a.media_duration}</span>
             </div>
           )}
 
-          {a.body && <p className="text-white/80 leading-relaxed mt-5 whitespace-pre-line">{a.body}</p>}
+          {a.body && <p className={`${dark ? "text-white/80" : "text-gray-700"} leading-relaxed mt-5 whitespace-pre-line`}>{a.body}</p>}
 
           {a.refs && a.refs.length > 0 && (
-            <div className="mt-6 border-t border-white/10 pt-4">
-              <p className="text-xs font-bold uppercase tracking-widest text-white/40 mb-2">Références</p>
+            <div className={`mt-6 border-t ${border} pt-4`}>
+              <p className={`text-xs font-bold uppercase tracking-widest ${sub} mb-2`}>Références</p>
               <ul className="space-y-1">
-                {a.refs.map((r, i) => (
-                  <li key={i}><a href={r.href} className="text-sm text-cama hover:underline">↗ {r.label}</a></li>
-                ))}
+                {a.refs.map((r, i) => <li key={i}><a href={r.href} className="text-sm text-cama hover:underline">↗ {r.label}</a></li>)}
               </ul>
             </div>
           )}
 
           {a.tags && a.tags.length > 0 && (
             <div className="mt-5 flex flex-wrap gap-1.5">
-              {a.tags.map((t) => <span key={t} className="text-[11px] bg-white/5 text-white/60 px-2.5 py-1 rounded-full">#{t}</span>)}
+              {a.tags.map((t) => <span key={t} className={`text-[11px] ${dark ? "bg-white/5 text-white/60" : "bg-gray-100 text-gray-600"} px-2.5 py-1 rounded-full`}>#{t}</span>)}
             </div>
           )}
 
-          <div className="mt-6 flex items-center gap-2">
-            <button onClick={onLike} className={`flex items-center gap-2 px-4 py-2.5 rounded-full font-bold text-sm transition-colors ${liked ? "bg-pink-500/20 text-pink-400" : "bg-white/5 text-white/60 hover:bg-white/10"}`}>
+          <div className="mt-6 flex items-center gap-2 flex-wrap">
+            <button onClick={onLike} className={`flex items-center gap-2 px-4 py-2.5 rounded-full font-bold text-sm transition-colors ${liked ? "bg-pink-500/20 text-pink-400" : `${dark ? "bg-white/5 text-white/60 hover:bg-white/10" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}`}>
               <Heart className={`w-4 h-4 ${liked ? "fill-pink-400" : ""}`} /> {count}
             </button>
-            <button onClick={onSave} className={`flex items-center gap-2 px-4 py-2.5 rounded-full font-bold text-sm transition-colors ${saved ? "bg-cama/20 text-cama" : "bg-white/5 text-white/60 hover:bg-white/10"}`}>
+            <button onClick={onSave} className={`flex items-center gap-2 px-4 py-2.5 rounded-full font-bold text-sm transition-colors ${saved ? "bg-cama/20 text-cama" : `${dark ? "bg-white/5 text-white/60 hover:bg-white/10" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}`}>
               <Bookmark className={`w-4 h-4 ${saved ? "fill-cama" : ""}`} /> {saved ? "Enregistré" : "Enregistrer"}
             </button>
-            <button className="flex items-center gap-2 px-4 py-2.5 rounded-full font-bold text-sm bg-white/5 text-white/60 hover:bg-white/10 transition-colors ml-auto">
+            <button className={`flex items-center gap-2 px-4 py-2.5 rounded-full font-bold text-sm ${dark ? "bg-white/5 text-white/60 hover:bg-white/10" : "bg-gray-100 text-gray-600 hover:bg-gray-200"} transition-colors ml-auto`}>
               <Share2 className="w-4 h-4" /> Partager
             </button>
             {a.cta_label && a.cta_href && (
-              <a href={a.cta_href} className="flex items-center gap-2 px-4 py-2.5 rounded-full font-bold text-sm bg-cama hover:bg-cama/90 transition-colors">
+              <a href={a.cta_href} className="flex items-center gap-2 px-4 py-2.5 rounded-full font-bold text-sm bg-cama text-white hover:bg-cama/90 transition-colors">
                 {a.cta_label} <ChevronRight className="w-4 h-4" />
               </a>
             )}
