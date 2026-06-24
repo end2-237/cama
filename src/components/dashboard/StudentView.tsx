@@ -13,6 +13,7 @@ import { fetchStudentProgram, fetchChapters, fetchProgress } from "@/lib/program
 import { fetchOpenExams, fetchAttemptsForStudent, fetchDeliberations } from "@/lib/exams";
 import { fetchLivesForCourses, subscribeLives } from "@/lib/lives";
 import { fetchExtraCourses, fetchMyEnrollments, MODE_LABEL } from "@/lib/extra";
+import { fetchJournal, type DBJournalArticle } from "@/lib/journal";
 import type { DBProgramCourse, DBChapter, DBExam, DBExamAttempt, DBExtraCourse, DBExtraEnrollment } from "@/lib/supabase";
 import type { DelibWithMeta } from "@/lib/exams";
 
@@ -144,7 +145,44 @@ function MediaBlock({ media }: { media: Media }) {
   );
 }
 
+/* Convertit un article du Journal (BD) vers le format éditorial du fil. */
+function journalToArticle(a: DBJournalArticle): Article {
+  let media: Media = { kind: "none" };
+  if (a.media_kind === "image" && a.media_src) media = { kind: "image", src: a.media_src, legend: a.media_legend ?? "" };
+  else if (a.media_kind === "video" && a.media_src) media = { kind: "video", src: a.media_src, duration: a.media_duration ?? "", legend: a.media_legend ?? "" };
+  else if (a.media_kind === "audio") media = { kind: "audio", duration: a.media_duration ?? "", legend: a.media_legend ?? "" };
+  else if (a.media_kind === "reel" && a.media_src) media = { kind: "reel", src: a.media_src, duration: a.media_duration ?? "", legend: a.media_legend ?? "" };
+  else if (a.media_kind === "live" && a.media_src) media = { kind: "live", src: a.media_src, at: a.media_at ?? "" };
+  return {
+    rubrique: a.rubrique,
+    title: a.title,
+    subtitle: a.subtitle ?? "",
+    body: a.body ?? "",
+    media,
+    author: a.author,
+    time: relTime(a.created_at),
+    refs: a.refs ?? [],
+    cta: a.cta_label && a.cta_href ? { label: a.cta_label, href: a.cta_href } : undefined,
+  };
+}
+
+function relTime(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime();
+  const h = Math.floor(diff / 3_600_000);
+  if (h < 1) return "À l'instant";
+  if (h < 24) return `Il y a ${h} h`;
+  const d = Math.floor(h / 24);
+  return `Il y a ${d} jour${d > 1 ? "s" : ""}`;
+}
+
 function NewsFeed({ articles }: { articles: Article[] }) {
+  const [journal, setJournal] = useState<Article[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    fetchJournal(true).then((rows) => { if (!cancelled) setJournal(rows.map(journalToArticle)); });
+    return () => { cancelled = true; };
+  }, []);
+  const feed = [...journal, ...articles];
   return (
     <aside className="bg-white border-r border-border overflow-x-hidden lg:sticky lg:top-[112px] lg:h-[calc(100vh-112px)] lg:overflow-y-auto">
       {/* Cartouche journal */}
@@ -156,7 +194,7 @@ function NewsFeed({ articles }: { articles: Article[] }) {
         <Newspaper className="w-4 h-4 text-ink" />
       </div>
 
-      {articles.length === 0 && (
+      {feed.length === 0 && (
         <article className="px-4 py-4 border-b border-border">
           <p className="text-[10px] font-black text-cama uppercase tracking-widest mb-1">Campus</p>
           <h3 className="text-sm font-bold text-ink leading-snug">Aucune actualité</h3>
@@ -164,7 +202,7 @@ function NewsFeed({ articles }: { articles: Article[] }) {
         </article>
       )}
 
-      {articles.map((a, i) => (
+      {feed.map((a, i) => (
         <article key={i} className="px-4 py-4 border-b border-border">
           <p className="text-[10px] font-black text-cama uppercase tracking-widest mb-1">{a.rubrique}</p>
           <h3 className="text-sm font-bold text-ink leading-snug hover:underline cursor-pointer">{a.title}</h3>
@@ -203,9 +241,9 @@ function NewsFeed({ articles }: { articles: Article[] }) {
       ))}
 
       <div className="px-4 py-3">
-        <button className="w-full text-[11px] font-bold text-ink border border-ink py-1.5 hover:bg-ink hover:text-white transition-colors">
+        <Link href="/journal" className="block w-full text-center text-[11px] font-bold text-ink border border-ink py-1.5 hover:bg-ink hover:text-white transition-colors">
           Toutes les éditions →
-        </button>
+        </Link>
       </div>
     </aside>
   );

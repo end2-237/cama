@@ -4,7 +4,7 @@ import { Suspense, useMemo, useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
-  Search, ArrowLeft, BookOpen, FileText, Radio, X, Mic,
+  Search, ArrowLeft, BookOpen, FileText, Radio, X, Mic, Globe, Loader2, ExternalLink,
   TrendingUp, CornerDownLeft, Terminal, CalendarDays, HelpCircle, User, QrCode, MonitorPlay,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
@@ -23,6 +23,8 @@ interface Hit {
   icon: typeof BookOpen;
   score: number;
 }
+
+interface WebHit { title: string; url: string; description: string; source: string; age: string }
 
 /* Pages statiques indexées */
 const STATIC_PAGES = [
@@ -48,14 +50,32 @@ function SearchEngine() {
   const router = useRouter();
   const { user } = useAuth();
   const [q, setQ] = useState(params.get("q") || "");
-  const [cat, setCat] = useState<"Tous" | Hit["cat"]>("Tous");
+  const [cat, setCat] = useState<"Tous" | Hit["cat"] | "Web">("Tous");
   const inputRef = useRef<HTMLInputElement>(null);
 
   const [courses, setCourses] = useState<DBProgramCourse[]>([]);
   const [chaptersByCourse, setChaptersByCourse] = useState<Record<string, DBChapter[]>>({});
   const [lives, setLives] = useState<DBLive[]>([]);
+  const [web, setWeb] = useState<WebHit[]>([]);
+  const [webLoading, setWebLoading] = useState(false);
 
   useEffect(() => { inputRef.current?.focus(); }, []);
+
+  /* Recherche web (Brave) — débouncée */
+  useEffect(() => {
+    const term = q.trim();
+    if (term.length < 3) { setWeb([]); setWebLoading(false); return; }
+    setWebLoading(true);
+    const t = setTimeout(async () => {
+      try {
+        const r = await fetch(`/api/search?q=${encodeURIComponent(term)}`);
+        const d = await r.json();
+        setWeb(Array.isArray(d.results) ? d.results : []);
+      } catch { setWeb([]); }
+      setWebLoading(false);
+    }, 450);
+    return () => clearTimeout(t);
+  }, [q]);
 
   useEffect(() => {
     if (!user) return;
@@ -248,12 +268,13 @@ function SearchEngine() {
 
             {/* Filtres catégories */}
             <div className="px-4 sm:px-6 flex items-center gap-0 overflow-x-auto">
-              {(["Tous", "Cours", "Chapitre", "Live", "Page"] as const).map((c) => (
+              {(["Tous", "Cours", "Chapitre", "Live", "Page", "Web"] as const).map((c) => (
                 <button key={c} onClick={() => setCat(c)}
-                  className={`px-3 py-2 text-xs font-bold border-b-2 transition-colors whitespace-nowrap ${
+                  className={`px-3 py-2 text-xs font-bold border-b-2 transition-colors whitespace-nowrap flex items-center gap-1 ${
                     cat === c ? "border-cama text-cama" : "border-transparent text-muted hover:text-ink"
                   }`}>
-                  {c === "Tous" ? `Tous (${hits.length})` : `${c}${counts[c] ? ` (${counts[c]})` : ""}`}
+                  {c === "Web" && <Globe className="w-3 h-3" />}
+                  {c === "Tous" ? `Tous (${hits.length})` : c === "Web" ? `Web${web.length ? ` (${web.length})` : ""}` : `${c}${counts[c] ? ` (${counts[c]})` : ""}`}
                 </button>
               ))}
             </div>
@@ -263,10 +284,12 @@ function SearchEngine() {
           <div className="grid lg:grid-cols-[1fr_380px] gap-0 items-start">
           <main className="px-4 sm:px-6 py-5 min-w-0 min-h-[calc(100vh-100px)]">
             <p className="text-[11px] text-subtle mb-4">
-              Environ {filtered.length} résultat{filtered.length > 1 ? "s" : ""} ({"<"} 0,01 s) — ressources Institut JFN uniquement
+              {cat === "Web"
+                ? `Environ ${web.length} résultat${web.length > 1 ? "s" : ""} web (Brave Search)`
+                : `Environ ${filtered.length} résultat${filtered.length > 1 ? "s" : ""} (< 0,01 s) — ressources Institut JFN`}
             </p>
 
-            {filtered.length === 0 && (
+            {filtered.length === 0 && cat !== "Web" && (
               <div className="py-16 text-center">
                 <Search className="w-10 h-10 text-border mx-auto mb-3" />
                 <p className="text-sm font-bold text-ink mb-1">Aucun résultat pour « {q} »</p>
@@ -281,7 +304,7 @@ function SearchEngine() {
             )}
 
             <div className="space-y-6">
-              {filtered.map((h, i) => (
+              {cat !== "Web" && filtered.map((h, i) => (
                 <Link key={i} href={h.href} className="block group max-w-2xl cursor-pointer">
                   {/* fil d'ariane façon Google */}
                   <div className="flex items-center gap-2 mb-0.5">
@@ -304,6 +327,45 @@ function SearchEngine() {
                   </p>
                 </Link>
               ))}
+
+              {/* ── Résultats du web (Brave Search) ── */}
+              {(cat === "Web" || cat === "Tous") && (
+                <div className={cat === "Tous" ? "pt-4 mt-2 border-t border-border" : ""}>
+                  {cat === "Tous" && (web.length > 0 || webLoading) && (
+                    <p className="text-[11px] font-black text-subtle uppercase tracking-widest mb-3 flex items-center gap-1.5">
+                      <Globe className="w-3.5 h-3.5 text-cama" /> Sur le web
+                    </p>
+                  )}
+                  {webLoading && (
+                    <p className="text-xs text-subtle flex items-center gap-2 py-3"><Loader2 className="w-3.5 h-3.5 animate-spin" /> Recherche web en cours…</p>
+                  )}
+                  {!webLoading && cat === "Web" && web.length === 0 && (
+                    <div className="py-16 text-center">
+                      <Globe className="w-10 h-10 text-border mx-auto mb-3" />
+                      <p className="text-sm font-bold text-ink mb-1">Aucun résultat web</p>
+                      <p className="text-xs text-muted">La recherche web nécessite la clé <code>BRAVE_API_KEY</code> configurée côté serveur.</p>
+                    </div>
+                  )}
+                  <div className="space-y-6">
+                    {web.map((w, i) => (
+                      <a key={i} href={w.url} target="_blank" rel="noopener noreferrer" className="block group max-w-2xl">
+                        <div className="flex items-center gap-2 mb-0.5">
+                          <div className="w-6 h-6 bg-surface border border-border flex items-center justify-center flex-shrink-0">
+                            <Globe className="w-3 h-3 text-cama" />
+                          </div>
+                          <div className="leading-tight min-w-0">
+                            <p className="text-[11px] text-ink truncate">{w.source}</p>
+                            <p className="text-[9px] text-subtle truncate">{w.url}</p>
+                          </div>
+                          <span className="ml-auto text-[8px] font-black px-1.5 py-0.5 flex-shrink-0 bg-blue-50 text-blue-700 flex items-center gap-0.5"><ExternalLink className="w-2 h-2" /> Web</span>
+                        </div>
+                        <h3 className="text-lg text-cama group-hover:underline leading-snug font-medium">{highlight(w.title)}</h3>
+                        <p className="text-sm text-muted leading-relaxed mt-0.5 line-clamp-2">{highlight(w.description)}</p>
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             {filtered.length > 0 && (
