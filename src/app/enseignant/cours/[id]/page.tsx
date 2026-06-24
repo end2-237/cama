@@ -171,6 +171,7 @@ function ChapterModes({ chapter, reload }: { chapter: DBChapter; reload: () => v
   const videoFileRef = useRef<HTMLInputElement>(null);
   const [videoTitle, setVideoTitle] = useState("");
   const [videoDur, setVideoDur] = useState("20");
+  const [transcribing, setTranscribing] = useState(false);
   const [liveTitle, setLiveTitle] = useState("");
   const [liveDate, setLiveDate]   = useState("");
   const [pdfUploading, setPdfUploading] = useState(0);   // 0 = idle, sinon %
@@ -227,7 +228,7 @@ function ChapterModes({ chapter, reload }: { chapter: DBChapter; reload: () => v
           <div className="flex items-center justify-between bg-cama-50 border border-cama/15 rounded-lg px-3 py-2.5">
             <div className="min-w-0">
               <p className="text-xs font-semibold text-ink truncate">{ch.video.title}</p>
-              <p className="text-[10px] text-muted">{ch.video.durationMin} min · transcodé 240p→720p · transcription IA générée</p>
+              <p className="text-[10px] text-muted">{ch.video.durationMin} min · transcodé 240p→720p · {ch.video.transcript?.startsWith("Transcription en cours") ? "⏳ transcription en cours…" : "✅ transcription IA générée"}</p>
             </div>
             <button onClick={async () => { await updateChapter(ch.id, { video: null }); reload(); }}
               className="text-subtle hover:text-red-500"><X className="w-4 h-4" /></button>
@@ -249,10 +250,26 @@ function ChapterModes({ chapter, reload }: { chapter: DBChapter; reload: () => v
                 const res = await uploadMedia(ch.program_course_id, f, setVideoUploading);
                 if ("error" in res) { setUploadErr(res.error); setVideoUploading(0); return; }
                 const dur = parseInt(videoDur) || 20;
-                await updateChapter(ch.id, { video: { title: videoTitle.trim(), durationMin: dur, sizeMo: res.sizeMo, url: res.url, quality: "source",
-                  transcript: `Transcription automatique (IA) de « ${videoTitle.trim()} » : le contenu intégral de la vidéo est restitué en texte pour permettre l'apprentissage sans téléchargement — un atout majeur en bas-débit.` } });
+                const placeholder = `Transcription en cours de génération pour « ${videoTitle.trim()} »…`;
+                await updateChapter(ch.id, { video: { title: videoTitle.trim(), durationMin: dur, sizeMo: res.sizeMo, url: res.url, quality: "source", transcript: placeholder } });
                 setVideoTitle(""); setVideoUploading(0);
                 reload();
+
+                // Lance la transcription IA (Groq Whisper) en arrière-plan.
+                setTranscribing(true);
+                try {
+                  const tForm = new FormData();
+                  tForm.append("file", f);
+                  const tRes = await fetch("/api/ai/transcribe", { method: "POST", body: tForm });
+                  if (tRes.ok) {
+                    const { transcript } = await tRes.json();
+                    if (transcript) {
+                      await updateChapter(ch.id, { video: { title: videoTitle.trim() || ch.title, durationMin: dur, sizeMo: res.sizeMo, url: res.url, quality: "source", transcript } });
+                      reload();
+                    }
+                  }
+                } catch { /* transcription échoue silencieusement — le placeholder reste */ }
+                setTranscribing(false);
               }} />
             {videoUploading > 0 ? (
               <div className="border border-cama/30 rounded-lg py-3 px-3">
@@ -265,6 +282,11 @@ function ChapterModes({ chapter, reload }: { chapter: DBChapter; reload: () => v
                 <Upload className="w-3.5 h-3.5" /> Déposer la vidéo (stockée + transcription IA)
               </button>
             )}
+          </div>
+        )}
+        {transcribing && (
+          <div className="mt-2 flex items-center gap-2 text-[11px] text-cama font-bold animate-pulse">
+            <Sparkles className="w-3.5 h-3.5" /> Transcription IA (Whisper) en cours… La vidéo est déjà enregistrée.
           </div>
         )}
         {uploadErr && <p className="text-[10px] text-red-500 mt-2">{uploadErr}</p>}
