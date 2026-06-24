@@ -2,17 +2,30 @@
 
 import { useEffect } from "react";
 import Link from "next/link";
-import { ArrowLeft, FileJson } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { ArrowLeft, FileJson, Lock } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
 
 /**
  * Documentation interactive de l'API CAMA via Swagger UI.
  * Swagger UI est chargé depuis le CDN (aucune dépendance npm ajoutée)
  * et pointe sur la spécification servie par /api/openapi.
+ *
+ * Accès réservé aux administrateurs.
  */
 const SWAGGER_VERSION = "5.17.14";
 
 export default function ApiDocsPage() {
+  const { user, loading } = useAuth();
+  const router = useRouter();
+  const isAdmin = !!user && user.role === "admin";
+
   useEffect(() => {
+    if (!loading && !isAdmin) router.replace("/dashboard");
+  }, [loading, isAdmin, router]);
+
+  useEffect(() => {
+    if (!isAdmin) return;
     const css = document.createElement("link");
     css.rel = "stylesheet";
     css.href = `https://unpkg.com/swagger-ui-dist@${SWAGGER_VERSION}/swagger-ui.css`;
@@ -37,7 +50,24 @@ export default function ApiDocsPage() {
       css.remove();
       script.remove();
     };
-  }, []);
+  }, [isAdmin]);
+
+  if (loading || !user) return (
+    <div className="min-h-screen flex items-center justify-center bg-white">
+      <div className="w-8 h-8 rounded-full border-4 border-cama border-t-transparent animate-spin" />
+    </div>
+  );
+
+  if (!isAdmin) return (
+    <div className="min-h-screen flex flex-col items-center justify-center bg-white text-center px-6">
+      <div className="w-14 h-14 rounded-full bg-red-50 flex items-center justify-center mb-4">
+        <Lock className="w-6 h-6 text-red-500" />
+      </div>
+      <h1 className="text-lg font-bold text-ink">Accès réservé aux administrateurs</h1>
+      <p className="text-sm text-muted mt-1">La documentation de l&apos;API n&apos;est accessible qu&apos;aux comptes admin.</p>
+      <Link href="/dashboard" className="btn-primary mt-5 gap-2"><ArrowLeft className="w-4 h-4" /> Retour au dashboard</Link>
+    </div>
+  );
 
   return (
     <div className="min-h-screen bg-white">
