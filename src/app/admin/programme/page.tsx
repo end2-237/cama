@@ -6,11 +6,11 @@ import { useRouter } from "next/navigation";
 import {
   ArrowLeft, Loader2, GraduationCap, CheckCircle2, AlertCircle,
   UserCheck, Plus, X, Save, ChevronDown, ChevronRight, Trash2,
-  Users, BookOpen, Clock, TrendingUp, CalendarClock,
+  Users, BookOpen, Clock, TrendingUp, CalendarClock, Eye, EyeOff,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabase";
-import type { DBProgramCourse, DBSession } from "@/lib/supabase";
+import type { DBProgramCourse, DBSession, CycleMode } from "@/lib/supabase";
 import { PARCOURS } from "@/lib/parcours";
 import {
   fetchProgram, assignTeacher, updateHours, fetchAnalytics, fetchSessions,
@@ -90,6 +90,21 @@ export default function AdminProgrammePage() {
     await supabase.from("program_courses").update({ ects }).eq("id", courseId);
   };
 
+  const onPublish = async (courseId: string, published: boolean) => {
+    setCourses((cs) => cs.map((c) => c.id === courseId ? { ...c, published } : c));
+    await supabase.from("program_courses").update({ published }).eq("id", courseId);
+    setAnalytics(await fetchAnalytics(slug));
+  };
+
+  // Modes d'un créneau (présentiel / hybride / en ligne) — détermine quels
+  // étudiants voient la séance dans leur emploi du temps selon leur cycle.
+  const toggleSessionMode = async (s: DBSession, mode: CycleMode) => {
+    const modes = s.modes?.includes(mode)
+      ? s.modes.filter((m) => m !== mode)
+      : [...(s.modes ?? []), mode];
+    await patchSession(s, { modes });
+  };
+
   const onDeleteCourse = async (courseId: string) => {
     if (!confirm("Supprimer cette matière et tout son contenu ?")) return;
     await supabase.from("program_courses").delete().eq("id", courseId);
@@ -107,7 +122,7 @@ export default function AdminProgrammePage() {
       program_course_id: courseId,
       title: "Séance",
       day: "Lundi", start_time: "08h00", end_time: "10h00",
-      kind: "campus", modes: [], status: "valide",
+      kind: "campus", modes: ["presentiel", "hybride", "online"], status: "valide",
       academic_year: parcours ? `${new Date().getFullYear() - 1}–${new Date().getFullYear()}` : null,
       proposed_by: user?.id ?? null,
     });
@@ -292,6 +307,13 @@ export default function AdminProgrammePage() {
                             <option value="">— Affecter un enseignant —</option>
                             {teachers.map((t) => <option key={t.id} value={t.id}>{t.first_name} {t.last_name}</option>)}
                           </select>
+                          <button onClick={() => onPublish(c.id, !c.published)}
+                            className={`flex items-center gap-1 text-[10px] font-bold px-2 py-1.5 rounded-lg border transition-colors ${
+                              c.published ? "border-green-300 bg-green-50 text-green-700" : "border-border text-muted hover:border-cama/40"}`}
+                            title={c.published ? "Publié — visible par les étudiants de ce cycle" : "Brouillon — masqué aux étudiants"}>
+                            {c.published ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+                            {c.published ? "Publié" : "Brouillon"}
+                          </button>
                           <button onClick={() => onDeleteCourse(c.id)} className="text-subtle hover:text-red-500 transition-colors p-1" title="Supprimer">
                             <Trash2 className="w-4 h-4" />
                           </button>
@@ -333,6 +355,16 @@ export default function AdminProgrammePage() {
                                     </select>
                                     <input value={h.room ?? ""} onChange={(e) => patchSession(h, { room: e.target.value })}
                                       placeholder="Salle" className="w-24 border border-border rounded px-2 py-1 text-xs outline-none focus:border-cama" />
+                                    <div className="flex items-center gap-1">
+                                      {([["presentiel", "Prés."], ["hybride", "Hyb."], ["online", "Ligne"]] as const).map(([m, lbl]) => (
+                                        <button key={m} onClick={() => toggleSessionMode(h, m)}
+                                          title={`Visible en mode ${lbl}`}
+                                          className={`text-[10px] font-bold px-1.5 py-1 rounded border transition-colors ${
+                                            h.modes?.includes(m) ? "border-cama bg-cama text-white" : "border-border text-muted hover:border-cama/40"}`}>
+                                          {lbl}
+                                        </button>
+                                      ))}
+                                    </div>
                                     <button onClick={() => removeSession(h.id)} className="text-subtle hover:text-red-500 transition-colors ml-auto">
                                       <Trash2 className="w-3.5 h-3.5" />
                                     </button>
