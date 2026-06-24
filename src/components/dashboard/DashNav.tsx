@@ -102,6 +102,18 @@ export default function DashNav({ activeTab, onTab, tabs }: DashNavProps) {
                   className="px-3 h-16 flex items-center text-[13px] font-semibold border-b-2 border-transparent text-muted hover:text-cama transition-all duration-200 whitespace-nowrap">
                   Utilisateurs
                 </Link>
+                <Link href="/admin/hors-cursus"
+                  className="px-3 h-16 flex items-center text-[13px] font-semibold border-b-2 border-transparent text-muted hover:text-cama transition-all duration-200 whitespace-nowrap">
+                  Hors-cursus
+                </Link>
+                <Link href="/admin/certifications"
+                  className="px-3 h-16 flex items-center text-[13px] font-semibold border-b-2 border-transparent text-muted hover:text-cama transition-all duration-200 whitespace-nowrap">
+                  Certifications
+                </Link>
+                <Link href="/presences"
+                  className="px-3 h-16 flex items-center text-[13px] font-semibold border-b-2 border-transparent text-muted hover:text-cama transition-all duration-200 whitespace-nowrap">
+                  Présences
+                </Link>
               </>
             )}
             {user.role === "enseignant" && (
@@ -114,6 +126,10 @@ export default function DashNav({ activeTab, onTab, tabs }: DashNavProps) {
                   className="px-3 h-16 flex items-center text-[13px] font-semibold border-b-2 border-transparent text-muted hover:text-cama transition-all duration-200 whitespace-nowrap">
                   Examens
                 </Link>
+                <Link href="/presences"
+                  className="px-3 h-16 flex items-center text-[13px] font-semibold border-b-2 border-transparent text-muted hover:text-cama transition-all duration-200 whitespace-nowrap">
+                  Présences
+                </Link>
               </>
             )}
             {user.role === "etudiant" && (
@@ -125,6 +141,10 @@ export default function DashNav({ activeTab, onTab, tabs }: DashNavProps) {
                 <Link href="/etudiant/examens"
                   className="px-3 h-16 flex items-center text-[13px] font-semibold border-b-2 border-transparent text-muted hover:text-cama transition-all duration-200 whitespace-nowrap">
                   Examens
+                </Link>
+                <Link href="/etudiant/parascolaire"
+                  className="px-3 h-16 flex items-center text-[13px] font-semibold border-b-2 border-transparent text-muted hover:text-cama transition-all duration-200 whitespace-nowrap">
+                  Parascolaire
                 </Link>
               </>
             )}

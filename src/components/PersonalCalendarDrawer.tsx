@@ -4,11 +4,12 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
   X, CalendarClock, MapPin, Clock, BookOpen, Settings,
-  Building2, Radio, MonitorPlay, ShieldCheck, Wifi,
+  Building2, Radio, MonitorPlay, ShieldCheck, Wifi, Sparkles,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { fetchStudentProgram, fetchSessions } from "@/lib/program";
-import type { CycleMode, DBSession, DBProgramCourse, SessionKind } from "@/lib/supabase";
+import { fetchExtraCourses, fetchMyEnrollments } from "@/lib/extra";
+import type { CycleMode, DBSession, DBProgramCourse, SessionKind, DBExtraCourse } from "@/lib/supabase";
 
 const MODE_ICON = { online: Wifi, hybride: MapPin, presentiel: Building2 } as const;
 const KIND_ICON: Record<SessionKind, typeof Radio> = {
@@ -30,6 +31,7 @@ const DAYS = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 export default function PersonalCalendarDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { user } = useAuth();
   const [sessions, setSessions] = useState<(DBSession & { course?: DBProgramCourse })[]>([]);
+  const [extras, setExtras] = useState<DBExtraCourse[]>([]);
 
   const mode: CycleMode = (user?.dossier?.mode as CycleMode) ?? "hybride";
   const meta = MODE_META[mode];
@@ -38,21 +40,28 @@ export default function PersonalCalendarDrawer({ open, onClose }: { open: boolea
   useEffect(() => {
     if (!user || !open) return;
     const slug = user.dossier?.parcoursSlug;
-    if (!slug) return;
     (async () => {
-      const cs = await fetchStudentProgram(slug, user.dossier?.level);
-      const ss = await fetchSessions(cs.map((c) => c.id));
-      const courseById = new Map(cs.map((c) => [c.id, c]));
-      setSessions(
-        ss.filter((s) => s.status === "valide" && (s.modes?.includes(mode) ?? false))
-          .map((s) => ({ ...s, course: courseById.get(s.program_course_id) }))
-      );
+      if (slug) {
+        const cs = await fetchStudentProgram(slug, user.dossier?.level);
+        const ss = await fetchSessions(cs.map((c) => c.id));
+        const courseById = new Map(cs.map((c) => [c.id, c]));
+        setSessions(
+          ss.filter((s) => s.status === "valide" && (s.modes?.includes(mode) ?? false))
+            .map((s) => ({ ...s, course: courseById.get(s.program_course_id) }))
+        );
+      }
+      // Cours hors-cursus auxquels l'étudiant est inscrit (se fondent dans le planning)
+      const [all, mine] = await Promise.all([fetchExtraCourses(true), fetchMyEnrollments(user.id)]);
+      const ids = new Set(mine.map((m) => m.extra_course_id));
+      setExtras(all.filter((c) => ids.has(c.id)));
     })();
   }, [user, open, mode]);
 
   const schedule: Record<string, typeof sessions> = {};
   DAYS.forEach((d) => { schedule[d] = sessions.filter((s) => s.day === d); });
-  const totalSessions = sessions.length;
+  const extrasByDay: Record<string, DBExtraCourse[]> = {};
+  DAYS.forEach((d) => { extrasByDay[d] = extras.filter((e) => e.day === d); });
+  const totalSessions = sessions.length + extras.length;
 
   return (
     <>
@@ -98,11 +107,13 @@ export default function PersonalCalendarDrawer({ open, onClose }: { open: boolea
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 items-start">
               {DAYS.map((day) => {
                 const slots = schedule[day] || [];
+                const dayExtras = extrasByDay[day] || [];
+                const total = slots.length + dayExtras.length;
                 return (
                   <div key={day} className="border border-border bg-white">
                     <div className="px-3 py-2 bg-ink flex items-center justify-between">
                       <p className="text-xs font-bold text-white uppercase tracking-wider">{day}</p>
-                      <p className="text-[10px] text-white/50">{slots.length === 0 ? "Libre" : `${slots.length} séance(s)`}</p>
+                      <p className="text-[10px] text-white/50">{total === 0 ? "Libre" : `${total} séance(s)`}</p>
                     </div>
                     <div className="divide-y divide-border">
                       {slots.map((s) => {
@@ -129,7 +140,28 @@ export default function PersonalCalendarDrawer({ open, onClose }: { open: boolea
                           </div>
                         );
                       })}
-                      {slots.length === 0 && <p className="px-3 py-3 text-[11px] text-subtle italic">Aucune séance — travail personnel.</p>}
+                      {/* Cours hors-cursus inscrits */}
+                      {dayExtras.map((e) => (
+                        <div key={e.id} className="px-3 py-2.5 flex items-start gap-2.5 hover:bg-surface transition-colors">
+                          <div className="w-7 h-7 flex items-center justify-center flex-shrink-0 border" style={{ borderColor: `${e.color}55`, color: e.color, background: `${e.color}12` }}>
+                            <Sparkles className="w-3.5 h-3.5" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <p className="text-[10px] font-bold text-ink flex items-center gap-1">
+                                <Clock className="w-2.5 h-2.5 text-subtle" /> {e.end_time ? `${e.start_time} – ${e.end_time}` : e.start_time}
+                              </p>
+                              <span className="text-[8px] font-bold px-1 py-0.5 text-white rounded" style={{ background: e.color }}>Hors-cursus</span>
+                            </div>
+                            <p className="text-xs text-ink leading-snug mt-0.5 font-medium">{e.title}</p>
+                            <p className="text-[9px] text-muted flex items-center gap-2 mt-0.5 flex-wrap">
+                              <span className="flex items-center gap-1"><Sparkles className="w-2.5 h-2.5" /> {e.category}</span>
+                              {e.room && <span className="flex items-center gap-1"><MapPin className="w-2.5 h-2.5" /> {e.room}</span>}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                      {total === 0 && <p className="px-3 py-3 text-[11px] text-subtle italic">Aucune séance — travail personnel.</p>}
                     </div>
                   </div>
                 );

@@ -5,14 +5,17 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft, Loader2, BookOpen, CheckCircle2, Plus, Trash2, Save,
-  Bot, FileText, Clock, ChevronRight, CalendarClock,
+  Bot, FileText, Clock, ChevronRight, CalendarClock, AlertTriangle, ArrowUpDown,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { supabase } from "@/lib/supabase";
 import type { DBProgramCourse, DBChapter, DBSession } from "@/lib/supabase";
 import {
   fetchTeacherCourses, updateCourseContent, fetchChapters, addChapter,
   deleteChapter, fetchSessions, upsertSession,
 } from "@/lib/program";
+
+type SortKey = "filiere" | "semestre" | "recent";
 
 export default function TeacherCoursesPage() {
   const { user, loading } = useAuth();
@@ -20,6 +23,8 @@ export default function TeacherCoursesPage() {
 
   const [courses, setCourses]   = useState<DBProgramCourse[]>([]);
   const [fetching, setFetching] = useState(true);
+  const [sort, setSort]         = useState<SortKey>("filiere");
+  const [chapterCounts, setChapterCounts] = useState<Record<string, number>>({});
   const [selected, setSelected] = useState<DBProgramCourse | null>(null);
   const [chapters, setChapters] = useState<DBChapter[]>([]);
   const [sessions, setSessions] = useState<DBSession[]>([]);
@@ -40,8 +45,35 @@ export default function TeacherCoursesPage() {
 
   useEffect(() => {
     if (!user) return;
-    fetchTeacherCourses(user.id).then((c) => { setCourses(c); setFetching(false); });
+    (async () => {
+      const c = await fetchTeacherCourses(user.id);
+      setCourses(c);
+      setFetching(false);
+      // Compte des chapitres par matière (pour les alertes "à compléter")
+      if (c.length) {
+        const { data } = await supabase.from("course_chapters")
+          .select("program_course_id").in("program_course_id", c.map((x) => x.id));
+        const counts: Record<string, number> = {};
+        (data as { program_course_id: string }[] | null)?.forEach((r) => {
+          counts[r.program_course_id] = (counts[r.program_course_id] ?? 0) + 1;
+        });
+        setChapterCounts(counts);
+      }
+    })();
   }, [user]);
+
+  // Tri + alertes
+  const sortedCourses = [...courses].sort((a, b) => {
+    if (sort === "filiere") return a.parcours_title.localeCompare(b.parcours_title) || a.semestre.localeCompare(b.semestre);
+    if (sort === "semestre") return a.semestre.localeCompare(b.semestre) || a.ordre - b.ordre;
+    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+  });
+  const courseAlert = (c: DBProgramCourse): string | null => {
+    if ((chapterCounts[c.id] ?? 0) === 0) return "Aucun chapitre — à compléter";
+    if (!c.published) return "Brouillon — non visible des étudiants";
+    return null;
+  };
+  const alertCount = courses.filter((c) => courseAlert(c)).length;
 
   const openCourse = async (c: DBProgramCourse) => {
     setSelected(c);
@@ -118,7 +150,26 @@ export default function TeacherCoursesPage() {
 
         {/* Liste matières assignées */}
         <div>
-          <h2 className="text-[11px] font-black text-ink uppercase tracking-widest mb-2">Matières assignées ({courses.length})</h2>
+          <div className="flex items-center justify-between mb-2">
+            <h2 className="text-[11px] font-black text-ink uppercase tracking-widest">Matières assignées ({courses.length})</h2>
+            {alertCount > 0 && (
+              <span className="flex items-center gap-1 text-[10px] font-bold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded-full">
+                <AlertTriangle className="w-3 h-3" /> {alertCount} à traiter
+              </span>
+            )}
+          </div>
+
+          {/* Tri */}
+          <div className="flex items-center gap-1 mb-2 bg-white border border-border rounded-lg p-1">
+            <ArrowUpDown className="w-3.5 h-3.5 text-subtle ml-1.5 flex-shrink-0" />
+            {([["filiere", "Filière"], ["semestre", "Semestre"], ["recent", "Récent"]] as const).map(([k, lbl]) => (
+              <button key={k} onClick={() => setSort(k)}
+                className={`flex-1 text-[11px] font-bold py-1 rounded transition-colors ${sort === k ? "bg-cama text-white" : "text-muted hover:text-ink"}`}>
+                {lbl}
+              </button>
+            ))}
+          </div>
+
           {fetching ? (
             <div className="py-10 text-center"><Loader2 className="w-5 h-5 animate-spin text-cama mx-auto" /></div>
           ) : courses.length === 0 ? (
@@ -127,20 +178,26 @@ export default function TeacherCoursesPage() {
             </div>
           ) : (
             <div className="bg-white border border-border rounded-xl divide-y divide-border overflow-hidden">
-              {courses.map((c) => (
+              {sortedCourses.map((c) => {
+                const alert = courseAlert(c);
+                return (
                 <button key={c.id} onClick={() => openCourse(c)}
                   className={`w-full text-left p-3 hover:bg-cama-50/40 transition-colors flex items-center gap-2 ${
                     selected?.id === c.id ? "bg-cama-50/60" : ""}`}>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-bold text-ink">{c.code} · {c.title}</p>
-                    <p className="text-[11px] text-muted">{c.parcours_title} · {c.annee_niveau} · {c.semestre}</p>
+                    <p className="text-[11px] text-muted">{c.parcours_title} · {c.annee_niveau} · {c.semestre} · {chapterCounts[c.id] ?? 0} chap.</p>
+                    {alert && (
+                      <p className="text-[10px] text-amber-600 flex items-center gap-1 mt-0.5"><AlertTriangle className="w-3 h-3 flex-shrink-0" /> {alert}</p>
+                    )}
                   </div>
                   {c.published
                     ? <span className="text-[9px] font-bold px-1.5 py-0.5 bg-green-50 text-green-600 rounded-full">Publié</span>
                     : <span className="text-[9px] font-bold px-1.5 py-0.5 bg-gold/10 text-gold-dark rounded-full">Brouillon</span>}
                   <ChevronRight className="w-3.5 h-3.5 text-subtle" />
                 </button>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
