@@ -18,6 +18,10 @@ import { BlocNatif, DBChapter } from "@/lib/db";
 import { supabase } from "@/lib/supabase";
 import { fetchChapters, fetchProgress, markChapter } from "@/lib/program";
 import { fetchLivesForCourses, subscribeLives } from "@/lib/lives";
+import { fetchResources } from "@/lib/resources";
+import type { DBCourseResource } from "@/lib/supabase";
+
+const RES_ICON = { syllabus: FileText, support: Download, biblio: ExternalLink, lien: ExternalLink } as const;
 
 interface CourseRow {
   id: string;
@@ -57,6 +61,7 @@ export default function CoursePlayer() {
   const [doneIds, setDoneIds] = useState<Set<string>>(new Set());
   const [, setLoaded] = useState(false);
   const [liveNow, setLiveNow] = useState<string | null>(null);
+  const [resources, setResources] = useState<DBCourseResource[]>([]);
 
   useEffect(() => {
     if (!loading && !user) router.replace("/auth/login");
@@ -117,6 +122,7 @@ export default function CoursePlayer() {
       );
       setDoneIds(new Set(progress.map((p) => p.chapter_id)));
       setLoaded(true);
+      fetchResources(id).then((r) => { if (!cancelled) setResources(r); });
     })();
     return () => { cancelled = true; };
   }, [id, user]);
@@ -356,21 +362,26 @@ export default function CoursePlayer() {
             <p className="text-[9px] font-black text-subtle uppercase tracking-widest mb-2 flex items-center gap-1">
               <BookMarked className="w-3 h-3" /> Ressources
             </p>
-            <div className="space-y-0.5">
-              {[
-                { icon: FileText,  label: "Syllabus complet",    sub: "PDF · 0.2 Mo" },
-                { icon: Download,  label: "Supports chapitres",  sub: "ZIP · tous les PDF" },
-                { icon: ExternalLink, label: "Bibliographie UE", sub: "Liens externes" },
-              ].map((r) => (
-                <button key={r.label} className="w-full flex items-center gap-2 px-1 py-1.5 hover:bg-surface transition-colors group text-left">
-                  <r.icon className="w-3.5 h-3.5 text-subtle flex-shrink-0 group-hover:text-cama" />
-                  <div className="min-w-0">
-                    <p className="text-[11px] font-semibold text-ink group-hover:text-cama transition-colors truncate">{r.label}</p>
-                    <p className="text-[9px] text-subtle">{r.sub}</p>
-                  </div>
-                </button>
-              ))}
-            </div>
+            {resources.length === 0 ? (
+              <p className="text-[10px] text-subtle italic px-1 py-1.5">Aucune ressource déposée par l&apos;enseignant.</p>
+            ) : (
+              <div className="space-y-0.5">
+                {resources.map((r) => {
+                  const Icon = RES_ICON[r.kind] ?? FileText;
+                  const sub = r.size_mo ? `${r.size_mo} Mo` : r.kind === "lien" || r.kind === "biblio" ? "Lien externe" : "Document";
+                  return (
+                    <a key={r.id} href={r.url ?? "#"} target="_blank" rel="noopener noreferrer"
+                      className="w-full flex items-center gap-2 px-1 py-1.5 hover:bg-surface transition-colors group text-left">
+                      <Icon className="w-3.5 h-3.5 text-subtle flex-shrink-0 group-hover:text-cama" />
+                      <div className="min-w-0">
+                        <p className="text-[11px] font-semibold text-ink group-hover:text-cama transition-colors truncate">{r.title}</p>
+                        <p className="text-[9px] text-subtle">{sub}</p>
+                      </div>
+                    </a>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           {/* Forum UE */}

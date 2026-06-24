@@ -5,7 +5,8 @@ import { getMaintenance, setMaintenance } from "@/lib/maintenance";
 import { CYCLE_MODES, SESSION_KINDS } from "@/lib/scheduling";
 import { fetchAdminStats, fetchUsers, fetchInscriptions, type InscriptionWithUser } from "@/lib/admin";
 import { fetchProgram, fetchSessions, upsertSession } from "@/lib/program";
-import type { DBUser, DBSession, DBProgramCourse } from "@/lib/supabase";
+import { fetchCalendar, addCalendarEvent, deleteCalendarEvent, seedCalendar } from "@/lib/calendar";
+import type { DBUser, DBSession, DBProgramCourse, DBCalendarEvent, CalEventType } from "@/lib/supabase";
 import {
   Users, BookOpen, GraduationCap, ShieldCheck, AlertTriangle,
   CheckCircle2, Clock, ChevronRight, UserPlus, Settings, BarChart2,
@@ -720,15 +721,18 @@ function PlanningTab() {
   const [evSem, setEvSem] = useState<1 | 2>(2);
   const [sessions, setSessions] = useState<DBSession[]>([]);
   const [courses, setCourses] = useState<DBProgramCourse[]>([]);
+  const [calendarEvents, setCalendarEvents] = useState<DBCalendarEvent[]>([]);
 
   useEffect(() => {
     let active = true;
     (async () => {
       const program = await fetchProgram();
       const sess = await fetchSessions(program.map((c) => c.id));
+      const cal = await seedCalendar();
       if (!active) return;
       setCourses(program);
       setSessions(sess);
+      setCalendarEvents(cal);
     })();
     return () => { active = false; };
   }, []);
@@ -736,22 +740,27 @@ function PlanningTab() {
   const courseOf = (id: string) => courses.find((c) => c.id === id);
   const proposals = sessions.filter((s) => s.status === "propose");
   const validated = sessions.filter((s) => s.status === "valide");
-  // Demandes de créneaux et calendrier académique n'ont pas d'équivalent en base.
+  // Les demandes de créneaux étudiants n'ont pas encore d'équivalent en base.
   const pendingSlots: never[] = [];
   const slotRequests: { id: string; studentId: string; day: string; start: string; end: string; ue: string; note: string; status: "propose" | "valide" | "rejete" }[] = [];
-  const calendarEvents: { id: string; date: string; label: string; type: string; semester: number }[] = [];
 
-  const addEvent = () => {
+  const addEvent = async () => {
     if (!evDate.trim() || !evLabel.trim()) return;
+    const created = await addCalendarEvent({ date_label: evDate.trim(), label: evLabel.trim(), type: evType as CalEventType, semester: evSem });
+    if (created) setCalendarEvents((prev) => [...prev, created]);
     setEvDate(""); setEvLabel("");
   };
   const setSession = async (id: string, status: "valide" | "rejete") => {
     await upsertSession({ id, status });
     setSessions((prev) => prev.map((s) => (s.id === id ? { ...s, status } : s)));
   };
-  // Pas d'équivalent en base pour les créneaux étudiants / calendrier académique.
+  // Pas d'équivalent en base pour les créneaux étudiants.
   const setSlot = (id: string, status: "valide" | "rejete") => { void id; void status; };
-  const delEvent = (id: string) => { void id; };
+  const delEvent = async (id: string) => {
+    await deleteCalendarEvent(id);
+    setCalendarEvents((prev) => prev.filter((e) => e.id !== id));
+  };
+  void fetchCalendar;
 
   const right = (
     <>
@@ -914,7 +923,7 @@ function PlanningTab() {
                 <div key={e.id} className="px-3 py-2 flex items-center gap-2 group">
                   <span className="text-[9px] font-bold px-1.5 py-0.5 bg-cama-50 text-cama flex-shrink-0">{EV_LABEL[e.type]}</span>
                   <div className="flex-1 min-w-0">
-                    <p className="text-[10px] font-bold text-cama">{e.date}</p>
+                    <p className="text-[10px] font-bold text-cama">{e.date_label}</p>
                     <p className="text-xs text-ink leading-snug">{e.label}</p>
                   </div>
                   <button onClick={() => delEvent(e.id)} className="p-1 text-subtle hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all flex-shrink-0"><Trash2 className="w-3.5 h-3.5" /></button>

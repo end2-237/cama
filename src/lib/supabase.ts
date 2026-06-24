@@ -166,6 +166,112 @@ export interface DBDeliberation {
   created_at: string;
 }
 
+// ── Ressources de cours (syllabus, supports, bibliographie) ──
+export type ResourceKind = "syllabus" | "support" | "biblio" | "lien";
+export interface DBCourseResource {
+  id: string;
+  program_course_id: string;
+  kind: ResourceKind;
+  title: string;
+  url: string | null;
+  size_mo: number | null;
+  created_by: string | null;
+  created_at: string;
+}
+
+// ── Calendrier académique (géré par l'admin) ──
+export type CalEventType = "cours" | "examen" | "jury" | "resultat" | "admin" | "vacances" | "event";
+export interface DBCalendarEvent {
+  id: string;
+  date_label: string;
+  sort_date: string | null;
+  label: string;
+  type: CalEventType;
+  semester: number;
+  academic_year: string;
+  created_by: string | null;
+  created_at: string;
+}
+
+// ── Cours hors-cursus (extra-curriculaires) ──
+export interface DBExtraCourse {
+  id: string;
+  title: string;
+  code: string | null;
+  category: string;
+  description: string | null;
+  instructor_name: string | null;
+  teacher_id: string | null;
+  mode: CycleMode;
+  capacity: number;
+  day: string | null;
+  start_time: string | null;
+  end_time: string | null;
+  room: string | null;
+  starts_on: string | null;
+  sessions_count: number;
+  color: string;
+  published: boolean;
+  created_by: string | null;
+  created_at: string;
+}
+
+export type ExtraStatus = "inscrit" | "en_cours" | "termine" | "abandon";
+export interface DBExtraEnrollment {
+  id: string;
+  extra_course_id: string;
+  student_id: string;
+  status: ExtraStatus;
+  progress: number;
+  satisfaction: number | null;
+  enrolled_at: string;
+}
+
+// ── Présences ──
+export interface DBAttendance {
+  id: string;
+  program_course_id: string | null;
+  session_id: string | null;
+  student_id: string;
+  session_date: string;
+  present: boolean;
+  cycle: string | null;
+  mode: CycleMode | null;
+  marked_by: string | null;
+  created_at: string;
+}
+
+// ── Certifications (gérées par l'admin) ──
+export type CertLevel = "Fondation" | "Associate" | "Professionnel" | "Expert";
+export interface DBCertification {
+  id: string;
+  title: string;
+  provider: string;
+  code: string | null;
+  description: string | null;
+  level: CertLevel;
+  duration_h: number;
+  environment_url: string | null;
+  badge_color: string;
+  capacity: number | null;
+  exam_fee: string | null;
+  published: boolean;
+  created_by: string | null;
+  created_at: string;
+}
+
+export type CertEnrollStatus = "inscrit" | "en_cours" | "obtenu" | "echec";
+export interface DBCertEnrollment {
+  id: string;
+  certification_id: string;
+  student_id: string;
+  status: CertEnrollStatus;
+  progress: number;
+  score: string | null;
+  started_at: string;
+  completed_at: string | null;
+}
+
 // Machine Linux distante : expose un terminal web (ttyd/wetty/guacamole)
 // accessible en HTTPS. CAMA embarque ce terminal pour s'y connecter.
 export interface DBRemoteMachine {

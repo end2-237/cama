@@ -1,13 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft, CalendarDays, GraduationCap, ShieldCheck, Sun,
-  BookOpen, Gavel, Award, Download, Settings,
+  BookOpen, Gavel, Award, Download, Settings, Loader2,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { fetchCalendar, seedCalendar } from "@/lib/calendar";
+import type { DBCalendarEvent } from "@/lib/supabase";
 
 const SEM_META = [
   { n: 1 as const, name: "Semestre 1", period: "Septembre 2025 — Janvier 2026", color: "#4F46E5" },
@@ -24,37 +26,25 @@ const TYPE_META: Record<string, { label: string; color: string; icon: typeof Boo
   event:    { label: "Événement",    color: "text-blue-600 bg-blue-50",    icon: CalendarDays },
 };
 
-const CALENDAR_EVENTS = [
-  { id: "ce1", date: "01 sept. 2025", label: "Rentrée administrative — inscriptions & réinscriptions", type: "admin", semester: 1 },
-  { id: "ce2", date: "08 sept. 2025", label: "Rentrée académique — début des cours S1 / S3 / S5", type: "cours", semester: 1 },
-  { id: "ce3", date: "22 sept. 2025", label: "Clôture des inscriptions tardives", type: "admin", semester: 1 },
-  { id: "ce4", date: "13 oct. 2025", label: "Semaine d'intégration & forum des clubs", type: "event", semester: 1 },
-  { id: "ce5", date: "03 — 08 nov. 2025", label: "Contrôles continus n°1 (toutes filières)", type: "examen", semester: 1 },
-  { id: "ce6", date: "15 déc. 2025", label: "Fin des enseignements du semestre 1", type: "cours", semester: 1 },
-  { id: "ce7", date: "16 déc. 2025 — 04 janv. 2026", label: "Vacances de fin d'année", type: "vacances", semester: 1 },
-  { id: "ce8", date: "05 — 17 janv. 2026", label: "Examens semestriels S1 (sessions Safe-CAMA)", type: "examen", semester: 1 },
-  { id: "ce9", date: "26 janv. 2026", label: "Délibérations du jury — semestre 1", type: "jury", semester: 1 },
-  { id: "ce10", date: "30 janv. 2026", label: "Publication des résultats S1 (relevés certifiés QR)", type: "resultat", semester: 1 },
-  { id: "ce11", date: "02 févr. 2026", label: "Début des cours S2 / S4 / S6", type: "cours", semester: 2 },
-  { id: "ce12", date: "16 — 21 mars 2026", label: "Contrôles continus n°2", type: "examen", semester: 2 },
-  { id: "ce13", date: "30 mars — 05 avr. 2026", label: "Vacances de Pâques", type: "vacances", semester: 2 },
-  { id: "ce14", date: "20 avr. 2026", label: "Lancement des stages de fin de cycle (L3 / M2)", type: "event", semester: 2 },
-  { id: "ce15", date: "11 — 16 mai 2026", label: "Contrôles continus n°3", type: "examen", semester: 2 },
-  { id: "ce16", date: "05 juin 2026", label: "Fin des enseignements du semestre 2", type: "cours", semester: 2 },
-  { id: "ce17", date: "08 — 20 juin 2026", label: "Examens semestriels S2 (sessions Safe-CAMA)", type: "examen", semester: 2 },
-  { id: "ce18", date: "25 juin 2026", label: "Délibérations du jury — semestre 2", type: "jury", semester: 2 },
-  { id: "ce19", date: "29 juin 2026", label: "Publication des résultats annuels", type: "resultat", semester: 2 },
-  { id: "ce20", date: "06 — 11 juil. 2026", label: "Session de rattrapage", type: "examen", semester: 2 },
-  { id: "ce21", date: "18 juil. 2026", label: "Cérémonie de remise des diplômes", type: "event", semester: 2 },
-];
-
 export default function CalendarPage() {
   const { user, loading } = useAuth();
   const router = useRouter();
+  const [events, setEvents] = useState<DBCalendarEvent[]>([]);
+  const [fetching, setFetching] = useState(true);
 
   useEffect(() => {
     if (!loading && !user) router.replace("/auth/login");
   }, [loading, user, router]);
+
+  useEffect(() => {
+    if (!user) return;
+    (async () => {
+      // L'admin amorce le calendrier par défaut s'il est vide ; sinon simple lecture.
+      const evts = user.role === "admin" ? await seedCalendar(user.id) : await fetchCalendar();
+      setEvents(evts);
+      setFetching(false);
+    })();
+  }, [user]);
 
   if (loading || !user) {
     return <div className="min-h-screen flex items-center justify-center">
@@ -95,9 +85,12 @@ export default function CalendarPage() {
           ))}
         </div>
 
+        {fetching ? (
+          <div className="py-16 text-center"><Loader2 className="w-6 h-6 animate-spin text-cama mx-auto" /></div>
+        ) : (
         <div className="grid md:grid-cols-2 gap-4 items-start">
           {SEM_META.map((s) => {
-            const events = CALENDAR_EVENTS.filter((e) => e.semester === s.n);
+            const semEvents = events.filter((e) => e.semester === s.n);
             return (
               <section key={s.n} className="bg-white border border-border">
                 <div className="px-5 py-4 border-b-2" style={{ borderBottomColor: s.color }}>
@@ -105,26 +98,27 @@ export default function CalendarPage() {
                   <p className="text-xs text-muted">{s.period}</p>
                 </div>
                 <div className="divide-y divide-border">
-                  {events.map((e) => {
-                    const m = TYPE_META[e.type];
+                  {semEvents.map((e) => {
+                    const m = TYPE_META[e.type] ?? TYPE_META.event;
                     return (
                       <div key={e.id} className="flex items-start gap-3 px-5 py-3 hover:bg-surface transition-colors">
                         <div className={`w-7 h-7 flex items-center justify-center flex-shrink-0 mt-0.5 ${m.color.split(" ")[1]}`}>
                           <m.icon className={`w-3.5 h-3.5 ${m.color.split(" ")[0]}`} />
                         </div>
                         <div className="min-w-0">
-                          <p className="text-[11px] font-bold" style={{ color: s.color }}>{e.date}</p>
+                          <p className="text-[11px] font-bold" style={{ color: s.color }}>{e.date_label}</p>
                           <p className="text-sm text-ink leading-snug">{e.label}</p>
                         </div>
                       </div>
                     );
                   })}
-                  {events.length === 0 && <p className="px-5 py-6 text-sm text-muted text-center">Aucun événement pour ce semestre.</p>}
+                  {semEvents.length === 0 && <p className="px-5 py-6 text-sm text-muted text-center">Aucun événement pour ce semestre.</p>}
                 </div>
               </section>
             );
           })}
         </div>
+        )}
 
         <p className="text-[11px] text-subtle mt-4">
           Document officiel de l&apos;Institut JFN — édité par l&apos;administration depuis l&apos;onglet Planification.
