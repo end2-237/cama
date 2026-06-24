@@ -8,56 +8,58 @@ import {
   Check, Bell, Globe, Send, CalendarClock, ShieldCheck, AlertTriangle, Info,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
-import { useDB } from "@/hooks/useDB";
-import { uid, CycleMode } from "@/lib/db";
-import { CYCLE_MODES, DAYS, modeMeta, studentMode } from "@/lib/scheduling";
+import type { CycleMode } from "@/lib/supabase";
+
+const DAYS = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
+const CYCLE_MODES: { id: CycleMode; label: string; color: string; desc: string }[] = [
+  { id: "presentiel", label: "Présentiel", color: "#4F46E5", desc: "Cours sur le campus aux horaires fixes." },
+  { id: "hybride", label: "Hybride", color: "#D97706", desc: "Mix campus + en ligne selon les séances." },
+  { id: "online", label: "En ligne", color: "#059669", desc: "100 % à distance, à votre rythme." },
+];
 
 const MODE_ICON = { online: Wifi, hybride: MapPin, presentiel: Building2 } as const;
 
+type SlotRequest = { id: string; day: string; start: string; end: string; ue: string; note: string; status: "propose" | "valide" | "rejete" };
+
 export default function SettingsPage() {
   const { user, loading } = useAuth();
-  const { db, mutate } = useDB();
   const router = useRouter();
 
-  /* form créneau */
+  const [mode, setMode] = useState<CycleMode>("hybride");
+  const [deadlineWeeks, setDeadlineWeeks] = useState(12);
+  const [myRequests, setMyRequests] = useState<SlotRequest[]>([]);
+
   const [day, setDay] = useState<string>(DAYS[0]);
   const [start, setStart] = useState("18h00");
   const [end, setEnd] = useState("19h00");
   const [ue, setUe] = useState("");
   const [note, setNote] = useState("");
-  /* prefs cosmétiques */
   const [prefs, setPrefs] = useState({ liveReminder: true, weeklyDigest: true, lowData: true });
 
   useEffect(() => {
     if (!loading && !user) router.replace("/auth/login");
   }, [loading, user, router]);
 
-  if (loading || !user || !db) {
+  useEffect(() => {
+    if (user?.dossier?.mode) setMode(user.dossier.mode as CycleMode);
+  }, [user]);
+
+  if (loading || !user) {
     return <div className="min-h-screen flex items-center justify-center">
       <div className="w-8 h-8 rounded-full border-4 border-cama border-t-transparent animate-spin" />
     </div>;
   }
 
   const isStudent = user.role === "etudiant";
-  const mode = studentMode(db.studentSettings, user.id);
-  const meta = modeMeta(mode);
-  const setting = db.studentSettings.find((s) => s.studentId === user.id);
-  const myRequests = db.slotRequests.filter((r) => r.studentId === user.id);
+  const meta = CYCLE_MODES.find((m) => m.id === mode) ?? CYCLE_MODES[1];
+  const canPropose = mode !== "presentiel";
 
-  const setMode = (m: CycleMode) => mutate((d) => {
-    const e = d.studentSettings.find((s) => s.studentId === user.id);
-    if (e) e.mode = m; else d.studentSettings.push({ studentId: user.id, mode: m, deadlineWeeks: 12 });
-  });
-  const setDeadline = (w: number) => mutate((d) => {
-    const e = d.studentSettings.find((s) => s.studentId === user.id);
-    if (e) e.deadlineWeeks = w; else d.studentSettings.push({ studentId: user.id, mode, deadlineWeeks: w });
-  });
   const addRequest = () => {
     if (!ue.trim()) return;
-    mutate((d) => d.slotRequests.push({ id: uid("sr"), studentId: user.id, day, start: start.trim(), end: end.trim(), ue: ue.trim(), note: note.trim(), status: "propose" }));
+    setMyRequests((r) => [...r, { id: crypto.randomUUID(), day, start: start.trim(), end: end.trim(), ue: ue.trim(), note: note.trim(), status: "propose" }]);
     setUe(""); setNote("");
   };
-  const delRequest = (id: string) => mutate((d) => { d.slotRequests = d.slotRequests.filter((r) => r.id !== id); });
+  const delRequest = (id: string) => setMyRequests((r) => r.filter((x) => x.id !== id));
 
   const ST = {
     propose: { label: "En attente de validation", cls: "bg-gold/10 text-gold-dark" },
@@ -130,14 +132,13 @@ export default function SettingsPage() {
                   })}
                 </div>
 
-                {/* Délai progression (hybride) */}
                 {mode === "hybride" && (
                   <div className="mt-4 flex items-center gap-3 p-3 bg-gold/5 border border-gold/20 flex-wrap">
                     <Clock className="w-4 h-4 text-gold-dark flex-shrink-0" />
                     <p className="text-xs text-ink flex-1 min-w-[200px]">
                       <strong>Délai de progression en ligne</strong> — vous devez boucler vos cours en ligne dans ce délai.
                     </p>
-                    <select value={setting?.deadlineWeeks || 12} onChange={(e) => setDeadline(Number(e.target.value))}
+                    <select value={deadlineWeeks} onChange={(e) => setDeadlineWeeks(Number(e.target.value))}
                       className="text-sm border border-border px-3 py-1.5 outline-none bg-white">
                       {[8, 10, 12, 16].map((w) => <option key={w} value={w}>{w} semaines</option>)}
                     </select>
@@ -153,11 +154,11 @@ export default function SettingsPage() {
                 <h2 className="text-sm font-bold text-ink">Proposer un créneau</h2>
               </div>
 
-              {meta.canPropose ? (
+              {canPropose ? (
                 <div className="p-5">
                   <div className="flex items-start gap-2 p-3 bg-cama-50/50 border border-cama/15 mb-4">
                     <Info className="w-4 h-4 text-cama flex-shrink-0 mt-0.5" />
-                    <p className="text-[11px] text-ink leading-snug">{meta.proposeScope} Toute proposition est soumise à validation de l&apos;administration.</p>
+                    <p className="text-[11px] text-ink leading-snug">{meta.desc} Toute proposition est soumise à validation de l&apos;administration.</p>
                   </div>
 
                   <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
@@ -175,10 +176,7 @@ export default function SettingsPage() {
                     </div>
                     <div>
                       <label className="text-[9px] font-bold text-muted uppercase tracking-wider mb-1 block">UE / matière</label>
-                      <select value={ue} onChange={(e) => setUe(e.target.value)} className={`${field} bg-white`}>
-                        <option value="">Choisir…</option>
-                        {db.ues.map((u) => <option key={u.id} value={u.code}>{u.code}</option>)}
-                      </select>
+                      <input value={ue} onChange={(e) => setUe(e.target.value)} placeholder="Ex: INF201" className={field} />
                     </div>
                   </div>
                   <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} placeholder="Motif / commentaire (optionnel)…" className={`${field} mt-3`} />
@@ -191,7 +189,6 @@ export default function SettingsPage() {
                 </div>
               )}
 
-              {/* Mes demandes */}
               {myRequests.length > 0 && (
                 <div className="border-t border-border divide-y divide-border">
                   <p className="px-5 py-2 text-[10px] font-black text-ink uppercase tracking-widest bg-surface">Mes propositions</p>

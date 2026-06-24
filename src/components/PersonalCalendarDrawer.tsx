@@ -1,29 +1,58 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
   X, CalendarClock, MapPin, Clock, BookOpen, Settings,
   Building2, Radio, MonitorPlay, ShieldCheck, Wifi,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
-import { useDB } from "@/hooks/useDB";
-import { CYCLE_MODES, SESSION_KINDS, DAYS, modeMeta, studentMode, weeklyForMode } from "@/lib/scheduling";
-import type { SessionKind } from "@/lib/db";
+import { fetchStudentProgram, fetchSessions } from "@/lib/program";
+import type { CycleMode, DBSession, DBProgramCourse, SessionKind } from "@/lib/supabase";
 
 const MODE_ICON = { online: Wifi, hybride: MapPin, presentiel: Building2 } as const;
 const KIND_ICON: Record<SessionKind, typeof Radio> = {
   campus: Building2, live: Radio, async: MonitorPlay, examen: ShieldCheck,
 };
+const KIND_META: Record<SessionKind, { label: string; color: string }> = {
+  campus:  { label: "Campus",  color: "text-cama bg-cama/10 border-cama/20" },
+  live:    { label: "Live",    color: "text-red-600 bg-red-50 border-red-200" },
+  async:   { label: "Async",   color: "text-purple-600 bg-purple-50 border-purple-200" },
+  examen:  { label: "Examen",  color: "text-amber-600 bg-amber-50 border-amber-200" },
+};
+const MODE_META: Record<CycleMode, { label: string; color: string; desc: string }> = {
+  presentiel: { label: "Présentiel", color: "#4F46E5", desc: "Cours sur le campus aux horaires fixes." },
+  hybride:    { label: "Hybride",    color: "#D97706", desc: "Mix campus + en ligne selon les séances." },
+  online:     { label: "En ligne",   color: "#059669", desc: "100 % à distance, à votre rythme." },
+};
+const DAYS = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 
 export default function PersonalCalendarDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { user } = useAuth();
-  const { db } = useDB();
+  const [sessions, setSessions] = useState<(DBSession & { course?: DBProgramCourse })[]>([]);
 
-  const mode = db && user ? studentMode(db.studentSettings, user.id) : "presentiel";
-  const meta = modeMeta(mode);
+  const mode: CycleMode = (user?.dossier?.mode as CycleMode) ?? "hybride";
+  const meta = MODE_META[mode];
   const ModeIcon = MODE_ICON[mode];
-  const schedule = db ? weeklyForMode(db.sessions, mode) : {};
-  const totalSessions = Object.values(schedule).reduce((a, s) => a + s.length, 0);
+
+  useEffect(() => {
+    if (!user || !open) return;
+    const slug = user.dossier?.parcoursSlug;
+    if (!slug) return;
+    (async () => {
+      const cs = await fetchStudentProgram(slug, user.dossier?.level);
+      const ss = await fetchSessions(cs.map((c) => c.id));
+      const courseById = new Map(cs.map((c) => [c.id, c]));
+      setSessions(
+        ss.filter((s) => s.status === "valide" && (s.modes?.includes(mode) ?? false))
+          .map((s) => ({ ...s, course: courseById.get(s.program_course_id) }))
+      );
+    })();
+  }, [user, open, mode]);
+
+  const schedule: Record<string, typeof sessions> = {};
+  DAYS.forEach((d) => { schedule[d] = sessions.filter((s) => s.day === d); });
+  const totalSessions = sessions.length;
 
   return (
     <>
@@ -44,7 +73,7 @@ export default function PersonalCalendarDrawer({ open, onClose }: { open: boolea
           <button onClick={onClose} className="p-2 hover:bg-white/15 transition-colors"><X className="w-5 h-5" /></button>
         </div>
 
-        {/* Mode d'inscription (réel, depuis les réglages) */}
+        {/* Mode d'inscription */}
         <div className="px-5 py-3 border-b border-border bg-surface flex items-center gap-3 flex-wrap">
           <ModeIcon className="w-4 h-4" style={{ color: meta.color }} />
           <div className="flex-1 min-w-[180px]">
@@ -77,7 +106,7 @@ export default function PersonalCalendarDrawer({ open, onClose }: { open: boolea
                     </div>
                     <div className="divide-y divide-border">
                       {slots.map((s) => {
-                        const k = SESSION_KINDS[s.kind];
+                        const k = KIND_META[s.kind];
                         const KIcon = KIND_ICON[s.kind];
                         return (
                           <div key={s.id} className="px-3 py-2.5 flex items-start gap-2.5 hover:bg-surface transition-colors">
@@ -87,13 +116,13 @@ export default function PersonalCalendarDrawer({ open, onClose }: { open: boolea
                             <div className="min-w-0 flex-1">
                               <div className="flex items-center gap-1.5 flex-wrap">
                                 <p className="text-[10px] font-bold text-ink flex items-center gap-1">
-                                  <Clock className="w-2.5 h-2.5 text-subtle" /> {s.end ? `${s.start} – ${s.end}` : s.start}
+                                  <Clock className="w-2.5 h-2.5 text-subtle" /> {s.end_time ? `${s.start_time} – ${s.end_time}` : s.start_time}
                                 </p>
                                 <span className={`text-[8px] font-bold px-1 py-0.5 border ${k.color}`}>{k.label}</span>
                               </div>
                               <p className="text-xs text-ink leading-snug mt-0.5 font-medium">{s.title}</p>
                               <p className="text-[9px] text-muted flex items-center gap-2 mt-0.5 flex-wrap">
-                                <span className="flex items-center gap-1"><BookOpen className="w-2.5 h-2.5" /> {db?.ues.find((u) => u.id === s.ueId)?.code || s.ueId}</span>
+                                <span className="flex items-center gap-1"><BookOpen className="w-2.5 h-2.5" /> {s.course?.code ?? "—"}</span>
                                 {s.room && <span className="flex items-center gap-1"><MapPin className="w-2.5 h-2.5" /> {s.room}</span>}
                               </p>
                             </div>
@@ -111,7 +140,7 @@ export default function PersonalCalendarDrawer({ open, onClose }: { open: boolea
 
         {/* Footer */}
         <div className="px-5 py-3 border-t border-border bg-surface flex items-center justify-between flex-wrap gap-2">
-          <p className="text-[10px] text-muted">Planning synchronisé avec les séances validées par l&apos;administration · {CYCLE_MODES.find((m) => m.id === mode)?.label}</p>
+          <p className="text-[10px] text-muted">Planning synchronisé avec les séances validées par l&apos;administration · {meta.label}</p>
           <Link href="/calendrier" onClick={onClose} className="text-[11px] font-bold text-cama hover:underline">Calendrier annuel →</Link>
         </div>
       </div>

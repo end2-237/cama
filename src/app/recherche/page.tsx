@@ -4,15 +4,18 @@ import { Suspense, useMemo, useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
-  Search, ArrowLeft, BookOpen, FileText, Radio, MessageSquare,
-  GraduationCap, X, Mic, TrendingUp, CornerDownLeft,
-  Terminal, CalendarDays, HelpCircle, User, QrCode, MonitorPlay,
+  Search, ArrowLeft, BookOpen, FileText, Radio, X, Mic,
+  TrendingUp, CornerDownLeft, Terminal, CalendarDays, HelpCircle, User, QrCode, MonitorPlay,
 } from "lucide-react";
-import { useDB } from "@/hooks/useDB";
+import { useAuth } from "@/context/AuthContext";
+import { fetchStudentProgram, fetchChapters } from "@/lib/program";
+import { fetchLivesForCourses } from "@/lib/lives";
+import type { DBProgramCourse, DBChapter } from "@/lib/supabase";
+import type { DBLive } from "@/lib/lives";
 
 /* ── Types ── */
 interface Hit {
-  cat: "Cours" | "Chapitre" | "Live" | "Forum" | "UE" | "Page";
+  cat: "Cours" | "Chapitre" | "Live" | "Page";
   title: string;
   snippet: string;
   href: string;
@@ -37,25 +40,44 @@ const CAT_META: Record<Hit["cat"], { color: string }> = {
   Cours:    { color: "bg-cama text-white" },
   Chapitre: { color: "bg-cama-50 text-cama" },
   Live:     { color: "bg-red-50 text-red-600" },
-  Forum:    { color: "bg-purple-100 text-purple-700" },
-  UE:       { color: "bg-gold/15 text-gold-dark" },
   Page:     { color: "bg-green-50 text-green-700" },
 };
 
 function SearchEngine() {
   const params = useSearchParams();
   const router = useRouter();
-  const { db } = useDB();
+  const { user } = useAuth();
   const [q, setQ] = useState(params.get("q") || "");
   const [cat, setCat] = useState<"Tous" | Hit["cat"]>("Tous");
   const inputRef = useRef<HTMLInputElement>(null);
 
+  const [courses, setCourses] = useState<DBProgramCourse[]>([]);
+  const [chaptersByCourse, setChaptersByCourse] = useState<Record<string, DBChapter[]>>({});
+  const [lives, setLives] = useState<DBLive[]>([]);
+
   useEffect(() => { inputRef.current?.focus(); }, []);
+
+  useEffect(() => {
+    if (!user) return;
+    const slug = user.dossier?.parcoursSlug;
+    if (!slug) return;
+    (async () => {
+      const cs = await fetchStudentProgram(slug, user.dossier?.level);
+      setCourses(cs);
+      const ids = cs.map((c) => c.id);
+      setLives(await fetchLivesForCourses(ids));
+      const map: Record<string, DBChapter[]> = {};
+      await Promise.all(cs.map(async (c) => { map[c.id] = await fetchChapters(c.id); }));
+      setChaptersByCourse(map);
+    })();
+  }, [user]);
+
+  const allChapters = useMemo(() => Object.values(chaptersByCourse).flat(), [chaptersByCourse]);
 
   /* Recherche instantanée */
   const hits = useMemo<Hit[]>(() => {
     const term = q.trim().toLowerCase();
-    if (!term || !db) return [];
+    if (!term) return [];
     const words = term.split(/\s+/);
     const match = (txt: string) => {
       const lt = txt.toLowerCase();
@@ -64,70 +86,49 @@ function SearchEngine() {
     const out: Hit[] = [];
 
     /* Cours */
-    db.courses.filter((c) => c.published).forEach((c) => {
-      const ue = db.ues.find((u) => u.id === c.ueId);
-      const m = match(c.title) * 3 + match(c.description) + match(ue?.code || "");
+    courses.filter((c) => c.published).forEach((c) => {
+      const m = match(c.title) * 3 + match(c.description ?? "") + match(c.code);
       if (m > 0) out.push({
         cat: "Cours", title: c.title,
-        snippet: c.description,
-        href: `/cours/${c.id}`, meta: `${ue?.code} · ${ue?.ects} ECTS · ${ue?.semestre}`,
+        snippet: c.description ?? "",
+        href: `/cours/${c.id}`, meta: `${c.code} · ${c.ects} ECTS · ${c.semestre}`,
         icon: BookOpen, score: m + 4,
       });
     });
 
     /* Chapitres + contenus */
-    db.chapters.forEach((ch) => {
-      const course = db.courses.find((c) => c.id === ch.courseId);
+    allChapters.forEach((ch) => {
+      const course = courses.find((c) => c.id === ch.program_course_id);
       if (!course?.published) return;
       let m = match(ch.title) * 3;
       let snippet = ch.title;
-      ch.natif?.blocks.forEach((b) => {
-        const text = b.type === "definition" ? `${b.terme} : ${b.text}` : b.type === "quiz" ? b.question : (b as { text?: string }).text || "";
-        const bm = match(text);
-        if (bm > m - match(ch.title) * 3 && bm > 0) snippet = text;
-        m += bm;
-      });
+      if (ch.natif?.blocks) {
+        (ch.natif.blocks as { type?: string; terme?: string; text?: string; question?: string }[]).forEach((b) => {
+          const text = b.type === "definition" ? `${b.terme} : ${b.text}` : b.type === "quiz" ? (b.question ?? "") : (b.text ?? "");
+          const bm = match(text);
+          if (bm > m - match(ch.title) * 3 && bm > 0) snippet = text;
+          m += bm;
+        });
+      }
       if (ch.video) m += match(ch.video.transcript) + match(ch.video.title);
       if (ch.pdf) m += match(ch.pdf.name);
       if (m > 0) out.push({
         cat: "Chapitre", title: `${ch.title} — ${course.title}`,
         snippet: snippet.slice(0, 180),
-        href: `/cours/${course.id}`, meta: `Chapitre ${ch.order} · ${[ch.natif && "natif", ch.pdf && "PDF", ch.video && "vidéo"].filter(Boolean).join(" · ")}`,
+        href: `/cours/${course.id}`, meta: `Chapitre ${ch.ordre} · ${[ch.natif && "natif", ch.pdf && "PDF", ch.video && "vidéo"].filter(Boolean).join(" · ")}`,
         icon: FileText, score: m + 2,
       });
     });
 
     /* Lives */
-    db.lives.forEach((l) => {
-      const course = db.courses.find((c) => c.id === l.courseId);
+    lives.forEach((l) => {
+      const course = courses.find((c) => c.id === l.program_course_id);
       const m = match(l.title) * 2 + match(course?.title || "");
       if (m > 0) out.push({
         cat: "Live", title: l.title,
-        snippet: `Classe virtuelle ${l.status === "encours" ? "EN DIRECT" : l.status === "planifie" ? "planifiée" : "terminée"} · ${new Date(l.date).toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" })} · ${l.durationMin} min`,
-        href: l.status === "encours" ? `/live/${l.id}` : `/cours/${l.courseId}`,
+        snippet: `Classe virtuelle ${l.status === "encours" ? "EN DIRECT" : l.status === "planifie" ? "planifiée" : "terminée"}`,
+        href: l.status === "encours" ? `/live/${l.id}` : `/cours/${l.program_course_id}`,
         meta: course?.title || "", icon: Radio, score: m + (l.status === "encours" ? 5 : 1),
-      });
-    });
-
-    /* Forum */
-    db.forum.forEach((f) => {
-      const ue = db.ues.find((u) => u.id === f.ueId);
-      const m = match(f.text) * 2 + match(f.author);
-      if (m > 0) out.push({
-        cat: "Forum", title: `${f.author} — ${ue?.code || "Forum"}`,
-        snippet: f.text,
-        href: "/dashboard", meta: `${f.role === "enseignant" ? "Enseignant" : "Étudiant"} · ${f.time}`,
-        icon: MessageSquare, score: m,
-      });
-    });
-
-    /* UEs */
-    db.ues.forEach((u) => {
-      const m = match(u.title) * 2 + match(u.code) * 3;
-      if (m > 0) out.push({
-        cat: "UE", title: `${u.code} — ${u.title}`,
-        snippet: `Unité d'enseignement · ${u.ects} ECTS · ${u.semestre}`,
-        href: "/dashboard", meta: `${u.ects} crédits`, icon: GraduationCap, score: m + 1,
       });
     });
 
@@ -141,7 +142,7 @@ function SearchEngine() {
     });
 
     return out.sort((a, b) => b.score - a.score).slice(0, 25);
-  }, [q, db]);
+  }, [q, courses, allChapters, lives]);
 
   const filtered = cat === "Tous" ? hits : hits.filter((h) => h.cat === cat);
   const counts = useMemo(() => {
@@ -247,7 +248,7 @@ function SearchEngine() {
 
             {/* Filtres catégories */}
             <div className="px-4 sm:px-6 flex items-center gap-0 overflow-x-auto">
-              {(["Tous", "Cours", "Chapitre", "Live", "Forum", "UE", "Page"] as const).map((c) => (
+              {(["Tous", "Cours", "Chapitre", "Live", "Page"] as const).map((c) => (
                 <button key={c} onClick={() => setCat(c)}
                   className={`px-3 py-2 text-xs font-bold border-b-2 transition-colors whitespace-nowrap ${
                     cat === c ? "border-cama text-cama" : "border-transparent text-muted hover:text-ink"

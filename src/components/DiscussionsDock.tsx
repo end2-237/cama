@@ -3,13 +3,11 @@
 import { useState, useRef, useEffect } from "react";
 import { MessagesSquare, X, Send, Users, ChevronLeft, GraduationCap } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
-import { useDB } from "@/hooks/useDB";
-import { uid } from "@/lib/db";
 import { useDragOffset } from "@/hooks/useDragOffset";
 
 type DMsg = { from: "moi" | "prof"; text: string; time: string };
+type ForumMsg = { id: string; ueCode: string; author: string; role: string; text: string; time: string };
 
-/* Conversations avec les enseignants (simulées, persistées en session) */
 const TEACHERS = [
   {
     id: "amina",
@@ -55,9 +53,15 @@ const PROF_REPLIES = [
   "C'est noté. Pensez aussi à poser la question sur le forum, elle peut servir aux autres.",
 ];
 
+const UE_CODES = ["INF201", "INF202", "INF203", "MAT201"];
+
+const SEED_FORUM: ForumMsg[] = [
+  { id: "f1", ueCode: "INF201", author: "Marie K.", role: "etudiant", text: "Quelqu'un a compris l'exercice 4 du TD ? Je bloque sur la complexité.", time: "Hier 14:20" },
+  { id: "f2", ueCode: "INF201", author: "Pr. Amina Bello", role: "enseignant", text: "Relisez le théorème maître, c'est la clé. Je détaillerai au live de vendredi.", time: "Hier 15:05" },
+];
+
 export default function DiscussionsDock() {
   const { user } = useAuth();
-  const { db, mutate } = useDB();
   const [open, setOpen] = useState(false);
   const { style: dragStyle, bind } = useDragOffset();
   const [tab, setTab] = useState<"profs" | "forum">("profs");
@@ -67,17 +71,17 @@ export default function DiscussionsDock() {
   );
   const [typing, setTyping] = useState(false);
   const [input, setInput] = useState("");
-  const [forumUe, setForumUe] = useState<string | null>(null);
+  const [forumUe, setForumUe] = useState<string>(UE_CODES[0]);
   const [forumInput, setForumInput] = useState("");
+  const [forumMsgs, setForumMsgs] = useState<ForumMsg[]>(SEED_FORUM);
   const endRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth" }); }, [threads, typing, tab, activeTeacher, db?.forum.length]);
+  useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth" }); }, [threads, typing, tab, activeTeacher, forumMsgs.length]);
 
-  if (!user || !db) return null;
+  if (!user) return null;
 
-  const ues = db.ues;
-  const currentUe = forumUe ?? ues[0]?.id;
-  const forumMsgs = db.forum.filter((f) => f.ueId === currentUe);
+  const currentUe = forumUe;
+  const currentForumMsgs = forumMsgs.filter((f) => f.ueCode === currentUe);
   const teacher = TEACHERS.find((t) => t.id === activeTeacher);
 
   function sendDM() {
@@ -98,10 +102,8 @@ export default function DiscussionsDock() {
 
   function postForum() {
     const q = forumInput.trim();
-    if (!q || !currentUe || !user) return;
-    mutate((d) => {
-      d.forum.push({ id: uid("f"), ueId: currentUe, author: user.name, role: user.role, text: q, time: "À l'instant" });
-    });
+    if (!q || !user) return;
+    setForumMsgs((msgs) => [...msgs, { id: crypto.randomUUID(), ueCode: currentUe, author: user.name, role: user.role, text: q, time: "À l'instant" }]);
     setForumInput("");
   }
 
@@ -220,21 +222,20 @@ export default function DiscussionsDock() {
           {/* ── FORUM DE CLASSE ── */}
           {tab === "forum" && (
             <>
-              {/* Sélecteur d'UE */}
               <div className="flex gap-1 px-3 py-2 border-b border-border overflow-x-auto flex-shrink-0">
-                {ues.map((u) => (
-                  <button key={u.id} onClick={() => setForumUe(u.id)}
+                {UE_CODES.map((code) => (
+                  <button key={code} onClick={() => setForumUe(code)}
                     className={`text-[10px] font-bold px-2.5 py-1 border whitespace-nowrap transition-colors ${
-                      currentUe === u.id ? "bg-ink text-white border-ink" : "bg-white text-muted border-border hover:border-ink/40"}`}>
-                    {u.code}
+                      currentUe === code ? "bg-ink text-white border-ink" : "bg-white text-muted border-border hover:border-ink/40"}`}>
+                    {code}
                   </button>
                 ))}
               </div>
               <div className="flex-1 overflow-y-auto p-3 space-y-3 bg-surface min-h-0">
-                {forumMsgs.length === 0 && (
+                {currentForumMsgs.length === 0 && (
                   <p className="text-xs text-subtle text-center py-6">Aucun message dans ce forum — lancez la discussion !</p>
                 )}
-                {forumMsgs.map((m) => (
+                {currentForumMsgs.map((m) => (
                   <div key={m.id} className="bg-white border border-border p-2.5">
                     <p className="text-[11px] font-bold text-ink flex items-center gap-1.5">
                       {m.author}

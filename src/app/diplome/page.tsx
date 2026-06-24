@@ -1,27 +1,36 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Download, GraduationCap, ShieldCheck } from "lucide-react";
+import { ArrowLeft, Download, GraduationCap, ShieldCheck, Loader2 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
-import { useDB } from "@/hooks/useDB";
+import { fetchDeliberations, type DelibWithMeta } from "@/lib/exams";
 import QrSvg from "@/components/QrSvg";
 
 export default function DiplomePage() {
   const { user, loading } = useAuth();
-  const { db } = useDB();
   const router = useRouter();
+  const [results, setResults] = useState<DelibWithMeta[]>([]);
+  const [fetching, setFetching] = useState(true);
 
   useEffect(() => {
     if (!loading && !user) router.replace("/auth/login");
   }, [loading, user, router]);
 
-  if (!db || !user) return null;
+  useEffect(() => {
+    if (!user) return;
+    (async () => {
+      const all = await fetchDeliberations();
+      setResults(all.filter((r) => r.student_id === user.id && r.status === "valide"));
+      setFetching(false);
+    })();
+  }, [user]);
 
-  const results = db.results.filter((r) => r.studentId === user.id && r.validatedByJury);
-  const credits = results.reduce((a, r) => a + (r.note >= 10 ? r.credits : 0), 0);
-  const code = `CAMA-${user.id.toUpperCase()}-2025`;
+  if (loading || !user) return null;
+
+  const credits = results.reduce((a, r) => a + (r.credits ?? 0), 0);
+  const code = `CAMA-${user.id.slice(0, 8).toUpperCase()}-2025`;
 
   return (
     <div className="min-h-screen bg-surface py-10 px-4">
@@ -33,6 +42,10 @@ export default function DiplomePage() {
           <button className="btn-primary py-2 px-4 text-xs gap-1.5"><Download className="w-3.5 h-3.5" /> Télécharger le PDF</button>
         </div>
 
+        {fetching ? (
+          <div className="py-16 text-center"><Loader2 className="w-6 h-6 animate-spin text-cama mx-auto" /></div>
+        ) : (
+          <>
         {/* ── Document ── */}
         <div className="bg-white rounded-3xl border-2 border-cama/20 overflow-hidden shadow-xl">
           {/* Bande haute */}
@@ -67,16 +80,16 @@ export default function DiplomePage() {
                 </tr>
               </thead>
               <tbody>
-                {results.map((r) => {
-                  const ue = db.ues.find((u) => u.id === r.ueId);
-                  return (
-                    <tr key={r.id} className="border-b border-border">
-                      <td className="py-2.5 text-sm text-ink">{ue?.code} — {ue?.title}</td>
-                      <td className="py-2.5 text-sm font-bold text-right text-ink">{r.note}/20</td>
-                      <td className="py-2.5 text-sm text-right text-ink">{r.note >= 10 ? r.credits : 0} ECTS</td>
-                    </tr>
-                  );
-                })}
+                {results.map((r) => (
+                  <tr key={r.id} className="border-b border-border">
+                    <td className="py-2.5 text-sm text-ink">{r.course?.code} — {r.course?.title}</td>
+                    <td className="py-2.5 text-sm font-bold text-right text-ink">{r.note}/20</td>
+                    <td className="py-2.5 text-sm text-right text-ink">{r.credits ?? 0} ECTS</td>
+                  </tr>
+                ))}
+                {results.length === 0 && (
+                  <tr><td colSpan={3} className="py-6 text-center text-sm text-muted">Aucune délibération validée pour le moment.</td></tr>
+                )}
                 <tr>
                   <td className="py-3 text-sm font-bold text-ink">Total validé par le jury</td>
                   <td />
@@ -117,6 +130,8 @@ export default function DiplomePage() {
         <p className="text-center text-[11px] text-subtle mt-4">
           Ce document est rattaché à la traçabilité complète du parcours (actions horodatées) — Confiance par la preuve.
         </p>
+          </>
+        )}
       </div>
     </div>
   );
