@@ -100,7 +100,7 @@ export default function ParascolairePage() {
       {/* Hero */}
       <div className="relative overflow-hidden text-white" style={{ background: "linear-gradient(135deg, #1E1B4B 0%, #4F46E5 50%, #7C3AED 100%)" }}>
         <div className="absolute inset-0 opacity-10" style={{ backgroundImage: "url('https://images.unsplash.com/photo-1523240795612-9a054b0db644?w=1200&q=50')", backgroundSize: "cover", backgroundPosition: "center" }} />
-        <div className="relative max-w-[1200px] mx-auto px-4 sm:px-6 pt-6 pb-8">
+        <div className="relative mx-auto px-4 sm:px-8 pt-6 pb-8">
           <Link href="/dashboard" className="inline-flex items-center gap-1.5 text-white/60 text-xs hover:text-white transition-colors mb-4">
             <ArrowLeft className="w-3.5 h-3.5" /> Retour au dashboard
           </Link>
@@ -111,17 +111,25 @@ export default function ParascolairePage() {
             </div>
             <div className="hidden sm:flex gap-3">
               <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl px-4 py-3 text-center">
+                <p className="text-2xl font-bold">{extra.length}</p>
+                <p className="text-[10px] text-white/60 uppercase tracking-wider">Cours dispo</p>
+              </div>
+              <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl px-4 py-3 text-center">
                 <p className="text-2xl font-bold">{myExtra.length}</p>
                 <p className="text-[10px] text-white/60 uppercase tracking-wider">Cours inscrits</p>
               </div>
               <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl px-4 py-3 text-center">
-                <p className="text-2xl font-bold">{myCerts.length}</p>
+                <p className="text-2xl font-bold">{certs.length}</p>
                 <p className="text-[10px] text-white/60 uppercase tracking-wider">Certifications</p>
+              </div>
+              <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl px-4 py-3 text-center">
+                <p className="text-2xl font-bold">{myCerts.length}</p>
+                <p className="text-[10px] text-white/60 uppercase tracking-wider">Cert. inscrites</p>
               </div>
             </div>
           </div>
         </div>
-        <div className="relative max-w-[1200px] mx-auto px-4 sm:px-6 flex gap-0">
+        <div className="relative mx-auto px-4 sm:px-8 flex gap-0">
           {([["extra", `Cours hors-cursus (${extra.length})`, Sparkles], ["cert", `Certifications (${certs.length})`, Award]] as const).map(([k, lbl, Icon]) => (
             <button key={k} onClick={() => setTab(k)}
               className={`flex items-center gap-1.5 px-5 py-3 text-sm font-bold border-b-2 transition-colors ${
@@ -132,14 +140,14 @@ export default function ParascolairePage() {
         </div>
       </div>
 
-      <main className="max-w-[1200px] mx-auto px-4 sm:px-6 py-6">
+      <main className="mx-auto px-4 sm:px-8 py-4">
         {fetching ? (
           <div className="py-16 text-center"><Loader2 className="w-6 h-6 animate-spin text-cama mx-auto" /></div>
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-[240px_1fr] gap-6 items-start">
+          <div className="grid grid-cols-1 lg:grid-cols-[260px_1fr_220px] gap-4 items-start">
 
             {/* ── SIDEBAR ── */}
-            <aside className="space-y-4 lg:sticky lg:top-4">
+            <aside className="space-y-3 lg:sticky lg:top-4">
               {/* Mon parcours */}
               <div className="bg-white border border-border rounded-xl overflow-hidden">
                 <div className="px-4 py-3 border-b border-border flex items-center gap-2">
@@ -206,10 +214,10 @@ export default function ParascolairePage() {
             </aside>
 
             {/* ── COLONNE PRINCIPALE ── */}
-            <div className="space-y-6">
+            <div className="space-y-4">
               {/* Slider vedette */}
               {featured.length > 0 && (
-                <div className="relative rounded-2xl overflow-hidden h-52 sm:h-60 group">
+                <div className="relative rounded-2xl overflow-hidden h-56 sm:h-72 group">
                   {featured.map((item, i) => {
                     const isExtra = tab === "extra";
                     const c = item as DBExtraCourse & DBCertification;
@@ -264,7 +272,7 @@ export default function ParascolairePage() {
                       <h2 className="text-lg font-bold text-ink">{cat === "Toutes" ? "Tous les cours" : cat}</h2>
                       <span className="text-xs text-muted">{filteredExtra.length} cours</span>
                     </div>
-                    <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-5">
+                    <div className="grid sm:grid-cols-2 2xl:grid-cols-3 gap-3">
                       {filteredExtra.map((c) => {
                         const enr = myExtraMap.get(c.id);
                         const img = EXTRA_IMG[c.category] ?? EXTRA_IMG["Autre"];
@@ -313,7 +321,7 @@ export default function ParascolairePage() {
                       <h2 className="text-lg font-bold text-ink">Certifications professionnelles</h2>
                       <span className="text-xs text-muted">{certs.length} parcours</span>
                     </div>
-                    <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-5">
+                    <div className="grid sm:grid-cols-2 2xl:grid-cols-3 gap-3">
                       {certs.map((c) => {
                         const enr = myCertMap.get(c.id);
                         const st = enr ? CERT_STATUS_META[enr.status] : null;
@@ -365,6 +373,78 @@ export default function ParascolairePage() {
                 )
               )}
             </div>
+
+            {/* ── SIDEBAR DROITE ── */}
+            <aside className="hidden lg:block space-y-3 lg:sticky lg:top-4">
+              {/* Statistiques rapides */}
+              <div className="bg-white border border-border rounded-xl overflow-hidden">
+                <div className="px-3 py-2.5 border-b border-border flex items-center gap-2">
+                  <TrendingUp className="w-4 h-4 text-cama" />
+                  <p className="text-xs font-black uppercase tracking-widest text-ink">Statistiques</p>
+                </div>
+                <div className="p-3 grid grid-cols-2 gap-2">
+                  <div className="bg-surface rounded-lg p-2.5 text-center">
+                    <p className="text-lg font-bold text-cama">{myExtra.filter(e => e.status === "termine").length}</p>
+                    <p className="text-[9px] text-muted uppercase">Cours terminés</p>
+                  </div>
+                  <div className="bg-surface rounded-lg p-2.5 text-center">
+                    <p className="text-lg font-bold text-amber-500">{myExtra.filter(e => e.status === "en_cours").length}</p>
+                    <p className="text-[9px] text-muted uppercase">En cours</p>
+                  </div>
+                  <div className="bg-surface rounded-lg p-2.5 text-center">
+                    <p className="text-lg font-bold text-emerald-500">{myCerts.filter(e => e.status === "obtenu").length}</p>
+                    <p className="text-[9px] text-muted uppercase">Certifiés</p>
+                  </div>
+                  <div className="bg-surface rounded-lg p-2.5 text-center">
+                    <p className="text-lg font-bold text-violet-500">{Math.round((myExtra.reduce((s, e) => s + e.progress, 0) + myCerts.reduce((s, e) => s + e.progress, 0)) / Math.max(1, myExtra.length + myCerts.length))}%</p>
+                    <p className="text-[9px] text-muted uppercase">Moy. progrès</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Populaires */}
+              <div className="bg-white border border-border rounded-xl overflow-hidden">
+                <div className="px-3 py-2.5 border-b border-border flex items-center gap-2">
+                  <Flame className="w-4 h-4 text-orange-500" />
+                  <p className="text-xs font-black uppercase tracking-widest text-ink">Populaires</p>
+                </div>
+                <div className="divide-y divide-border">
+                  {(tab === "extra" ? extra : certs).slice(0, 5).map((item, i) => {
+                    const isExtra = tab === "extra";
+                    const color = isExtra ? (item as DBExtraCourse).color : (item as DBCertification).badge_color;
+                    return (
+                      <button key={item.id} onClick={() => isExtra ? startExtra(item as DBExtraCourse) : startCert(item as DBCertification)}
+                        className="w-full px-3 py-2 hover:bg-surface transition-colors text-left flex items-center gap-2">
+                        <span className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold text-white shrink-0" style={{ background: color }}>{i + 1}</span>
+                        <p className="text-[11px] font-semibold text-ink truncate">{item.title}</p>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Catégories rapides (certifications) */}
+              {tab === "cert" && (
+                <div className="bg-white border border-border rounded-xl overflow-hidden">
+                  <div className="px-3 py-2.5 border-b border-border flex items-center gap-2">
+                    <Award className="w-4 h-4 text-cama" />
+                    <p className="text-xs font-black uppercase tracking-widest text-ink">Providers</p>
+                  </div>
+                  <div className="p-2 flex flex-wrap gap-1.5">
+                    {Array.from(new Set(certs.map(c => c.provider))).map(p => (
+                      <span key={p} className="text-[10px] font-bold bg-surface text-ink px-2.5 py-1 rounded-full">{p} ({certs.filter(c => c.provider === p).length})</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Encart motivation */}
+              <div className="rounded-xl p-3.5 text-white" style={{ background: "linear-gradient(135deg, #7C3AED, #EC4899)" }}>
+                <GraduationCap className="w-5 h-5 text-yellow-300 mb-1.5" />
+                <p className="font-bold text-sm leading-snug mb-1">Boostez votre CV</p>
+                <p className="text-white/70 text-[11px] leading-relaxed">Chaque certification obtenue renforce votre profil professionnel et ouvre de nouvelles opportunités.</p>
+              </div>
+            </aside>
           </div>
         )}
       </main>
