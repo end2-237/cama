@@ -19,6 +19,8 @@ import {
 } from "@/lib/program";
 import { DAYS, CYCLE_MODES, SESSION_KINDS } from "@/lib/scheduling";
 import { createLive, deleteLive } from "@/lib/lives";
+import { uploadMedia, estimateVideoSizeMo, fetchResources, addResource, deleteResource } from "@/lib/resources";
+import type { DBCourseResource, ResourceKind } from "@/lib/supabase";
 
 export default function CourseEditor() {
   const { id } = useParams<{ id: string }>();
@@ -137,6 +139,16 @@ export default function CourseEditor() {
         </div>
         <CourseDetailsEditor course={course} reload={reload} />
 
+        {/* ── Ressources du cours ── */}
+        <div className="mt-10 flex items-center gap-3 mb-4">
+          <FileText className="w-6 h-6 text-cama" strokeWidth={1.5} />
+          <div>
+            <h2 className="text-xl font-bold text-ink">Ressources du cours</h2>
+            <p className="text-xs text-muted">Syllabus, supports et bibliographie — visibles dans la barre latérale côté étudiant.</p>
+          </div>
+        </div>
+        <ResourcesEditor courseId={id} />
+
         {/* ── Planification proposée ── */}
         <div className="mt-10 flex items-center gap-3 mb-4">
           <CalendarClock className="w-6 h-6 text-cama" strokeWidth={1.5} />
@@ -156,10 +168,14 @@ function ChapterModes({ chapter, reload }: { chapter: DBChapter; reload: () => v
   const ch = chapter;
   const { user } = useAuth();
   const fileRef = useRef<HTMLInputElement>(null);
+  const videoFileRef = useRef<HTMLInputElement>(null);
   const [videoTitle, setVideoTitle] = useState("");
   const [videoDur, setVideoDur] = useState("20");
   const [liveTitle, setLiveTitle] = useState("");
   const [liveDate, setLiveDate]   = useState("");
+  const [pdfUploading, setPdfUploading] = useState(0);   // 0 = idle, sinon %
+  const [videoUploading, setVideoUploading] = useState(0);
+  const [uploadErr, setUploadErr] = useState("");
 
   return (
     <div className="border-t border-border bg-surface p-5 grid md:grid-cols-2 gap-4 animate-fade-up">
@@ -178,17 +194,28 @@ function ChapterModes({ chapter, reload }: { chapter: DBChapter; reload: () => v
           </div>
         ) : (
           <>
-            <input ref={fileRef} type="file" accept=".pdf" className="hidden"
+            <input ref={fileRef} type="file" accept="application/pdf" className="hidden"
               onChange={async (e) => {
                 const f = e.target.files?.[0];
                 if (!f) return;
-                await updateChapter(ch.id, { pdf: { name: f.name, sizeMo: Math.max(0.1, Math.round((f.size / 1048576) * 10) / 10), pages: 10 + Math.floor(Math.random() * 20) } });
+                setUploadErr(""); setPdfUploading(5);
+                const res = await uploadMedia(ch.program_course_id, f, setPdfUploading);
+                if ("error" in res) { setUploadErr(res.error); setPdfUploading(0); return; }
+                await updateChapter(ch.id, { pdf: { name: f.name, sizeMo: res.sizeMo, pages: 0, url: res.url } });
+                setPdfUploading(0);
                 reload();
               }} />
-            <button onClick={() => fileRef.current?.click()}
-              className="w-full border-2 border-dashed border-border rounded-lg py-4 text-xs text-muted hover:border-cama/40 hover:text-cama transition-all flex items-center justify-center gap-2">
-              <Upload className="w-4 h-4" /> Déposer un PDF (versioning + compression auto)
-            </button>
+            {pdfUploading > 0 ? (
+              <div className="border-2 border-dashed border-cama/40 rounded-lg py-4 px-3">
+                <p className="text-[11px] text-cama font-bold flex items-center gap-2 mb-2"><Upload className="w-4 h-4 animate-pulse" /> Téléversement… {pdfUploading}%</p>
+                <div className="h-1.5 bg-surface rounded-full overflow-hidden"><div className="h-full bg-cama transition-all" style={{ width: `${pdfUploading}%` }} /></div>
+              </div>
+            ) : (
+              <button onClick={() => fileRef.current?.click()}
+                className="w-full border-2 border-dashed border-border rounded-lg py-4 text-xs text-muted hover:border-cama/40 hover:text-cama transition-all flex items-center justify-center gap-2">
+                <Upload className="w-4 h-4" /> Déposer un PDF (stocké, compressé pour bas-débit)
+              </button>
+            )}
           </>
         )}
       </div>
@@ -209,24 +236,38 @@ function ChapterModes({ chapter, reload }: { chapter: DBChapter; reload: () => v
           <div className="space-y-2">
             <input value={videoTitle} onChange={(e) => setVideoTitle(e.target.value)} placeholder="Titre de la vidéo"
               className="w-full text-xs border border-border rounded-lg px-3 py-2 outline-none focus:border-cama" />
-            <div className="flex gap-2">
+            <div className="flex gap-2 items-center">
               <input value={videoDur} onChange={(e) => setVideoDur(e.target.value)} type="number" min="1" placeholder="Durée (min)"
                 className="w-24 text-xs border border-border rounded-lg px-3 py-2 outline-none focus:border-cama" />
-              <button
-                onClick={async () => {
-                  if (!videoTitle.trim()) return;
-                  await updateChapter(ch.id, { video: { title: videoTitle.trim(), durationMin: parseInt(videoDur) || 20,
-                    sizeMo: (parseInt(videoDur) || 20) * 4,
-                    transcript: `Transcription automatique (IA) de « ${videoTitle.trim()} » : le contenu intégral de la vidéo est restitué en texte pour permettre l'apprentissage sans téléchargement — un atout majeur en bas-débit.` } });
-                  setVideoTitle("");
-                  reload();
-                }}
-                className="flex-1 btn-primary py-2 text-xs justify-center gap-1.5">
-                <Upload className="w-3.5 h-3.5" /> Uploader (transcodage auto)
-              </button>
+              <span className="text-[10px] text-subtle">≈ {estimateVideoSizeMo(parseInt(videoDur) || 20, "360p")} Mo en 360p (bas-débit)</span>
             </div>
+            <input ref={videoFileRef} type="file" accept="video/mp4,video/webm,video/quicktime" className="hidden"
+              onChange={async (e) => {
+                const f = e.target.files?.[0];
+                if (!f || !videoTitle.trim()) { if (!videoTitle.trim()) setUploadErr("Donnez d'abord un titre à la vidéo."); return; }
+                setUploadErr(""); setVideoUploading(5);
+                const res = await uploadMedia(ch.program_course_id, f, setVideoUploading);
+                if ("error" in res) { setUploadErr(res.error); setVideoUploading(0); return; }
+                const dur = parseInt(videoDur) || 20;
+                await updateChapter(ch.id, { video: { title: videoTitle.trim(), durationMin: dur, sizeMo: res.sizeMo, url: res.url, quality: "source",
+                  transcript: `Transcription automatique (IA) de « ${videoTitle.trim()} » : le contenu intégral de la vidéo est restitué en texte pour permettre l'apprentissage sans téléchargement — un atout majeur en bas-débit.` } });
+                setVideoTitle(""); setVideoUploading(0);
+                reload();
+              }} />
+            {videoUploading > 0 ? (
+              <div className="border border-cama/30 rounded-lg py-3 px-3">
+                <p className="text-[11px] text-cama font-bold flex items-center gap-2 mb-2"><Upload className="w-4 h-4 animate-pulse" /> Téléversement… {videoUploading}%</p>
+                <div className="h-1.5 bg-surface rounded-full overflow-hidden"><div className="h-full bg-cama transition-all" style={{ width: `${videoUploading}%` }} /></div>
+              </div>
+            ) : (
+              <button onClick={() => videoFileRef.current?.click()}
+                className="w-full btn-primary py-2 text-xs justify-center gap-1.5">
+                <Upload className="w-3.5 h-3.5" /> Déposer la vidéo (stockée + transcription IA)
+              </button>
+            )}
           </div>
         )}
+        {uploadErr && <p className="text-[10px] text-red-500 mt-2">{uploadErr}</p>}
       </div>
 
       {/* ── Mode 3 : Cours natif ── */}
@@ -436,6 +477,98 @@ function CourseDetailsEditor({ course, reload }: { course: DBProgramCourse; relo
           <Check className="w-4 h-4" /> Enregistrer la fiche
         </button>
         {saved && <span className="text-xs font-bold text-green-600 flex items-center gap-1 animate-fade-in"><Check className="w-3.5 h-3.5" /> Fiche enregistrée — visible côté étudiant</span>}
+      </div>
+    </div>
+  );
+}
+
+/* ════ Gestion des ressources du cours ════ */
+const RES_KINDS: { id: ResourceKind; label: string }[] = [
+  { id: "syllabus", label: "Syllabus" },
+  { id: "support", label: "Support (fichier)" },
+  { id: "biblio", label: "Bibliographie" },
+  { id: "lien", label: "Lien externe" },
+];
+
+function ResourcesEditor({ courseId }: { courseId: string }) {
+  const { user } = useAuth();
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [resources, setResources] = useState<DBCourseResource[]>([]);
+  const [kind, setKind] = useState<ResourceKind>("syllabus");
+  const [title, setTitle] = useState("");
+  const [url, setUrl] = useState("");
+  const [uploading, setUploading] = useState(0);
+  const [err, setErr] = useState("");
+
+  const reload = useCallback(async () => { setResources(await fetchResources(courseId)); }, [courseId]);
+  useEffect(() => { reload(); }, [reload]);
+
+  const isFile = kind === "syllabus" || kind === "support";
+
+  const addLink = async () => {
+    if (!title.trim()) return;
+    await addResource({ program_course_id: courseId, kind, title: title.trim(), url: url.trim() || null, created_by: user?.id ?? null });
+    setTitle(""); setUrl("");
+    reload();
+  };
+
+  const onFile = async (f: File) => {
+    setErr(""); setUploading(5);
+    const res = await uploadMedia(courseId, f, setUploading);
+    if ("error" in res) { setErr(res.error); setUploading(0); return; }
+    await addResource({ program_course_id: courseId, kind, title: title.trim() || f.name, url: res.url, size_mo: res.sizeMo, created_by: user?.id ?? null });
+    setTitle(""); setUploading(0);
+    reload();
+  };
+
+  const field = "text-sm border border-border rounded-lg px-3 py-2 outline-none focus:border-cama";
+
+  return (
+    <div className="bg-white rounded-2xl border border-border overflow-hidden">
+      <div className="p-5 border-b border-border bg-surface/50 grid sm:grid-cols-[auto_1fr_auto] gap-3 items-end">
+        <div>
+          <label className="text-[10px] font-bold text-muted uppercase tracking-wider mb-1 block">Type</label>
+          <select value={kind} onChange={(e) => setKind(e.target.value as ResourceKind)} className={`${field} bg-white`}>
+            {RES_KINDS.map((k) => <option key={k.id} value={k.id}>{k.label}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className="text-[10px] font-bold text-muted uppercase tracking-wider mb-1 block">Titre</label>
+          <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Ex: Syllabus complet 2025-2026" className={`${field} w-full`} />
+        </div>
+        {isFile ? (
+          <>
+            <input ref={fileRef} type="file" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f); }} />
+            <button onClick={() => fileRef.current?.click()} disabled={uploading > 0}
+              className="btn-primary py-2 px-4 text-xs gap-1.5 h-[38px] disabled:opacity-50">
+              <Upload className="w-3.5 h-3.5" /> {uploading > 0 ? `${uploading}%` : "Déposer le fichier"}
+            </button>
+          </>
+        ) : (
+          <button onClick={addLink} className="btn-primary py-2 px-4 text-xs gap-1.5 h-[38px]">
+            <Plus className="w-3.5 h-3.5" /> Ajouter
+          </button>
+        )}
+        {!isFile && (
+          <div className="sm:col-span-3">
+            <label className="text-[10px] font-bold text-muted uppercase tracking-wider mb-1 block">Lien (URL)</label>
+            <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://…" className={`${field} w-full`} />
+          </div>
+        )}
+        {err && <p className="sm:col-span-3 text-[10px] text-red-500">{err}</p>}
+      </div>
+      <div className="divide-y divide-border">
+        {resources.length === 0 && <p className="px-5 py-6 text-sm text-muted text-center">Aucune ressource. Ajoutez le syllabus, les supports ou la bibliographie.</p>}
+        {resources.map((r) => (
+          <div key={r.id} className="px-5 py-3 flex items-center gap-3">
+            <span className="text-[9px] font-bold uppercase text-cama bg-cama-50 px-1.5 py-0.5 rounded flex-shrink-0">{RES_KINDS.find((k) => k.id === r.kind)?.label ?? r.kind}</span>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-ink truncate">{r.title}</p>
+              <p className="text-[10px] text-muted truncate">{r.size_mo ? `${r.size_mo} Mo` : r.url}</p>
+            </div>
+            <button onClick={async () => { await deleteResource(r.id); reload(); }} className="p-1.5 text-subtle hover:text-red-500 transition-colors"><Trash2 className="w-4 h-4" /></button>
+          </div>
+        ))}
       </div>
     </div>
   );

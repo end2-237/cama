@@ -832,14 +832,15 @@ function PdfMode({ pdf }: { pdf: NonNullable<DBChapter["pdf"]> }) {
           <p className="text-sm font-bold text-ink">{pdf.name}</p>
           <p className="text-xs text-muted">Poids : <strong>{pdf.sizeMo} Mo</strong> · {pdf.pages} pages · Compressé pour bas-débit</p>
         </div>
-        <button
+        <a
+          href={pdf.url ?? "#"} target="_blank" rel="noopener noreferrer"
           onClick={() => setDownloaded(true)}
           className={`flex items-center gap-2 text-sm font-bold px-4 py-2 rounded-full border-2 transition-all ${
             downloaded ? "border-green-500 text-green-600 bg-green-50" : "border-cama text-cama hover:bg-cama-50"
           }`}
         >
-          {downloaded ? <><Check className="w-4 h-4" /> Hors-ligne</> : <><Download className="w-4 h-4" /> Télécharger ({pdf.sizeMo} Mo)</>}
-        </button>
+          {downloaded ? <><Check className="w-4 h-4" /> Ouvert</> : <><Download className="w-4 h-4" /> Ouvrir le PDF ({pdf.sizeMo} Mo)</>}
+        </a>
       </div>
 
       {/* Lecture page à page */}
@@ -902,6 +903,8 @@ function VideoMode({ video }: { video: NonNullable<DBChapter["video"]> }) {
               </div>
             )}
           </div>
+        ) : video.url ? (
+          <video src={video.url} controls className="absolute inset-0 w-full h-full object-contain bg-black" />
         ) : (
           <>
             <img src="https://images.unsplash.com/photo-1531482615713-2afd69097998?w=900&q=60" alt="" className="absolute inset-0 w-full h-full object-cover opacity-40" />

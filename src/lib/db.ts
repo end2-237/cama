@@ -20,8 +20,8 @@ export type BlocNatif =
 
 export interface DBChapter {
   id: string; courseId: string; order: number; title: string;
-  pdf?:   { name: string; sizeMo: number; pages: number };
-  video?: { title: string; durationMin: number; transcript: string; sizeMo: number };
+  pdf?:   { name: string; sizeMo: number; pages: number; url?: string };
+  video?: { title: string; durationMin: number; transcript: string; sizeMo: number; url?: string; quality?: string };
   natif?: { blocks: BlocNatif[] };
   liveId?: string;
 }

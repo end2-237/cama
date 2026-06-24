@@ -78,8 +78,8 @@ export interface DBChapter {
   program_course_id: string;
   ordre: number;
   title: string;
-  pdf: { name: string; sizeMo: number; pages: number } | null;
-  video: { title: string; durationMin: number; transcript: string; sizeMo: number } | null;
+  pdf: { name: string; sizeMo: number; pages: number; url?: string } | null;
+  video: { title: string; durationMin: number; transcript: string; sizeMo: number; url?: string; quality?: string } | null;
   natif: { blocks: unknown[] } | null;
   live_id: string | null;
   created_at: string;
