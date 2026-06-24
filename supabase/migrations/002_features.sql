@@ -7,6 +7,19 @@
 create extension if not exists pgcrypto;
 
 -- ════════════════════════════════════════════════════════════
+-- 0. NETTOYAGE — supprime les tables de cette migration si elles
+--    existent dans un état incohérent (issu d'un essai précédent).
+--    Ces tables sont nouvelles : aucune donnée importante n'est perdue.
+-- ════════════════════════════════════════════════════════════
+drop table if exists public.certification_enrollments cascade;
+drop table if exists public.certifications            cascade;
+drop table if exists public.attendance                cascade;
+drop table if exists public.extra_enrollments         cascade;
+drop table if exists public.extra_courses             cascade;
+drop table if exists public.calendar_events           cascade;
+drop table if exists public.course_resources          cascade;
+
+-- ════════════════════════════════════════════════════════════
 -- 1. RESSOURCES DE COURS (syllabus, supports, bibliographie, liens)
 --    Téléversées par l'enseignant ; visibles par l'étudiant.
 -- ════════════════════════════════════════════════════════════
