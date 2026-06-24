@@ -12,18 +12,16 @@ import { useAuth } from "@/context/AuthContext";
 import { fetchStudentProgram, fetchChapters, fetchProgress } from "@/lib/program";
 import { fetchOpenExams, fetchAttemptsForStudent, fetchDeliberations } from "@/lib/exams";
 import { fetchLivesForCourses, subscribeLives } from "@/lib/lives";
-import type { DBProgramCourse, DBChapter, DBExam, DBExamAttempt } from "@/lib/supabase";
+import { fetchExtraCourses, fetchMyEnrollments, enrollExtra, unenrollExtra, MODE_LABEL } from "@/lib/extra";
+import type { DBProgramCourse, DBChapter, DBExam, DBExamAttempt, DBExtraCourse, DBExtraEnrollment } from "@/lib/supabase";
 import type { DelibWithMeta } from "@/lib/exams";
-import { COURS_INTERMEDIAIRES, formatFcfa } from "@/lib/parcours";
 
-/* Visuels des cours hors cursus (par slug) */
-const HORS_CURSUS_IMG: Record<string, string> = {
-  anglais:        "https://images.unsplash.com/photo-1543109740-4bdb38fda756?w=480&q=70",
-  diction:        "https://images.unsplash.com/photo-1475721027785-f74eccf877e2?w=480&q=70",
-  bureautique:    "https://images.unsplash.com/photo-1587614382346-4ec70e388b28?w=480&q=70",
-  entrepreneuriat:"https://images.unsplash.com/photo-1556761175-5973dc0f32e7?w=480&q=70",
-  allemand:       "https://images.unsplash.com/photo-1467269204594-9661b134dd2b?w=480&q=70",
-  design:         "https://images.unsplash.com/photo-1626785774573-4b799315345d?w=480&q=70",
+const EXTRA_IMG: Record<string, string> = {
+  "Soft skills":      "https://images.unsplash.com/photo-1475721027785-f74eccf877e2?w=480&q=70",
+  "Langues":          "https://images.unsplash.com/photo-1543109740-4bdb38fda756?w=480&q=70",
+  "Entrepreneuriat":  "https://images.unsplash.com/photo-1556761175-5973dc0f32e7?w=480&q=70",
+  "Tech":             "https://images.unsplash.com/photo-1517694712202-14dd9538aa97?w=480&q=70",
+  "Autre":            "https://images.unsplash.com/photo-1626785774573-4b799315345d?w=480&q=70",
 };
 
 export default function StudentView({ tab }: { tab: string }) {
@@ -253,6 +251,8 @@ function CoursesTab() {
   const [chaptersByCourse, setChaptersByCourse] = useState<Record<string, DBChapter[]>>({});
   const [doneIds, setDoneIds] = useState<Set<string>>(new Set());
   const [liveNow, setLiveNow] = useState<{ id: string; title: string } | null>(null);
+  const [extraCourses, setExtraCourses] = useState<DBExtraCourse[]>([]);
+  const [myExtra, setMyExtra] = useState<DBExtraEnrollment[]>([]);
 
   useEffect(() => {
     if (!courses.length) return;
@@ -287,6 +287,9 @@ function CoursesTab() {
       setCourses(list);
       setChaptersByCourse(Object.fromEntries(chaptersEntries));
       setDoneIds(new Set(progList.map((p) => p.chapter_id)));
+      const [ex, mex] = await Promise.all([fetchExtraCourses(true), fetchMyEnrollments(user.id)]);
+      if (cancelled) return;
+      setExtraCourses(ex); setMyExtra(mex);
     })();
     return () => { cancelled = true; };
   }, [user]);
@@ -396,38 +399,46 @@ function CoursesTab() {
           })}
         </div>
 
-        {/* ── HORS CURSUS ── */}
+        {/* ── HORS CURSUS (réel) ── */}
         <div className="flex items-center justify-between mt-4 mb-2 pb-2 border-b border-border">
           <div className="flex items-center gap-2">
             <GraduationCap className="w-5 h-5 text-ink" strokeWidth={1.5} />
             <h2 className="text-xl font-light text-ink">Hors cursus</h2>
           </div>
-          <p className="text-[10px] text-subtle">Cours intermédiaires ouverts à tous, hors parcours académique</p>
+          <Link href="/etudiant/parascolaire" className="text-[10px] font-bold text-cama hover:underline">Tout voir →</Link>
         </div>
-        <div className="grid grid-cols-2 xl:grid-cols-3 gap-px bg-border border border-border">
-          {COURS_INTERMEDIAIRES.map((c) => (
-            <div key={c.slug} className="bg-white group cursor-pointer hover:bg-cama-50/30 transition-colors">
-              <div className="relative h-24 overflow-hidden">
-                <img src={HORS_CURSUS_IMG[c.slug]} alt={c.title}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
-                <span className={`absolute top-1.5 right-1.5 text-[9px] font-black px-1.5 py-0.5 ${
-                  c.gratuit ? "bg-green-600 text-white" : "bg-gold text-white"
-                }`}>
-                  {c.gratuit ? "GRATUIT" : formatFcfa(c.prix!)}
-                </span>
-                <span className="absolute bottom-1.5 left-1.5 text-[9px] font-bold text-white bg-black/50 px-1.5 py-0.5">{c.duree}</span>
-              </div>
-              <div className="p-2.5">
-                <h3 className="text-xs font-bold text-ink leading-snug group-hover:text-cama transition-colors">{c.emoji} {c.title}</h3>
-                <p className="text-[10px] text-muted leading-snug mt-0.5 line-clamp-2">{c.desc}</p>
-                <button className="mt-1.5 text-[10px] font-bold text-white bg-ink px-2 py-1 hover:bg-cama transition-colors">
-                  {c.gratuit ? "S'inscrire gratuitement" : "Souscrire"}
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
+        {extraCourses.length === 0 ? (
+          <div className="border border-border bg-white p-6 text-center">
+            <p className="text-xs text-muted">Aucun cours hors-cursus publié pour le moment.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 xl:grid-cols-3 gap-px bg-border border border-border">
+            {extraCourses.map((c) => {
+              const enrolled = myExtra.some((e) => e.extra_course_id === c.id);
+              const img = EXTRA_IMG[c.category] ?? EXTRA_IMG["Autre"];
+              return (
+                <div key={c.id} className="bg-white group cursor-pointer hover:bg-cama-50/30 transition-colors">
+                  <div className="relative h-24 overflow-hidden">
+                    <img src={img} alt={c.title}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
+                    <span className="absolute top-1.5 right-1.5 text-[9px] font-black px-1.5 py-0.5 text-white" style={{ background: c.color }}>{c.category}</span>
+                    <span className="absolute bottom-1.5 left-1.5 text-[9px] font-bold text-white bg-black/50 px-1.5 py-0.5">{c.sessions_count} séances · {MODE_LABEL[c.mode]}</span>
+                  </div>
+                  <div className="p-2.5">
+                    <h3 className="text-xs font-bold text-ink leading-snug group-hover:text-cama transition-colors">{c.title}</h3>
+                    <p className="text-[10px] text-muted leading-snug mt-0.5 line-clamp-2">{c.description}</p>
+                    <button
+                      onClick={async (e) => { e.preventDefault(); if (enrolled) await unenrollExtra(c.id, user!.id); else await enrollExtra(c.id, user!.id); const [ex2, mex2] = await Promise.all([fetchExtraCourses(true), fetchMyEnrollments(user!.id)]); setExtraCourses(ex2); setMyExtra(mex2); }}
+                      className={`mt-1.5 text-[10px] font-bold px-2 py-1 transition-colors ${enrolled ? "border border-green-500 text-green-600 bg-green-50" : "text-white bg-ink hover:bg-cama"}`}>
+                      {enrolled ? "Inscrit" : "S'inscrire"}
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* ── COL DROITE : Notifications + Prof IA + Agenda ── */}

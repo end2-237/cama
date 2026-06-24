@@ -6,7 +6,7 @@ import Link from "next/link";
 import {
   Grid3x3, Search, ChevronDown, Globe, HelpCircle,
   Bell, LogOut, User, Settings, Megaphone, X, FileText, Radio, AlertCircle,
-  CalendarDays, CalendarClock,
+  CalendarDays, CalendarClock, Sparkles, Award, ClipboardList, BookOpen, ShieldCheck,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import PersonalCalendarDrawer from "@/components/PersonalCalendarDrawer";
@@ -23,6 +23,7 @@ export default function DashNav({ activeTab, onTab, tabs }: DashNavProps) {
   const [profileOpen, setProfileOpen] = useState(false);
   const [commOpen, setCommOpen] = useState(false);
   const [calOpen, setCalOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
 
   const ADMIN_COMMS = [
     { icon: Megaphone, type: "Circulaire", color: "text-cama bg-cama/10", title: "Fermeture administrative — 14 juillet", body: "Les services administratifs seront fermés le 14 juillet. Les demandes urgentes sont à envoyer avant le 12 juillet.", time: "Il y a 1 jour" },
@@ -91,7 +92,7 @@ export default function DashNav({ activeTab, onTab, tabs }: DashNavProps) {
                 {t}
               </button>
             ))}
-            {/* Liens BD réels par rôle */}
+            {/* Admin: Programme + Utilisateurs inline, rest in "Plus" dropdown */}
             {user.role === "admin" && (
               <>
                 <Link href="/admin/programme"
@@ -102,18 +103,28 @@ export default function DashNav({ activeTab, onTab, tabs }: DashNavProps) {
                   className="px-3 h-16 flex items-center text-[13px] font-semibold border-b-2 border-transparent text-muted hover:text-cama transition-all duration-200 whitespace-nowrap">
                   Utilisateurs
                 </Link>
-                <Link href="/admin/hors-cursus"
-                  className="px-3 h-16 flex items-center text-[13px] font-semibold border-b-2 border-transparent text-muted hover:text-cama transition-all duration-200 whitespace-nowrap">
-                  Hors-cursus
-                </Link>
-                <Link href="/admin/certifications"
-                  className="px-3 h-16 flex items-center text-[13px] font-semibold border-b-2 border-transparent text-muted hover:text-cama transition-all duration-200 whitespace-nowrap">
-                  Certifications
-                </Link>
-                <Link href="/presences"
-                  className="px-3 h-16 flex items-center text-[13px] font-semibold border-b-2 border-transparent text-muted hover:text-cama transition-all duration-200 whitespace-nowrap">
-                  Présences
-                </Link>
+                <div className="relative">
+                  <button onClick={() => setMoreOpen(!moreOpen)}
+                    className={`px-3 h-16 flex items-center gap-1 text-[13px] font-semibold border-b-2 transition-all duration-200 whitespace-nowrap ${
+                      moreOpen ? "border-cama text-cama" : "border-transparent text-muted hover:text-ink"}`}>
+                    Plus <ChevronDown className={`w-3 h-3 transition-transform ${moreOpen ? "rotate-180" : ""}`} />
+                  </button>
+                  {moreOpen && (
+                    <div className="absolute left-0 top-full mt-0 w-56 bg-white rounded-xl border border-border shadow-xl overflow-hidden z-50 animate-scale-in">
+                      {[
+                        { href: "/admin/hors-cursus",    icon: Sparkles,      label: "Hors-cursus" },
+                        { href: "/admin/certifications", icon: Award,         label: "Certifications" },
+                        { href: "/presences",            icon: ClipboardList, label: "Présences" },
+                        { href: "/jury/deliberations",   icon: ShieldCheck,   label: "Délibérations" },
+                      ].map((l) => (
+                        <Link key={l.href} href={l.href} onClick={() => setMoreOpen(false)}
+                          className="flex items-center gap-3 px-4 py-3 text-sm text-ink hover:bg-surface transition-colors">
+                          <l.icon className="w-4 h-4 text-cama" /> {l.label}
+                        </Link>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </>
             )}
             {user.role === "enseignant" && (
@@ -122,14 +133,26 @@ export default function DashNav({ activeTab, onTab, tabs }: DashNavProps) {
                   className="px-3 h-16 flex items-center text-[13px] font-semibold border-b-2 border-transparent text-muted hover:text-cama transition-all duration-200 whitespace-nowrap">
                   Mes matières
                 </Link>
-                <Link href="/enseignant/examens"
-                  className="px-3 h-16 flex items-center text-[13px] font-semibold border-b-2 border-transparent text-muted hover:text-cama transition-all duration-200 whitespace-nowrap">
-                  Examens
-                </Link>
-                <Link href="/presences"
-                  className="px-3 h-16 flex items-center text-[13px] font-semibold border-b-2 border-transparent text-muted hover:text-cama transition-all duration-200 whitespace-nowrap">
-                  Présences
-                </Link>
+                <div className="relative">
+                  <button onClick={() => setMoreOpen(!moreOpen)}
+                    className={`px-3 h-16 flex items-center gap-1 text-[13px] font-semibold border-b-2 transition-all duration-200 whitespace-nowrap ${
+                      moreOpen ? "border-cama text-cama" : "border-transparent text-muted hover:text-ink"}`}>
+                    Plus <ChevronDown className={`w-3 h-3 transition-transform ${moreOpen ? "rotate-180" : ""}`} />
+                  </button>
+                  {moreOpen && (
+                    <div className="absolute left-0 top-full mt-0 w-52 bg-white rounded-xl border border-border shadow-xl overflow-hidden z-50 animate-scale-in">
+                      {[
+                        { href: "/enseignant/examens", icon: BookOpen,      label: "Examens" },
+                        { href: "/presences",          icon: ClipboardList, label: "Présences" },
+                      ].map((l) => (
+                        <Link key={l.href} href={l.href} onClick={() => setMoreOpen(false)}
+                          className="flex items-center gap-3 px-4 py-3 text-sm text-ink hover:bg-surface transition-colors">
+                          <l.icon className="w-4 h-4 text-cama" /> {l.label}
+                        </Link>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </>
             )}
             {user.role === "etudiant" && (
@@ -138,17 +161,29 @@ export default function DashNav({ activeTab, onTab, tabs }: DashNavProps) {
                   className="px-3 h-16 flex items-center text-[13px] font-semibold border-b-2 border-transparent text-muted hover:text-cama transition-all duration-200 whitespace-nowrap">
                   Mon programme
                 </Link>
-                <Link href="/etudiant/examens"
-                  className="px-3 h-16 flex items-center text-[13px] font-semibold border-b-2 border-transparent text-muted hover:text-cama transition-all duration-200 whitespace-nowrap">
-                  Examens
-                </Link>
-                <Link href="/etudiant/parascolaire"
-                  className="px-3 h-16 flex items-center text-[13px] font-semibold border-b-2 border-transparent text-muted hover:text-cama transition-all duration-200 whitespace-nowrap">
-                  Parascolaire
-                </Link>
+                <div className="relative">
+                  <button onClick={() => setMoreOpen(!moreOpen)}
+                    className={`px-3 h-16 flex items-center gap-1 text-[13px] font-semibold border-b-2 transition-all duration-200 whitespace-nowrap ${
+                      moreOpen ? "border-cama text-cama" : "border-transparent text-muted hover:text-ink"}`}>
+                    Plus <ChevronDown className={`w-3 h-3 transition-transform ${moreOpen ? "rotate-180" : ""}`} />
+                  </button>
+                  {moreOpen && (
+                    <div className="absolute left-0 top-full mt-0 w-52 bg-white rounded-xl border border-border shadow-xl overflow-hidden z-50 animate-scale-in">
+                      {[
+                        { href: "/etudiant/examens",       icon: BookOpen,      label: "Examens" },
+                        { href: "/etudiant/parascolaire",  icon: Sparkles,      label: "Parascolaire" },
+                      ].map((l) => (
+                        <Link key={l.href} href={l.href} onClick={() => setMoreOpen(false)}
+                          className="flex items-center gap-3 px-4 py-3 text-sm text-ink hover:bg-surface transition-colors">
+                          <l.icon className="w-4 h-4 text-cama" /> {l.label}
+                        </Link>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </>
             )}
-            {(user.role === "jury" || user.role === "admin") && (
+            {user.role === "jury" && (
               <Link href="/jury/deliberations"
                 className="px-3 h-16 flex items-center text-[13px] font-semibold border-b-2 border-transparent text-muted hover:text-cama transition-all duration-200 whitespace-nowrap">
                 Délibérations
