@@ -20,6 +20,11 @@ create table if not exists public.course_resources (
   created_by        uuid references public.users(id) on delete set null,
   created_at        timestamptz not null default now()
 );
+alter table public.course_resources add column if not exists program_course_id uuid;
+alter table public.course_resources add column if not exists kind    text not null default 'support';
+alter table public.course_resources add column if not exists title   text;
+alter table public.course_resources add column if not exists url     text;
+alter table public.course_resources add column if not exists size_mo numeric;
 create index if not exists idx_cr_course on public.course_resources(program_course_id);
 
 -- ════════════════════════════════════════════════════════════
@@ -36,6 +41,15 @@ create table if not exists public.calendar_events (
   created_by    uuid references public.users(id) on delete set null,
   created_at    timestamptz not null default now()
 );
+-- Réparation si une version antérieure de la table existe déjà
+alter table public.calendar_events add column if not exists date_label    text;
+alter table public.calendar_events add column if not exists sort_date     date;
+alter table public.calendar_events add column if not exists label         text;
+alter table public.calendar_events add column if not exists type          text not null default 'event';
+alter table public.calendar_events add column if not exists semester      int  not null default 1;
+alter table public.calendar_events add column if not exists academic_year text not null default '2025-2026';
+alter table public.calendar_events add column if not exists created_by    uuid;
+alter table public.calendar_events add column if not exists created_at    timestamptz not null default now();
 create index if not exists idx_ce_year on public.calendar_events(academic_year, semester);
 
 -- ════════════════════════════════════════════════════════════
@@ -63,6 +77,12 @@ create table if not exists public.extra_courses (
   created_by      uuid references public.users(id) on delete set null,
   created_at      timestamptz not null default now()
 );
+alter table public.extra_courses add column if not exists published boolean not null default false;
+alter table public.extra_courses add column if not exists mode      text not null default 'hybride';
+alter table public.extra_courses add column if not exists category  text not null default 'Soft skills';
+alter table public.extra_courses add column if not exists color     text not null default '#7C3AED';
+alter table public.extra_courses add column if not exists capacity  int not null default 30;
+alter table public.extra_courses add column if not exists sessions_count int not null default 8;
 create index if not exists idx_ec_published on public.extra_courses(published);
 
 -- Participants aux cours hors-cursus (progression + satisfaction)
@@ -76,6 +96,11 @@ create table if not exists public.extra_enrollments (
   enrolled_at     timestamptz not null default now(),
   unique (extra_course_id, student_id)
 );
+alter table public.extra_enrollments add column if not exists extra_course_id uuid;
+alter table public.extra_enrollments add column if not exists student_id   uuid;
+alter table public.extra_enrollments add column if not exists status       text not null default 'inscrit';
+alter table public.extra_enrollments add column if not exists progress     int not null default 0;
+alter table public.extra_enrollments add column if not exists satisfaction int;
 create index if not exists idx_ee_course  on public.extra_enrollments(extra_course_id);
 create index if not exists idx_ee_student on public.extra_enrollments(student_id);
 
@@ -96,6 +121,13 @@ create table if not exists public.attendance (
   created_at        timestamptz not null default now(),
   unique (program_course_id, student_id, session_date)
 );
+alter table public.attendance add column if not exists program_course_id uuid;
+alter table public.attendance add column if not exists session_id   uuid;
+alter table public.attendance add column if not exists student_id    uuid;
+alter table public.attendance add column if not exists session_date  date;
+alter table public.attendance add column if not exists present       boolean not null default false;
+alter table public.attendance add column if not exists cycle         text;
+alter table public.attendance add column if not exists mode          text;
 create index if not exists idx_att_course on public.attendance(program_course_id);
 create index if not exists idx_att_date   on public.attendance(session_date);
 
@@ -119,6 +151,14 @@ create table if not exists public.certifications (
   created_by      uuid references public.users(id) on delete set null,
   created_at      timestamptz not null default now()
 );
+alter table public.certifications add column if not exists published   boolean not null default false;
+alter table public.certifications add column if not exists provider    text not null default 'CAMA';
+alter table public.certifications add column if not exists level       text not null default 'Fondation';
+alter table public.certifications add column if not exists duration_h  int not null default 20;
+alter table public.certifications add column if not exists badge_color text not null default '#F59E0B';
+alter table public.certifications add column if not exists environment_url text;
+alter table public.certifications add column if not exists exam_fee    text;
+alter table public.certifications add column if not exists capacity    int;
 create index if not exists idx_cert_published on public.certifications(published);
 
 create table if not exists public.certification_enrollments (
@@ -132,6 +172,12 @@ create table if not exists public.certification_enrollments (
   completed_at     timestamptz,
   unique (certification_id, student_id)
 );
+alter table public.certification_enrollments add column if not exists certification_id uuid;
+alter table public.certification_enrollments add column if not exists student_id uuid;
+alter table public.certification_enrollments add column if not exists status     text not null default 'inscrit';
+alter table public.certification_enrollments add column if not exists progress   int not null default 0;
+alter table public.certification_enrollments add column if not exists score      text;
+alter table public.certification_enrollments add column if not exists completed_at timestamptz;
 create index if not exists idx_certenr_cert    on public.certification_enrollments(certification_id);
 create index if not exists idx_certenr_student on public.certification_enrollments(student_id);
 
