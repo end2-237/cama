@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { ChevronLeft, Radio, Circle, Users, CheckCircle2 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { fetchLive, setLiveStatus } from "@/lib/lives";
 import JitsiRoom from "@/components/JitsiRoom";
 
 export default function LiveRoom() {
@@ -24,6 +25,35 @@ export default function LiveRoom() {
     const t = setInterval(() => setElapsed((e) => e + 1), 1000);
     return () => clearInterval(t);
   }, []);
+
+  // Présence enseignant : entrée → live « en cours », sortie → « terminé ».
+  useEffect(() => {
+    if (loading || !user) return;
+    if (user.role !== "enseignant" && user.role !== "admin") return;
+    if (id === "demo") return;
+
+    let active = true;
+    let started = false;
+    const onUnload = () => { setLiveStatus(id, "termine").catch(() => {}); };
+
+    (async () => {
+      try {
+        const live = await fetchLive(id);
+        if (!live || !active) return;
+        started = true;
+        await setLiveStatus(id, "encours");
+        window.addEventListener("beforeunload", onUnload);
+      } catch {
+        // silencieux
+      }
+    })();
+
+    return () => {
+      active = false;
+      window.removeEventListener("beforeunload", onUnload);
+      if (started) setLiveStatus(id, "termine").catch(() => {});
+    };
+  }, [id, user, loading]);
 
   if (loading || !user) return (
     <div className="min-h-screen flex items-center justify-center bg-ink">

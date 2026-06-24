@@ -200,8 +200,37 @@ create table if not exists public.deliberations (
 create index if not exists idx_delib_student on public.deliberations(student_id);
 
 -- ════════════════════════════════════════════════════════════
+-- 9. LIVES — classes virtuelles (présence prof en temps réel)
+-- ════════════════════════════════════════════════════════════
+create table if not exists public.lives (
+  id                uuid primary key default gen_random_uuid(),
+  program_course_id uuid references public.program_courses(id) on delete cascade,
+  chapter_id        uuid,
+  title             text not null default 'Classe virtuelle',
+  status            text not null default 'planifie',   -- planifie|encours|termine
+  started_at        timestamptz,
+  ended_at          timestamptz,
+  created_by        uuid references public.users(id) on delete set null,
+  created_at        timestamptz not null default now()
+);
+create index if not exists idx_lives_course on public.lives(program_course_id);
+
+-- Realtime : diffuse les changements de statut aux étudiants connectés
+alter table public.lives replica identity full;
+do $$
+begin
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'lives'
+  ) then
+    alter publication supabase_realtime add table public.lives;
+  end if;
+end $$;
+
+-- ════════════════════════════════════════════════════════════
 -- RLS désactivée (prototype — clé anon en accès direct)
 -- ════════════════════════════════════════════════════════════
+alter table public.lives           disable row level security;
 alter table public.inscriptions    disable row level security;
 alter table public.program_courses disable row level security;
 alter table public.course_chapters disable row level security;

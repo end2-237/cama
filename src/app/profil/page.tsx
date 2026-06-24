@@ -12,37 +12,68 @@ import {
   BadgeCheck, BarChart2, Hash, Search,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
-import { useDB } from "@/hooks/useDB";
 import QrSvg from "@/components/QrSvg";
 import PersonalCalendarDrawer from "@/components/PersonalCalendarDrawer";
+import { fetchStudentProgram, fetchChapters, fetchProgress } from "@/lib/program";
+import { fetchAttemptsForStudent, fetchDeliberations, type DelibWithMeta } from "@/lib/exams";
+import type { DBProgramCourse, DBChapter, DBExamAttempt } from "@/lib/supabase";
 
 export default function ProfilePage() {
   const { user, loading } = useAuth();
-  const { db } = useDB();
   const router = useRouter();
   const [calOpen, setCalOpen] = useState(false);
   const [dataSaver, setDataSaver] = useState(true);
   const [notifEmail, setNotifEmail] = useState(true);
 
+  const [courses, setCourses] = useState<DBProgramCourse[]>([]);
+  const [chaptersByCourse, setChaptersByCourse] = useState<Record<string, DBChapter[]>>({});
+  const [doneIds, setDoneIds] = useState<Set<string>>(new Set());
+  const [attempts, setAttempts] = useState<DBExamAttempt[]>([]);
+  const [results, setResults] = useState<DelibWithMeta[]>([]);
+
   useEffect(() => {
     if (!loading && !user) router.replace("/auth/login");
   }, [loading, user, router]);
 
-  if (loading || !user || !db) {
+  useEffect(() => {
+    if (!user) return;
+    const slug = user.dossier?.parcoursSlug;
+    let cancelled = false;
+    (async () => {
+      const [progress, atts, delibs] = await Promise.all([
+        fetchProgress(user.id),
+        fetchAttemptsForStudent(user.id),
+        fetchDeliberations(),
+      ]);
+      if (cancelled) return;
+      setDoneIds(new Set(progress.map((p) => p.chapter_id)));
+      setAttempts(atts);
+      setResults(delibs.filter((d) => d.student_id === user.id));
+
+      if (!slug) return;
+      const progCourses = await fetchStudentProgram(slug);
+      if (cancelled) return;
+      setCourses(progCourses);
+      const chapterLists = await Promise.all(progCourses.map((c) => fetchChapters(c.id)));
+      if (cancelled) return;
+      const map: Record<string, DBChapter[]> = {};
+      progCourses.forEach((c, i) => { map[c.id] = chapterLists[i]; });
+      setChaptersByCourse(map);
+    })();
+    return () => { cancelled = true; };
+  }, [user]);
+
+  if (loading || !user) {
     return <div className="min-h-screen flex items-center justify-center">
       <div className="w-8 h-8 rounded-full border-4 border-cama border-t-transparent animate-spin" />
     </div>;
   }
 
-  /* Statistiques réelles depuis la DB */
-  const doneIds = new Set(db.progress.filter((p) => p.studentId === user.id).map((p) => p.chapterId));
-  const courses = db.courses.filter((c) => c.published);
-  const totalChapters = db.chapters.filter((c) => courses.some((x) => x.id === c.courseId)).length;
+  /* Statistiques réelles depuis Supabase */
+  const totalChapters = Object.values(chaptersByCourse).reduce((a, chs) => a + chs.length, 0);
   const pct = totalChapters ? Math.round((doneIds.size / totalChapters) * 100) : 0;
-  const results = db.results.filter((r) => r.studentId === user.id);
-  const validated = results.filter((r) => r.validatedByJury);
+  const validated = results.filter((r) => r.status === "valide");
   const ects = validated.reduce((a, r) => a + r.credits, 0);
-  const attempts = db.attempts.filter((a) => a.studentId === user.id);
   const alerts = attempts.reduce((a, x) => a + x.alerts.length, 0);
   const qrCode = `CAMA-${user.id.toUpperCase()}-2025`;
 
@@ -364,10 +395,9 @@ export default function ProfilePage() {
             </h2>
             <div className="border border-border divide-y divide-border">
               {courses.map((c) => {
-                const chs = db.chapters.filter((x) => x.courseId === c.id);
+                const chs = chaptersByCourse[c.id] ?? [];
                 const done = chs.filter((x) => doneIds.has(x.id)).length;
-                const p = chs.length ? Math.round((done / chs.length) * 100) : 0;
-                const ue = db.ues.find((u) => u.id === c.ueId);
+                const p = pct;
                 return (
                   <Link key={c.id} href={`/cours/${c.id}`} className="flex items-center gap-3 p-3 hover:bg-cama-50/40 transition-colors group">
                     <div className="w-8 h-8 bg-cama-50 flex items-center justify-center flex-shrink-0 group-hover:bg-cama transition-colors">
@@ -375,7 +405,7 @@ export default function ProfilePage() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-bold text-ink truncate group-hover:text-cama transition-colors">{c.title}</p>
-                      <p className="text-[10px] text-subtle">{ue?.code} · {done}/{chs.length} chapitres</p>
+                      <p className="text-[10px] text-subtle">{c.code} · {done}/{chs.length} chapitres</p>
                     </div>
                     <div className="w-20 h-1 bg-surface overflow-hidden flex-shrink-0">
                       <div className="h-full bg-gradient-to-r from-cama to-cama-400" style={{ width: `${p}%` }} />
@@ -394,15 +424,15 @@ export default function ProfilePage() {
             </h2>
             <div className="border border-border divide-y divide-border">
               {results.map((r) => {
-                const ue = db.ues.find((u) => u.id === r.ueId);
+                const note = r.note ?? 0;
                 return (
                   <div key={r.id} className="flex items-center gap-3 p-3">
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs font-bold text-ink truncate">{ue?.title}</p>
-                      <p className="text-[10px] text-subtle">{ue?.code} · {r.credits} ECTS</p>
+                      <p className="text-xs font-bold text-ink truncate">{r.course?.title}</p>
+                      <p className="text-[10px] text-subtle">{r.course?.code} · {r.credits} ECTS</p>
                     </div>
-                    <span className={`text-sm font-bold ${r.note >= 10 ? "text-green-600" : "text-red-500"}`}>{r.note}/20</span>
-                    {r.validatedByJury
+                    <span className={`text-sm font-bold ${note >= 10 ? "text-green-600" : "text-red-500"}`}>{note}/20</span>
+                    {r.status === "valide"
                       ? <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 bg-green-50 text-green-600"><CheckCircle2 className="w-2.5 h-2.5" /> Jury</span>
                       : <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 bg-gold/10 text-gold-dark"><Clock className="w-2.5 h-2.5" /> Délib.</span>}
                   </div>

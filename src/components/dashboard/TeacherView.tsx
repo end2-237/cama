@@ -15,6 +15,7 @@ import {
   createExam, setExamStatus, gradeAttempt,
 } from "@/lib/exams";
 import { fetchUsers } from "@/lib/admin";
+import { fetchLivesForCourses, subscribeLives } from "@/lib/lives";
 import type {
   DBProgramCourse, DBChapter, DBExam, DBExamAttempt, DBExamQuestion, DBUser, ExamStatus,
 } from "@/lib/supabase";
@@ -193,6 +194,25 @@ function CoursesTab() {
   const [attempts, setAttempts] = useState<DBExamAttempt[]>([]);
   const [users, setUsers] = useState<Map<string, DBUser>>(new Map());
   const [loaded, setLoaded] = useState(false);
+  const [liveNow, setLiveNow] = useState<{ id: string; title: string } | null>(null);
+
+  useEffect(() => {
+    if (!courses.length) return;
+    const ids = courses.map((c) => c.id);
+    let cancelled = false;
+    (async () => {
+      const list = await fetchLivesForCourses(ids);
+      if (cancelled) return;
+      const a = list.find((l) => l.status === "encours");
+      if (a) setLiveNow({ id: a.id, title: a.title });
+    })();
+    const unsub = subscribeLives((live) => {
+      if (!ids.includes(live.program_course_id ?? "")) return;
+      if (live.status === "encours") setLiveNow({ id: live.id, title: live.title });
+      else setLiveNow((prev) => (prev?.id === live.id ? null : prev));
+    });
+    return () => { cancelled = true; unsub(); };
+  }, [courses]);
 
   useEffect(() => {
     if (!user) return;
@@ -216,7 +236,6 @@ function CoursesTab() {
   if (!user) return null;
 
   const myCourses = courses;
-  const liveNow = null as { id: string; title: string } | null;
   const published = myCourses.filter((c) => c.published).length;
   const pending = attempts.filter((a) => a.status === "soumis").length;
   const totalStudents = new Set(attempts.map((a) => a.student_id)).size;

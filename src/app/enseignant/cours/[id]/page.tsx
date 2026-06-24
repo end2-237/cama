@@ -18,6 +18,7 @@ import {
   updateCourseContent, fetchSessions, upsertSession, deleteSession,
 } from "@/lib/program";
 import { DAYS, CYCLE_MODES, SESSION_KINDS } from "@/lib/scheduling";
+import { createLive, deleteLive } from "@/lib/lives";
 
 export default function CourseEditor() {
   const { id } = useParams<{ id: string }>();
@@ -153,6 +154,7 @@ export default function CourseEditor() {
 /* ════ Gestion des modes d'un chapitre ════ */
 function ChapterModes({ chapter, reload }: { chapter: DBChapter; reload: () => void }) {
   const ch = chapter;
+  const { user } = useAuth();
   const fileRef = useRef<HTMLInputElement>(null);
   const [videoTitle, setVideoTitle] = useState("");
   const [videoDur, setVideoDur] = useState("20");
@@ -247,8 +249,13 @@ function ChapterModes({ chapter, reload }: { chapter: DBChapter; reload: () => v
             <button
               onClick={async () => {
                 if (!liveTitle.trim()) return;
-                const newId = crypto.randomUUID();
-                await updateChapter(ch.id, { live_id: newId });
+                const liveId = await createLive({
+                  program_course_id: ch.program_course_id,
+                  chapter_id: ch.id,
+                  title: liveTitle.trim() || "Classe virtuelle",
+                  created_by: user?.id ?? null,
+                });
+                if (liveId) { await updateChapter(ch.id, { live_id: liveId }); }
                 setLiveTitle("");
                 reload();
               }}
@@ -275,7 +282,7 @@ function LiveStatus({ chapter, reload }: { chapter: DBChapter; reload: () => voi
         <Link href={`/live/${chapter.live_id}`} className="text-xs font-bold bg-cama text-white px-3 py-1.5 rounded-full hover:bg-cama-700 transition-colors">
           Entrer dans la salle
         </Link>
-        <button onClick={async () => { await updateChapter(chapter.id, { live_id: null }); reload(); }}
+        <button onClick={async () => { await deleteLive(chapter.live_id!); await updateChapter(chapter.id, { live_id: null }); reload(); }}
           className="text-subtle hover:text-red-500"><X className="w-4 h-4" /></button>
       </div>
     </div>

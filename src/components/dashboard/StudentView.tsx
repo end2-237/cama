@@ -11,6 +11,7 @@ import {
 import { useAuth } from "@/context/AuthContext";
 import { fetchStudentProgram, fetchChapters, fetchProgress } from "@/lib/program";
 import { fetchOpenExams, fetchAttemptsForStudent, fetchDeliberations } from "@/lib/exams";
+import { fetchLivesForCourses, subscribeLives } from "@/lib/lives";
 import type { DBProgramCourse, DBChapter, DBExam, DBExamAttempt } from "@/lib/supabase";
 import type { DelibWithMeta } from "@/lib/exams";
 import { COURS_INTERMEDIAIRES, formatFcfa } from "@/lib/parcours";
@@ -251,7 +252,25 @@ function CoursesTab() {
   const [courses, setCourses] = useState<DBProgramCourse[]>([]);
   const [chaptersByCourse, setChaptersByCourse] = useState<Record<string, DBChapter[]>>({});
   const [doneIds, setDoneIds] = useState<Set<string>>(new Set());
-  const liveNow = null;
+  const [liveNow, setLiveNow] = useState<{ id: string; title: string } | null>(null);
+
+  useEffect(() => {
+    if (!courses.length) return;
+    const ids = courses.map((c) => c.id);
+    let cancelled = false;
+    (async () => {
+      const list = await fetchLivesForCourses(ids);
+      if (cancelled) return;
+      const a = list.find((l) => l.status === "encours");
+      if (a) setLiveNow({ id: a.id, title: a.title });
+    })();
+    const unsub = subscribeLives((live) => {
+      if (!ids.includes(live.program_course_id ?? "")) return;
+      if (live.status === "encours") setLiveNow({ id: live.id, title: live.title });
+      else setLiveNow((prev) => (prev?.id === live.id ? null : prev));
+    });
+    return () => { cancelled = true; unsub(); };
+  }, [courses]);
 
   useEffect(() => {
     const slug = user?.dossier?.parcoursSlug;
@@ -306,7 +325,7 @@ function CoursesTab() {
 
         {/* Live en cours */}
         {liveNow && (
-          <Link href={`/live/${liveNow}`}
+          <Link href={`/live/${liveNow.id}`}
             className="flex items-center gap-3 p-3 mb-2 text-white hover:opacity-95 transition-opacity"
             style={{ background: "linear-gradient(90deg, #1E1B4B, #4F46E5)" }}>
             <div className="w-9 h-9 bg-red-500/20 flex items-center justify-center flex-shrink-0">
@@ -316,7 +335,7 @@ function CoursesTab() {
               <p className="text-[10px] text-red-300 font-bold flex items-center gap-1.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse" /> EN DIRECT MAINTENANT
               </p>
-              <p className="font-bold text-sm truncate"></p>
+              <p className="font-bold text-sm truncate">{liveNow.title}</p>
             </div>
             <span className="text-xs font-bold bg-gold text-white px-3 py-1.5 flex-shrink-0">Rejoindre</span>
           </Link>

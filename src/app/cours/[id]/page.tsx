@@ -17,6 +17,7 @@ import { useAuth } from "@/context/AuthContext";
 import { BlocNatif, DBChapter } from "@/lib/db";
 import { supabase } from "@/lib/supabase";
 import { fetchChapters, fetchProgress, markChapter } from "@/lib/program";
+import { fetchLivesForCourses, subscribeLives } from "@/lib/lives";
 
 interface CourseRow {
   id: string;
@@ -52,10 +53,29 @@ export default function CoursePlayer() {
   const [chapters, setChapters] = useState<DBChapter[]>([]);
   const [doneIds, setDoneIds] = useState<Set<string>>(new Set());
   const [, setLoaded] = useState(false);
+  const [liveNow, setLiveNow] = useState<string | null>(null);
 
   useEffect(() => {
     if (!loading && !user) router.replace("/auth/login");
   }, [loading, user, router]);
+
+  useEffect(() => {
+    if (!course?.id) return;
+    const courseId = course.id;
+    let cancelled = false;
+    (async () => {
+      const list = await fetchLivesForCourses([courseId]);
+      if (cancelled) return;
+      const active = list.find((l) => l.status === "encours");
+      setLiveNow(active?.id ?? null);
+    })();
+    const unsub = subscribeLives((live) => {
+      if (live.program_course_id !== courseId) return;
+      if (live.status === "encours") setLiveNow(live.id);
+      else setLiveNow((prev) => (prev === live.id ? null : prev));
+    });
+    return () => { cancelled = true; unsub(); };
+  }, [course?.id]);
 
   useEffect(() => {
     if (!id || !user) return;
@@ -146,6 +166,24 @@ export default function CoursePlayer() {
           </div>
         </div>
       </header>
+
+      {/* Live en cours */}
+      {liveNow && (
+        <Link href={`/live/${liveNow}`}
+          className="flex items-center gap-3 p-3 text-white hover:opacity-95 transition-opacity"
+          style={{ background: "linear-gradient(90deg, #1E1B4B, #4F46E5)" }}>
+          <div className="w-9 h-9 bg-red-500/20 flex items-center justify-center flex-shrink-0">
+            <Radio className="w-4 h-4 text-red-300 animate-pulse" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-[10px] text-red-300 font-bold flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse" /> EN DIRECT MAINTENANT
+            </p>
+            <p className="font-bold text-sm truncate">{course.title}</p>
+          </div>
+          <span className="text-xs font-bold bg-gold text-white px-3 py-1.5 flex-shrink-0">Rejoindre</span>
+        </Link>
+      )}
 
       {/* ── HERO ── */}
       <section className="relative overflow-hidden text-white"
