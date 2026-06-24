@@ -7,7 +7,11 @@ import {
   GraduationCap, CalendarClock, TrendingUp, AlertTriangle, ShieldCheck,
   MessageSquare, Plus, Sparkles,
 } from "lucide-react";
-import { useDB } from "@/hooks/useDB";
+import { useEffect, useState } from "react";
+import { supabase } from "@/lib/supabase";
+import type { DBProgramCourse, DBChapter, DBExam } from "@/lib/supabase";
+import { fetchChapters } from "@/lib/program";
+import { fetchExamsForCourses } from "@/lib/exams";
 
 interface Props {
   courseId: string | null;
@@ -22,15 +26,31 @@ function cohortOf(id: string) {
 }
 
 export default function TeacherCourseDrawer({ courseId, onClose }: Props) {
-  const { db, mutate } = useDB();
   const open = !!courseId;
 
-  const course = db?.courses.find((c) => c.id === courseId);
-  const ue = db?.ues.find((u) => u.id === course?.ueId);
-  const chapters = (db?.chapters.filter((c) => c.courseId === courseId) || []).sort((a, b) => a.order - b.order);
-  const lives = db?.lives.filter((l) => l.courseId === courseId) || [];
-  const exams = db?.exams.filter((e) => e.ueId === course?.ueId) || [];
-  const forumCount = db?.forum.filter((f) => f.ueId === course?.ueId).length || 0;
+  const [course, setCourse] = useState<DBProgramCourse | null>(null);
+  const [chapters, setChapters] = useState<DBChapter[]>([]);
+  const [exams, setExams] = useState<DBExam[]>([]);
+
+  useEffect(() => {
+    if (!courseId) return;
+    let active = true;
+    (async () => {
+      const [{ data: c }, chs, exs] = await Promise.all([
+        supabase.from("program_courses").select("*").eq("id", courseId).maybeSingle(),
+        fetchChapters(courseId),
+        fetchExamsForCourses([courseId]),
+      ]);
+      if (!active) return;
+      setCourse((c as DBProgramCourse) ?? null);
+      setChapters(chs);
+      setExams(exs);
+    })();
+    return () => { active = false; };
+  }, [courseId]);
+
+  const lives: { id: string; title: string; date: string; durationMin: number; status: string; participants: unknown[] }[] = [];
+  const forumCount = 0;
 
   const students = course ? cohortOf(course.id) : 0;
   const completion = 38 + (students % 40);            // taux moyen de complétion %
@@ -60,7 +80,7 @@ export default function TeacherCourseDrawer({ courseId, onClose }: Props) {
           open ? "translate-x-0" : "-translate-x-full"
         }`}>
 
-        {course && ue && (
+        {course && (
           <>
             {/* ── Header hero ── */}
             <div className="relative overflow-hidden text-white flex-shrink-0"
@@ -71,16 +91,16 @@ export default function TeacherCourseDrawer({ courseId, onClose }: Props) {
               <div className="relative px-5 sm:px-8 py-5 flex items-start gap-4">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-                    <span className="text-[10px] font-black uppercase tracking-widest bg-gold text-white px-2 py-0.5">{ue.code}</span>
-                    <span className="text-[10px] font-bold text-white/60">{ue.ects} ECTS · {ue.semestre}</span>
+                    <span className="text-[10px] font-black uppercase tracking-widest bg-gold text-white px-2 py-0.5">{course.code}</span>
+                    <span className="text-[10px] font-bold text-white/60">{course.ects} ECTS · {course.semestre}</span>
                     <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 ${course.published ? "bg-green-500/90" : "bg-white/15"}`}>
                       {course.published ? <><Eye className="w-3 h-3" /> Publié</> : <><EyeOff className="w-3 h-3" /> Brouillon</>}
                     </span>
-                    {course.profIA && <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-white/15 px-2 py-0.5"><Bot className="w-3 h-3 text-gold" /> Prof IA</span>}
+                    {course.prof_ia && <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-white/15 px-2 py-0.5"><Bot className="w-3 h-3 text-gold" /> Prof IA</span>}
                   </div>
                   <h2 className="text-xl sm:text-2xl font-bold leading-tight">{course.title}</h2>
                   <p className="text-xs text-white/70 mt-1 flex items-center gap-2 flex-wrap">
-                    <span className="flex items-center gap-1"><GraduationCap className="w-3 h-3" /> {ue.title}</span>
+                    <span className="flex items-center gap-1"><GraduationCap className="w-3 h-3" /> {course.title}</span>
                     <span className="text-white/30">·</span>
                     {chapters.length} chapitres
                     <span className="text-white/30">·</span>
@@ -112,7 +132,7 @@ export default function TeacherCourseDrawer({ courseId, onClose }: Props) {
                 {/* Description */}
                 <div className="px-5 sm:px-8 py-4 border-b border-border">
                   <p className="text-[9px] font-black text-subtle uppercase tracking-widest mb-2">Présentation du cours</p>
-                  <p className="text-sm text-muted leading-relaxed">{course.description || "Aucune description renseignée."}</p>
+                  <p className="text-sm text-muted leading-relaxed">{(course.description ?? "") || "Aucune description renseignée."}</p>
                 </div>
 
                 {/* Engagement cohorte */}
@@ -152,7 +172,7 @@ export default function TeacherCourseDrawer({ courseId, onClose }: Props) {
                       {chapters.map((c) => (
                         <div key={c.id} className="flex items-center gap-3 p-3">
                           <div className="w-7 h-7 flex items-center justify-center text-[11px] font-bold flex-shrink-0 bg-cama text-white">
-                            {c.order}
+                            {c.ordre}
                           </div>
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-semibold text-ink leading-snug">{c.title}</p>
@@ -160,8 +180,8 @@ export default function TeacherCourseDrawer({ courseId, onClose }: Props) {
                               {c.natif && <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 bg-cama-50 text-cama"><MonitorPlay className="w-2.5 h-2.5" /> Natif</span>}
                               {c.pdf && <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 bg-gold/10 text-gold-dark"><FileText className="w-2.5 h-2.5" /> PDF {c.pdf.sizeMo} Mo</span>}
                               {c.video && <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 bg-cama-50 text-cama"><Video className="w-2.5 h-2.5" /> {c.video.durationMin} min</span>}
-                              {c.liveId && <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 bg-red-50 text-red-500"><Radio className="w-2.5 h-2.5" /> Live</span>}
-                              {!c.natif && !c.pdf && !c.video && !c.liveId && <span className="text-[9px] text-subtle italic">Aucun mode — chapitre vide</span>}
+                              {c.live_id && <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 bg-red-50 text-red-500"><Radio className="w-2.5 h-2.5" /> Live</span>}
+                              {!c.natif && !c.pdf && !c.video && !c.live_id && <span className="text-[9px] text-subtle italic">Aucun mode — chapitre vide</span>}
                             </div>
                           </div>
                           <span className="text-[9px] text-subtle flex-shrink-0 flex items-center gap-1"><Clock className="w-3 h-3" /> ~25 min</span>
@@ -200,13 +220,12 @@ export default function TeacherCourseDrawer({ courseId, onClose }: Props) {
                     <p className="text-[9px] font-black text-subtle uppercase tracking-widest mb-3">Évaluations rattachées à l&apos;UE</p>
                     <div className="space-y-2">
                       {exams.map((e) => {
-                        const att = db?.attempts.filter((a) => a.examId === e.id).length || 0;
                         return (
                           <div key={e.id} className="flex items-center gap-3 p-3 border border-border bg-surface">
                             <ShieldCheck className={`w-4 h-4 flex-shrink-0 ${e.status === "ouvert" ? "text-cama" : "text-subtle"}`} />
                             <div className="flex-1 min-w-0">
                               <p className="text-xs font-bold text-ink truncate">{e.title}</p>
-                              <p className="text-[10px] text-muted">{e.durationMin} min · {e.questions.length} questions · {att} copie(s)</p>
+                              <p className="text-[10px] text-muted">{e.duration_min} min</p>
                             </div>
                             <span className={`text-[9px] font-bold px-2 py-0.5 ${e.status === "ouvert" ? "bg-green-50 text-green-600" : "bg-white text-muted border border-border"}`}>
                               {e.status === "ouvert" ? "Ouvert" : e.status === "planifie" ? "Planifié" : "Terminé"}
@@ -230,15 +249,23 @@ export default function TeacherCourseDrawer({ courseId, onClose }: Props) {
                   </Link>
                   <div className="grid grid-cols-2 gap-2">
                     <button
-                      onClick={() => mutate((d) => { const c = d.courses.find((x) => x.id === course.id); if (c) c.published = !c.published; })}
+                      onClick={async () => {
+                        const next = !course.published;
+                        setCourse({ ...course, published: next });
+                        await supabase.from("program_courses").update({ published: next }).eq("id", course.id);
+                      }}
                       className={`flex items-center justify-center gap-1.5 py-2.5 text-xs font-bold border-2 transition-all ${
                         course.published ? "border-green-500 bg-green-50 text-green-600" : "border-border text-muted hover:border-cama/40"}`}>
                       {course.published ? <><Eye className="w-3.5 h-3.5" /> Publié</> : <><EyeOff className="w-3.5 h-3.5" /> Publier</>}
                     </button>
                     <button
-                      onClick={() => mutate((d) => { const c = d.courses.find((x) => x.id === course.id); if (c) c.profIA = !c.profIA; })}
+                      onClick={async () => {
+                        const next = !course.prof_ia;
+                        setCourse({ ...course, prof_ia: next });
+                        await supabase.from("program_courses").update({ prof_ia: next }).eq("id", course.id);
+                      }}
                       className={`flex items-center justify-center gap-1.5 py-2.5 text-xs font-bold border-2 transition-all ${
-                        course.profIA ? "border-cama bg-cama-50 text-cama" : "border-border text-muted hover:border-cama/40"}`}>
+                        course.prof_ia ? "border-cama bg-cama-50 text-cama" : "border-border text-muted hover:border-cama/40"}`}>
                       <Bot className="w-3.5 h-3.5" /> Prof IA
                     </button>
                   </div>
@@ -249,9 +276,9 @@ export default function TeacherCourseDrawer({ courseId, onClose }: Props) {
                   <p className="text-[9px] font-black text-subtle uppercase tracking-widest mb-2">Fiche du cours</p>
                   <div className="space-y-2">
                     {[
-                      { icon: GraduationCap, k: "UE", v: `${ue.code} — ${ue.title}` },
-                      { icon: Award, k: "Crédits", v: `${ue.ects} ECTS` },
-                      { icon: CalendarClock, k: "Semestre", v: ue.semestre },
+                      { icon: GraduationCap, k: "UE", v: `${course.code} — ${course.title}` },
+                      { icon: Award, k: "Crédits", v: `${course.ects} ECTS` },
+                      { icon: CalendarClock, k: "Semestre", v: course.semestre },
                       { icon: Users, k: "Cohorte inscrite", v: `${students} étudiants` },
                       { icon: BarChart2, k: "Complétion moyenne", v: `${completion}%` },
                       { icon: Clock, k: "Charge estimée", v: `${chapters.length * 25} min + TD` },
@@ -305,7 +332,7 @@ export default function TeacherCourseDrawer({ courseId, onClose }: Props) {
                     {[
                       modeCount.natif < chapters.length ? "Ajouter un cours natif aux chapitres sans mode léger (bas débit)." : "Tous les chapitres ont un mode natif — excellent pour le bas débit.",
                       atRisk > 3 ? `${atRisk} étudiants à risque : planifier un live de remédiation.` : "Engagement sain : peu d'étudiants à risque.",
-                      !course.profIA ? "Activer le Prof IA pour un tutorat ancré sur vos ressources." : "Prof IA actif — pensez à enrichir les transcriptions.",
+                      !course.prof_ia ? "Activer le Prof IA pour un tutorat ancré sur vos ressources." : "Prof IA actif — pensez à enrichir les transcriptions.",
                     ].map((o, i) => (
                       <p key={i} className="flex items-start gap-2 text-[11px] text-muted">
                         <ChevronRight className="w-3 h-3 text-cama flex-shrink-0 mt-0.5" /> {o}

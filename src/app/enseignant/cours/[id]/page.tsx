@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import {
@@ -10,15 +10,21 @@ import {
   Target, CalendarClock, Clock, Send,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
-import { useDB } from "@/hooks/useDB";
-import { uid, BlocNatif, CycleMode, SessionKind, DBCourseDetails } from "@/lib/db";
+import { BlocNatif } from "@/lib/db";
+import { supabase } from "@/lib/supabase";
+import type { DBProgramCourse, DBChapter, DBSession, CycleMode, SessionKind } from "@/lib/supabase";
+import {
+  fetchChapters, addChapter as addChapterDB, updateChapter, deleteChapter,
+  updateCourseContent, fetchSessions, upsertSession, deleteSession,
+} from "@/lib/program";
 import { DAYS, CYCLE_MODES, SESSION_KINDS } from "@/lib/scheduling";
 
 export default function CourseEditor() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const { user, loading } = useAuth();
-  const { db, mutate } = useDB();
+  const [course, setCourse] = useState<DBProgramCourse | null>(null);
+  const [chapters, setChapters] = useState<DBChapter[]>([]);
   const [newChap, setNewChap] = useState("");
   const [editing, setEditing] = useState<string | null>(null);
 
@@ -26,22 +32,26 @@ export default function CourseEditor() {
     if (!loading && (!user || user.role !== "enseignant")) router.replace("/auth/login");
   }, [loading, user, router]);
 
-  const course = db?.courses.find((c) => c.id === id);
-  const ue = db?.ues.find((u) => u.id === course?.ueId);
-  const chapters = (db?.chapters.filter((c) => c.courseId === id) || []).sort((a, b) => a.order - b.order);
+  const reload = useCallback(async () => {
+    const { data } = await supabase.from("program_courses").select("*").eq("id", id).maybeSingle();
+    setCourse((data as DBProgramCourse) ?? null);
+    const chs = await fetchChapters(id);
+    setChapters(chs.sort((a, b) => a.ordre - b.ordre));
+  }, [id]);
 
-  if (!db || !user || !course) {
+  useEffect(() => { reload(); }, [reload]);
+
+  if (loading || !user || !course) {
     return <div className="min-h-screen flex items-center justify-center">
       <div className="w-8 h-8 rounded-full border-4 border-cama border-t-transparent animate-spin" />
     </div>;
   }
 
-  const addChapter = () => {
+  const addChap = async () => {
     if (!newChap.trim()) return;
-    mutate((d) => {
-      d.chapters.push({ id: uid("ch"), courseId: id, order: chapters.length + 1, title: newChap.trim() });
-    });
+    await addChapterDB(id, newChap.trim(), chapters.length + 1);
     setNewChap("");
+    reload();
   };
 
   return (
@@ -53,19 +63,19 @@ export default function CourseEditor() {
           </Link>
           <div className="w-px h-5 bg-border" />
           <div className="flex-1 min-w-0">
-            <p className="text-[10px] text-subtle">{ue?.code} · Éditeur de cours</p>
+            <p className="text-[10px] text-subtle">{course.code} · Éditeur de cours</p>
             <p className="text-sm font-bold text-ink truncate">{course.title}</p>
           </div>
           {/* Prof IA toggle */}
           <button
-            onClick={() => mutate((d) => { const c = d.courses.find((x) => x.id === id); if (c) c.profIA = !c.profIA; })}
+            onClick={async () => { await updateCourseContent(id, { prof_ia: !course.prof_ia }); reload(); }}
             className={`hidden sm:flex items-center gap-2 text-xs font-bold px-3 py-2 rounded-full border-2 transition-all ${
-              course.profIA ? "border-cama bg-cama-50 text-cama" : "border-border text-muted"}`}>
-            <Bot className="w-4 h-4" /> Prof IA {course.profIA ? "activé" : "désactivé"}
+              course.prof_ia ? "border-cama bg-cama-50 text-cama" : "border-border text-muted"}`}>
+            <Bot className="w-4 h-4" /> Prof IA {course.prof_ia ? "activé" : "désactivé"}
           </button>
           {/* Publication */}
           <button
-            onClick={() => mutate((d) => { const c = d.courses.find((x) => x.id === id); if (c) c.published = !c.published; })}
+            onClick={async () => { await updateCourseContent(id, { published: !course.published }); reload(); }}
             className={`flex items-center gap-2 text-xs font-bold px-4 py-2 rounded-full transition-all ${
               course.published ? "bg-green-500 text-white" : "bg-border text-muted hover:bg-cama hover:text-white"}`}>
             {course.published ? <><Eye className="w-4 h-4" /> Publié</> : <><EyeOff className="w-4 h-4" /> Brouillon</>}
@@ -83,35 +93,35 @@ export default function CourseEditor() {
             <div key={ch.id} className="bg-white rounded-2xl border border-border overflow-hidden">
               <div className="flex items-center gap-3 px-5 py-4">
                 <GripVertical className="w-4 h-4 text-subtle flex-shrink-0" />
-                <div className="w-7 h-7 rounded-full bg-cama text-white flex items-center justify-center text-xs font-bold flex-shrink-0">{ch.order}</div>
+                <div className="w-7 h-7 rounded-full bg-cama text-white flex items-center justify-center text-xs font-bold flex-shrink-0">{ch.ordre}</div>
                 <p className="font-bold text-ink flex-1 min-w-0 truncate">{ch.title}</p>
                 <div className="flex items-center gap-1.5">
                   {ch.pdf && <span className="badge bg-gold/10 text-gold-dark text-[10px]"><FileText className="w-3 h-3" /> PDF</span>}
                   {ch.video && <span className="badge bg-cama-50 text-cama text-[10px]"><Video className="w-3 h-3" /> Vidéo</span>}
                   {ch.natif && <span className="badge bg-cama-50 text-cama text-[10px]"><MonitorPlay className="w-3 h-3" /> Natif</span>}
-                  {ch.liveId && <span className="badge bg-red-50 text-red-500 text-[10px]"><Radio className="w-3 h-3" /> Live</span>}
+                  {ch.live_id && <span className="badge bg-red-50 text-red-500 text-[10px]"><Radio className="w-3 h-3" /> Live</span>}
                 </div>
                 <button onClick={() => setEditing(editing === ch.id ? null : ch.id)}
                   className={`text-xs font-bold px-3 py-1.5 rounded-full border-2 transition-all ${
                     editing === ch.id ? "border-cama bg-cama text-white" : "border-border text-muted hover:border-cama/40"}`}>
                   {editing === ch.id ? "Fermer" : "Gérer les modes"}
                 </button>
-                <button onClick={() => mutate((d) => { d.chapters = d.chapters.filter((c) => c.id !== ch.id); })}
+                <button onClick={async () => { await deleteChapter(ch.id); reload(); }}
                   className="p-1.5 text-subtle hover:text-red-500 transition-colors">
                   <Trash2 className="w-4 h-4" />
                 </button>
               </div>
-              {editing === ch.id && <ChapterModes chapterId={ch.id} />}
+              {editing === ch.id && <ChapterModes chapter={ch} reload={reload} />}
             </div>
           ))}
         </div>
 
         {/* Ajouter chapitre */}
         <div className="mt-6 bg-white rounded-2xl border-2 border-dashed border-border p-5 flex gap-3">
-          <input value={newChap} onChange={(e) => setNewChap(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addChapter()}
+          <input value={newChap} onChange={(e) => setNewChap(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addChap()}
             placeholder="Titre du nouveau chapitre…"
             className="flex-1 text-sm outline-none text-ink placeholder-subtle min-w-0" />
-          <button onClick={addChapter} className="btn-primary gap-2 py-2 px-5 text-sm">
+          <button onClick={addChap} className="btn-primary gap-2 py-2 px-5 text-sm">
             <Plus className="w-4 h-4" /> Ajouter le chapitre
           </button>
         </div>
@@ -124,7 +134,7 @@ export default function CourseEditor() {
             <p className="text-xs text-muted">Ces informations s&apos;affichent dans la fiche détaillée côté étudiant.</p>
           </div>
         </div>
-        <CourseDetailsEditor courseId={id} />
+        <CourseDetailsEditor course={course} reload={reload} />
 
         {/* ── Planification proposée ── */}
         <div className="mt-10 flex items-center gap-3 mb-4">
@@ -134,22 +144,20 @@ export default function CourseEditor() {
             <p className="text-xs text-muted">Proposez vos séances : l&apos;administration les valide et les planifie pour les étudiants.</p>
           </div>
         </div>
-        <SessionPlanner courseId={id} teacherId={user.id} ueId={course.ueId} />
+        <SessionPlanner courseId={id} teacherId={user.id} courseTitle={course.title} />
       </main>
     </div>
   );
 }
 
 /* ════ Gestion des modes d'un chapitre ════ */
-function ChapterModes({ chapterId }: { chapterId: string }) {
-  const { db, mutate } = useDB();
-  const ch = db?.chapters.find((c) => c.id === chapterId);
+function ChapterModes({ chapter, reload }: { chapter: DBChapter; reload: () => void }) {
+  const ch = chapter;
   const fileRef = useRef<HTMLInputElement>(null);
   const [videoTitle, setVideoTitle] = useState("");
   const [videoDur, setVideoDur] = useState("20");
   const [liveTitle, setLiveTitle] = useState("");
   const [liveDate, setLiveDate]   = useState("");
-  if (!ch) return null;
 
   return (
     <div className="border-t border-border bg-surface p-5 grid md:grid-cols-2 gap-4 animate-fade-up">
@@ -163,19 +171,17 @@ function ChapterModes({ chapterId }: { chapterId: string }) {
               <p className="text-xs font-semibold text-ink truncate">{ch.pdf.name}</p>
               <p className="text-[10px] text-muted">{ch.pdf.sizeMo} Mo · {ch.pdf.pages} pages · compressé + vignette générée</p>
             </div>
-            <button onClick={() => mutate((d) => { const c = d.chapters.find((x) => x.id === chapterId); if (c) delete c.pdf; })}
+            <button onClick={async () => { await updateChapter(ch.id, { pdf: null }); reload(); }}
               className="text-subtle hover:text-red-500"><X className="w-4 h-4" /></button>
           </div>
         ) : (
           <>
             <input ref={fileRef} type="file" accept=".pdf" className="hidden"
-              onChange={(e) => {
+              onChange={async (e) => {
                 const f = e.target.files?.[0];
                 if (!f) return;
-                mutate((d) => {
-                  const c = d.chapters.find((x) => x.id === chapterId);
-                  if (c) c.pdf = { name: f.name, sizeMo: Math.max(0.1, Math.round((f.size / 1048576) * 10) / 10), pages: 10 + Math.floor(Math.random() * 20) };
-                });
+                await updateChapter(ch.id, { pdf: { name: f.name, sizeMo: Math.max(0.1, Math.round((f.size / 1048576) * 10) / 10), pages: 10 + Math.floor(Math.random() * 20) } });
+                reload();
               }} />
             <button onClick={() => fileRef.current?.click()}
               className="w-full border-2 border-dashed border-border rounded-lg py-4 text-xs text-muted hover:border-cama/40 hover:text-cama transition-all flex items-center justify-center gap-2">
@@ -194,7 +200,7 @@ function ChapterModes({ chapterId }: { chapterId: string }) {
               <p className="text-xs font-semibold text-ink truncate">{ch.video.title}</p>
               <p className="text-[10px] text-muted">{ch.video.durationMin} min · transcodé 240p→720p · transcription IA générée</p>
             </div>
-            <button onClick={() => mutate((d) => { const c = d.chapters.find((x) => x.id === chapterId); if (c) delete c.video; })}
+            <button onClick={async () => { await updateChapter(ch.id, { video: null }); reload(); }}
               className="text-subtle hover:text-red-500"><X className="w-4 h-4" /></button>
           </div>
         ) : (
@@ -205,15 +211,13 @@ function ChapterModes({ chapterId }: { chapterId: string }) {
               <input value={videoDur} onChange={(e) => setVideoDur(e.target.value)} type="number" min="1" placeholder="Durée (min)"
                 className="w-24 text-xs border border-border rounded-lg px-3 py-2 outline-none focus:border-cama" />
               <button
-                onClick={() => {
+                onClick={async () => {
                   if (!videoTitle.trim()) return;
-                  mutate((d) => {
-                    const c = d.chapters.find((x) => x.id === chapterId);
-                    if (c) c.video = { title: videoTitle.trim(), durationMin: parseInt(videoDur) || 20,
-                      sizeMo: (parseInt(videoDur) || 20) * 4,
-                      transcript: `Transcription automatique (IA) de « ${videoTitle.trim()} » : le contenu intégral de la vidéo est restitué en texte pour permettre l'apprentissage sans téléchargement — un atout majeur en bas-débit.` };
-                  });
+                  await updateChapter(ch.id, { video: { title: videoTitle.trim(), durationMin: parseInt(videoDur) || 20,
+                    sizeMo: (parseInt(videoDur) || 20) * 4,
+                    transcript: `Transcription automatique (IA) de « ${videoTitle.trim()} » : le contenu intégral de la vidéo est restitué en texte pour permettre l'apprentissage sans téléchargement — un atout majeur en bas-débit.` } });
                   setVideoTitle("");
+                  reload();
                 }}
                 className="flex-1 btn-primary py-2 text-xs justify-center gap-1.5">
                 <Upload className="w-3.5 h-3.5" /> Uploader (transcodage auto)
@@ -226,14 +230,14 @@ function ChapterModes({ chapterId }: { chapterId: string }) {
       {/* ── Mode 3 : Cours natif ── */}
       <div className="bg-white rounded-xl border border-border p-4 md:col-span-2">
         <p className="text-xs font-bold text-ink flex items-center gap-2 mb-3"><MonitorPlay className="w-4 h-4 text-cama" /> Mode 3 — Cours interactif natif (éditeur intégré)</p>
-        <NatifEditor chapterId={chapterId} />
+        <NatifEditor chapter={ch} reload={reload} />
       </div>
 
       {/* ── Mode 4 : Live ── */}
       <div className="bg-white rounded-xl border border-border p-4 md:col-span-2">
         <p className="text-xs font-bold text-ink flex items-center gap-2 mb-3"><Radio className="w-4 h-4 text-red-500" /> Mode 4 — Classe virtuelle en direct</p>
-        {ch.liveId ? (
-          <LiveStatus liveId={ch.liveId} chapterId={chapterId} />
+        {ch.live_id ? (
+          <LiveStatus chapter={ch} reload={reload} />
         ) : (
           <div className="flex flex-wrap gap-2">
             <input value={liveTitle} onChange={(e) => setLiveTitle(e.target.value)} placeholder="Titre de la séance"
@@ -241,17 +245,12 @@ function ChapterModes({ chapterId }: { chapterId: string }) {
             <input value={liveDate} onChange={(e) => setLiveDate(e.target.value)} type="datetime-local"
               className="text-xs border border-border rounded-lg px-3 py-2 outline-none focus:border-cama" />
             <button
-              onClick={() => {
+              onClick={async () => {
                 if (!liveTitle.trim()) return;
-                mutate((d) => {
-                  const liveId = uid("l");
-                  d.lives.push({ id: liveId, courseId: ch.courseId, title: liveTitle.trim(),
-                    date: liveDate ? new Date(liveDate).toISOString() : new Date(Date.now() + 3600000).toISOString(),
-                    durationMin: 60, status: "planifie", replayPublie: false, participants: [] });
-                  const c = d.chapters.find((x) => x.id === chapterId);
-                  if (c) c.liveId = liveId;
-                });
+                const newId = crypto.randomUUID();
+                await updateChapter(ch.id, { live_id: newId });
                 setLiveTitle("");
+                reload();
               }}
               className="btn-primary py-2 px-4 text-xs gap-1.5">
               <Calendar className="w-3.5 h-3.5" /> Planifier
@@ -264,36 +263,19 @@ function ChapterModes({ chapterId }: { chapterId: string }) {
   );
 }
 
-function LiveStatus({ liveId, chapterId }: { liveId: string; chapterId: string }) {
-  const { db, mutate } = useDB();
-  const live = db?.lives.find((l) => l.id === liveId);
-  if (!live) return null;
+function LiveStatus({ chapter, reload }: { chapter: DBChapter; reload: () => void }) {
+  if (!chapter.live_id) return null;
   return (
     <div className="flex items-center justify-between bg-red-50/60 border border-red-100 rounded-lg px-3 py-2.5 flex-wrap gap-2">
       <div className="min-w-0">
-        <p className="text-xs font-semibold text-ink">{live.title}</p>
-        <p className="text-[10px] text-muted">
-          {new Date(live.date).toLocaleString("fr-FR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })} · {live.durationMin} min ·{" "}
-          <span className={live.status === "encours" ? "text-red-500 font-bold" : ""}>{live.status === "encours" ? "EN DIRECT" : live.status === "termine" ? "Terminé (replay publié)" : "Planifié"}</span>
-        </p>
+        <p className="text-xs font-semibold text-ink">Classe virtuelle programmée</p>
+        <p className="text-[10px] text-muted">Salle de classe virtuelle prête</p>
       </div>
       <div className="flex items-center gap-2">
-        {live.status === "planifie" && (
-          <button onClick={() => mutate((d) => { const l = d.lives.find((x) => x.id === liveId); if (l) l.status = "encours"; })}
-            className="text-xs font-bold bg-red-500 text-white px-3 py-1.5 rounded-full hover:bg-red-600 transition-colors">
-            Démarrer maintenant
-          </button>
-        )}
-        {live.status === "encours" && (
-          <Link href={`/live/${liveId}`} className="text-xs font-bold bg-cama text-white px-3 py-1.5 rounded-full hover:bg-cama-700 transition-colors">
-            Entrer dans la salle
-          </Link>
-        )}
-        <button onClick={() => mutate((d) => {
-            d.lives = d.lives.filter((l) => l.id !== liveId);
-            const c = d.chapters.find((x) => x.id === chapterId);
-            if (c) delete c.liveId;
-          })}
+        <Link href={`/live/${chapter.live_id}`} className="text-xs font-bold bg-cama text-white px-3 py-1.5 rounded-full hover:bg-cama-700 transition-colors">
+          Entrer dans la salle
+        </Link>
+        <button onClick={async () => { await updateChapter(chapter.id, { live_id: null }); reload(); }}
           className="text-subtle hover:text-red-500"><X className="w-4 h-4" /></button>
       </div>
     </div>
@@ -301,16 +283,14 @@ function LiveStatus({ liveId, chapterId }: { liveId: string; chapterId: string }
 }
 
 /* ════ Éditeur de cours natif (blocs) ════ */
-function NatifEditor({ chapterId }: { chapterId: string }) {
-  const { db, mutate } = useDB();
-  const ch = db?.chapters.find((c) => c.id === chapterId);
-  const blocks = ch?.natif?.blocks || [];
+function NatifEditor({ chapter, reload }: { chapter: DBChapter; reload: () => void }) {
+  const blocks = (chapter.natif?.blocks as BlocNatif[]) ?? [];
   const [text, setText] = useState("");
   const [kind, setKind] = useState<"titre" | "texte" | "point" | "quiz">("texte");
   const [qOpts, setQOpts] = useState(["", "", ""]);
   const [qGood, setQGood] = useState(0);
 
-  const addBlock = () => {
+  const addBlock = async () => {
     if (!text.trim()) return;
     let b: BlocNatif;
     if (kind === "quiz") {
@@ -320,13 +300,16 @@ function NatifEditor({ chapterId }: { chapterId: string }) {
     } else {
       b = { type: kind, text: text.trim() } as BlocNatif;
     }
-    mutate((d) => {
-      const c = d.chapters.find((x) => x.id === chapterId);
-      if (!c) return;
-      if (!c.natif) c.natif = { blocks: [] };
-      c.natif.blocks.push(b);
-    });
+    const newBlocks = [...blocks, b];
+    await updateChapter(chapter.id, { natif: { blocks: newBlocks } });
     setText(""); setQOpts(["", "", ""]);
+    reload();
+  };
+
+  const deleteBlock = async (i: number) => {
+    const newBlocks = blocks.filter((_, j) => j !== i);
+    await updateChapter(chapter.id, { natif: { blocks: newBlocks } });
+    reload();
   };
 
   return (
@@ -339,10 +322,7 @@ function NatifEditor({ chapterId }: { chapterId: string }) {
                 {b.type}
               </span>
               <p className="text-xs text-muted truncate flex-1">{"text" in b ? b.text : b.type === "quiz" ? b.question : ""}</p>
-              <button onClick={() => mutate((d) => {
-                  const c = d.chapters.find((x) => x.id === chapterId);
-                  if (c?.natif) c.natif.blocks.splice(i, 1);
-                })}
+              <button onClick={() => deleteBlock(i)}
                 className="text-subtle hover:text-red-500 flex-shrink-0"><X className="w-3.5 h-3.5" /></button>
             </div>
           ))}
@@ -385,34 +365,26 @@ function NatifEditor({ chapterId }: { chapterId: string }) {
 }
 
 /* ════ Éditeur de fiche pédagogique ════ */
-function CourseDetailsEditor({ courseId }: { courseId: string }) {
-  const { db, mutate } = useDB();
-  const course = db?.courses.find((c) => c.id === courseId);
-  const d = course?.details;
-  const [objectives, setObjectives] = useState((d?.objectives || []).join("\n"));
-  const [competences, setCompetences] = useState((d?.competences || []).join(", "));
-  const [prerequis, setPrerequis] = useState(d?.prerequis || "");
-  const [audience, setAudience] = useState(d?.audience || "");
-  const [evaluation, setEvaluation] = useState(d?.evaluation || "");
-  const [volume, setVolume] = useState(d?.volume || "");
-  const [difficulte, setDifficulte] = useState<DBCourseDetails["difficulte"]>(d?.difficulte || "Intermédiaire");
+function CourseDetailsEditor({ course, reload }: { course: DBProgramCourse; reload: () => void }) {
+  const [objectives, setObjectives] = useState((course.objectives || []).join("\n"));
+  const [competences, setCompetences] = useState((course.competences || []).join(", "));
+  const [prerequis, setPrerequis] = useState(course.prerequis || "");
+  const [audience, setAudience] = useState(course.audience || "");
+  const [evaluation, setEvaluation] = useState(course.evaluation || "");
+  const [volume, setVolume] = useState("");
+  const [difficulte, setDifficulte] = useState(course.difficulte || "Intermédiaire");
   const [saved, setSaved] = useState(false);
-  if (!course) return null;
 
-  const save = () => {
-    mutate((db2) => {
-      const c = db2.courses.find((x) => x.id === courseId);
-      if (!c) return;
-      c.details = {
-        objectives: objectives.split("\n").map((s) => s.trim()).filter(Boolean),
-        competences: competences.split(",").map((s) => s.trim()).filter(Boolean),
-        prerequis: prerequis.trim() || undefined,
-        audience: audience.trim() || undefined,
-        evaluation: evaluation.trim() || undefined,
-        volume: volume.trim() || undefined,
-        difficulte,
-      };
+  const save = async () => {
+    await updateCourseContent(course.id, {
+      objectives: objectives.split("\n").map((s) => s.trim()).filter(Boolean),
+      competences: competences.split(",").map((s) => s.trim()).filter(Boolean),
+      prerequis: prerequis.trim() || null,
+      audience: audience.trim() || null,
+      evaluation: evaluation.trim() || null,
+      difficulte,
     });
+    reload();
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   };
@@ -448,7 +420,7 @@ function CourseDetailsEditor({ courseId }: { courseId: string }) {
       </div>
       <div>
         <label className="text-xs font-bold text-ink mb-1.5 block">Difficulté</label>
-        <select value={difficulte} onChange={(e) => setDifficulte(e.target.value as DBCourseDetails["difficulte"])} className={`${field} bg-white`}>
+        <select value={difficulte} onChange={(e) => setDifficulte(e.target.value)} className={`${field} bg-white`}>
           <option>Débutant</option><option>Intermédiaire</option><option>Avancé</option>
         </select>
       </div>
@@ -463,34 +435,36 @@ function CourseDetailsEditor({ courseId }: { courseId: string }) {
 }
 
 /* ════ Planificateur de séances (propositions) ════ */
-function SessionPlanner({ courseId, teacherId, ueId }: { courseId: string; teacherId: string; ueId: string }) {
-  const { db, mutate } = useDB();
-  const course = db?.courses.find((c) => c.id === courseId);
-  const sessions = (db?.sessions || []).filter((s) => s.courseId === courseId);
+function SessionPlanner({ courseId, teacherId, courseTitle }: { courseId: string; teacherId: string; courseTitle: string }) {
+  const [sessions, setSessions] = useState<DBSession[]>([]);
   const [day, setDay] = useState<string>(DAYS[0]);
   const [start, setStart] = useState("08h00");
   const [end, setEnd] = useState("10h00");
   const [kind, setKind] = useState<SessionKind>("campus");
   const [room, setRoom] = useState("");
   const [modes, setModes] = useState<CycleMode[]>(["presentiel"]);
-  if (!course) return null;
+
+  const reloadSessions = useCallback(async () => {
+    setSessions(await fetchSessions([courseId]));
+  }, [courseId]);
+
+  useEffect(() => { reloadSessions(); }, [reloadSessions]);
 
   const toggleMode = (m: CycleMode) => setModes((arr) => arr.includes(m) ? arr.filter((x) => x !== m) : [...arr, m]);
 
-  const propose = () => {
+  const propose = async () => {
     if (modes.length === 0) return;
-    mutate((db2) => {
-      db2.sessions.push({
-        id: uid("s"), courseId, ueId, title: course.title,
-        day, start: start.trim(), end: kind === "async" ? "" : end.trim(),
-        kind, room: room.trim() || undefined, modes,
-        proposedBy: teacherId, status: "propose", semester: "S4",
-      });
+    await upsertSession({
+      program_course_id: courseId, title: courseTitle,
+      day, start_time: start.trim(), end_time: kind === "async" ? null : end.trim(),
+      kind, room: room.trim() || null, modes,
+      proposed_by: teacherId, status: "propose", semestre: "S4",
     });
     setRoom("");
+    reloadSessions();
   };
 
-  const remove = (sid: string) => mutate((db2) => { db2.sessions = db2.sessions.filter((s) => s.id !== sid); });
+  const remove = async (sid: string) => { await deleteSession(sid); reloadSessions(); };
 
   const STATUS = {
     propose: { label: "En attente de validation", cls: "bg-gold/10 text-gold-dark" },
@@ -560,7 +534,7 @@ function SessionPlanner({ courseId, teacherId, ueId }: { courseId: string; teach
               <span className={`text-[9px] font-bold px-1.5 py-0.5 border flex-shrink-0 ${k.color}`}>{k.label}</span>
               <div className="flex-1 min-w-[160px]">
                 <p className="text-sm font-semibold text-ink flex items-center gap-2">
-                  <Clock className="w-3.5 h-3.5 text-subtle" /> {s.day} · {s.end ? `${s.start} – ${s.end}` : s.start}
+                  <Clock className="w-3.5 h-3.5 text-subtle" /> {s.day} · {s.end_time ? `${s.start_time} – ${s.end_time}` : s.start_time}
                   {s.room && <span className="text-[11px] text-muted font-normal">· {s.room}</span>}
                 </p>
                 <div className="flex items-center gap-1 mt-1 flex-wrap">

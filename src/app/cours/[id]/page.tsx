@@ -14,8 +14,20 @@ import {
   Search, Filter, ChevronUp, BookOpen, X as XIcon,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
-import { useDB } from "@/hooks/useDB";
-import { uid, BlocNatif, DBChapter } from "@/lib/db";
+import { BlocNatif, DBChapter } from "@/lib/db";
+import { supabase } from "@/lib/supabase";
+import { fetchChapters, fetchProgress, markChapter } from "@/lib/program";
+
+interface CourseRow {
+  id: string;
+  code: string;
+  title: string;
+  ects: number;
+  semestre: string;
+  prof_ia: boolean;
+  description: string | null;
+  objectives: string | null;
+}
 
 type Mode = "pdf" | "video" | "natif" | "live" | "ia";
 
@@ -31,30 +43,55 @@ export default function CoursePlayer() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const { user, loading } = useAuth();
-  const { db, mutate } = useDB();
 
   const [chapIdx, setChapIdx] = useState(0);
   const [mode, setMode] = useState<Mode>("natif");
   const [searchOpen, setSearchOpen] = useState(false);
 
+  const [course, setCourse] = useState<CourseRow | null>(null);
+  const [chapters, setChapters] = useState<DBChapter[]>([]);
+  const [doneIds, setDoneIds] = useState<Set<string>>(new Set());
+  const [, setLoaded] = useState(false);
+
   useEffect(() => {
     if (!loading && !user) router.replace("/auth/login");
   }, [loading, user, router]);
 
-  const course   = db?.courses.find((c) => c.id === id);
-  const chapters = useMemo(
-    () => (db?.chapters.filter((c) => c.courseId === id) || []).sort((a, b) => a.order - b.order),
-    [db, id]
-  );
-  const ue = db?.ues.find((u) => u.id === course?.ueId);
+  useEffect(() => {
+    if (!id || !user) return;
+    let cancelled = false;
+    (async () => {
+      const [{ data: courseRow }, supaChapters, progress] = await Promise.all([
+        supabase.from("program_courses").select("*").eq("id", id).maybeSingle(),
+        fetchChapters(id),
+        fetchProgress(user.id),
+      ]);
+      if (cancelled) return;
+      setCourse((courseRow as CourseRow) ?? null);
+      setChapters(
+        supaChapters.map((c) => ({
+          id: c.id,
+          courseId: c.program_course_id,
+          order: c.ordre,
+          title: c.title,
+          pdf: c.pdf ?? undefined,
+          video: c.video ?? undefined,
+          natif: (c.natif as { blocks: BlocNatif[] } | null) ?? undefined,
+          liveId: c.live_id ?? undefined,
+        }))
+      );
+      setDoneIds(new Set(progress.map((p) => p.chapter_id)));
+      setLoaded(true);
+    })();
+    return () => { cancelled = true; };
+  }, [id, user]);
 
-  if (!db || !user || !course) {
+  if (loading || !user || !course) {
     return <div className="min-h-screen flex items-center justify-center">
       <div className="w-8 h-8 rounded-full border-4 border-cama border-t-transparent animate-spin" />
     </div>;
   }
 
-  const doneIds = new Set(db.progress.filter((p) => p.studentId === user.id).map((p) => p.chapterId));
   const chapter = chapters[chapIdx];
   /* Un chapitre est débloqué si le précédent est validé (checkpoint) */
   const unlocked = (i: number) => i === 0 || doneIds.has(chapters[i - 1].id);
@@ -65,14 +102,13 @@ export default function CoursePlayer() {
   if (chapter?.pdf)   availModes.push("pdf");
   if (chapter?.video) availModes.push("video");
   if (chapter?.liveId) availModes.push("live");
-  if (course.profIA)  availModes.push("ia");
+  if (course.prof_ia)  availModes.push("ia");
   const activeMode: Mode = availModes.includes(mode) ? mode : availModes[0] || "natif";
 
-  const validateChapter = () => {
+  const validateChapter = async () => {
     if (doneIds.has(chapter.id)) return;
-    mutate((d) => {
-      d.progress.push({ studentId: user.id, chapterId: chapter.id, doneAt: new Date().toISOString() });
-    });
+    await markChapter(user.id, chapter.id, true);
+    setDoneIds((prev) => new Set(prev).add(chapter.id));
   };
 
   const doneCount = chapters.filter((c) => doneIds.has(c.id)).length;
@@ -128,8 +164,8 @@ export default function CoursePlayer() {
         <div className="relative max-w-[1400px] mx-auto px-4 sm:px-6 py-8 flex flex-wrap items-end gap-6">
           <div className="flex-1 min-w-[280px]">
             <div className="flex items-center gap-2 mb-2">
-              <span className="text-[10px] font-black uppercase tracking-widest bg-gold text-white px-2 py-0.5">{ue?.code}</span>
-              <span className="text-[10px] font-bold text-white/60">{ue?.ects} ECTS · {ue?.semestre}</span>
+              <span className="text-[10px] font-black uppercase tracking-widest bg-gold text-white px-2 py-0.5">{course.code}</span>
+              <span className="text-[10px] font-bold text-white/60">{course.ects} ECTS · {course.semestre}</span>
             </div>
             <h1 className="text-2xl sm:text-3xl font-bold leading-tight mb-2">{course.title}</h1>
             <div className="flex items-center gap-2 text-xs text-white/70">
@@ -139,7 +175,7 @@ export default function CoursePlayer() {
               {chapters.length} chapitres
               <span className="text-white/30">·</span>
               <span className="flex items-center gap-1">
-                {course.profIA && <><Bot className="w-3.5 h-3.5 text-gold" /> Prof IA inclus</>}
+                {course.prof_ia && <><Bot className="w-3.5 h-3.5 text-gold" /> Prof IA inclus</>}
               </span>
             </div>
           </div>
@@ -198,12 +234,12 @@ export default function CoursePlayer() {
         <aside className="bg-white border-r border-border lg:sticky lg:top-12 lg:max-h-[calc(100vh-48px)] lg:overflow-y-auto">
 
           {/* Prochain live */}
-          {db.lives.some((l) => l.courseId === course.id && l.status === "planifie") && (
+          {chapters.some((c) => c.liveId) && (
             <div className="px-4 py-2 border-b border-border bg-red-50/50 flex items-center gap-2">
               <Radio className="w-3.5 h-3.5 text-red-500 flex-shrink-0" />
               <div className="min-w-0 flex-1">
                 <p className="text-[9px] font-bold text-red-600">Prochain live</p>
-                <p className="text-[10px] text-ink truncate">{db.lives.find((l) => l.courseId === course.id && l.status === "planifie")?.title}</p>
+                <p className="text-[10px] text-ink truncate">Live programmé</p>
               </div>
               <Bell className="w-3 h-3 text-red-400 flex-shrink-0" />
             </div>
@@ -250,7 +286,7 @@ export default function CoursePlayer() {
           <div className="px-4 py-3 border-t border-border grid grid-cols-2 gap-px bg-border">
             {[
               { icon: Clock,     label: "Temps estimé", value: `${chapters.length * 25} min` },
-              { icon: Award,     label: "Crédits ECTS",  value: `${ue?.ects || 0} pts` },
+              { icon: Award,     label: "Crédits ECTS",  value: `${course.ects || 0} pts` },
               { icon: Target,    label: "Objectif",      value: doneCount >= chapters.length ? "Atteint ✓" : "En cours" },
               { icon: BarChart2, label: "Difficulté",    value: "Interméd." },
             ].map((s) => (
@@ -285,7 +321,7 @@ export default function CoursePlayer() {
           </div>
 
           {/* Forum UE */}
-          <ForumPanel ueId={course.ueId} />
+          <ForumPanel ueId={course.id} />
         </aside>
 
         {/* ── Contenu central ── */}
@@ -929,36 +965,15 @@ function Bloc({ b }: { b: BlocNatif }) {
 
 /* ════ MODE LIVE — accès à la classe virtuelle ════ */
 function LiveMode({ liveId }: { liveId: string }) {
-  const { db } = useDB();
-  const live = db?.lives.find((l) => l.id === liveId);
-  if (!live) return null;
-  const date = new Date(live.date);
   return (
     <div className="border-2 border-border rounded-2xl p-6 text-center max-w-md mx-auto">
-      <div className={`w-14 h-14 rounded-full mx-auto mb-4 flex items-center justify-center ${
-        live.status === "encours" ? "bg-red-50" : "bg-cama-50"}`}>
-        <Radio className={`w-7 h-7 ${live.status === "encours" ? "text-red-500" : "text-cama"}`} />
+      <div className="w-14 h-14 rounded-full mx-auto mb-4 flex items-center justify-center bg-cama-50">
+        <Radio className="w-7 h-7 text-cama" />
       </div>
-      <h3 className="font-bold text-ink mb-1">{live.title}</h3>
-      <p className="text-sm text-muted mb-1">
-        {date.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" })} · {date.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })} · {live.durationMin} min
-      </p>
-      {live.status === "encours" ? (
-        <>
-          <p className="inline-flex items-center gap-1.5 text-xs font-bold text-red-500 mb-4">
-            <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" /> EN DIRECT
-          </p>
-          <Link href={`/live/${live.id}`} className="btn-primary w-full justify-center gap-2">
-            <Radio className="w-4 h-4" /> Rejoindre le live
-          </Link>
-        </>
-      ) : live.status === "termine" ? (
-        <p className="text-sm text-green-600 font-bold mt-2">
-          {live.replayPublie ? "Replay disponible dans l'onglet Vidéo" : "Live terminé — replay en cours de publication"}
-        </p>
-      ) : (
-        <p className="badge bg-cama-50 text-cama mt-2">Planifié</p>
-      )}
+      <h3 className="font-bold text-ink mb-1">Classe virtuelle</h3>
+      <Link href={`/live/${liveId}`} className="btn-primary w-full justify-center gap-2 mt-2">
+        <Radio className="w-4 h-4" /> Rejoindre le live
+      </Link>
       <p className="text-[10px] text-subtle mt-4">Mode audio seul disponible · enregistré pour replay — personne n&apos;est exclu.</p>
     </div>
   );
@@ -1130,18 +1145,17 @@ function ChapterNotes({ chapId }: { chapId: string }) {
 
 /* ════ FORUM UE (sidebar) ════ */
 function ForumPanel({ ueId }: { ueId: string }) {
-  const { db, mutate } = useDB();
+  void ueId;
   const { user } = useAuth();
   const [open, setOpen] = useState(false);
   const [text, setText] = useState("");
-  const msgs = db?.forum.filter((f) => f.ueId === ueId) || [];
+  const [msgs, setMsgs] = useState<{ id: string; author: string; role: string; text: string; time: string }[]>([]);
 
   const post = () => {
     if (!text.trim() || !user) return;
-    mutate((d) => {
-      d.forum.push({ id: uid("f"), ueId, author: user.name, role: user.role, text: text.trim(),
-        time: "À l'instant" });
-    });
+    setMsgs((m) => [...m, {
+      id: `${Date.now()}`, author: user.name, role: user.role, text: text.trim(), time: "À l'instant",
+    }]);
     setText("");
   };
 

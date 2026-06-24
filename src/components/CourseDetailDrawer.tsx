@@ -6,9 +6,11 @@ import {
   Lock, Clock, Award, Target, ChevronRight, Play, User, Star,
   CalendarClock, MessageSquare, Wifi, BarChart2, GraduationCap,
 } from "lucide-react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
-import { useDB } from "@/hooks/useDB";
-import { studentMode, SESSION_KINDS } from "@/lib/scheduling";
+import { supabase } from "@/lib/supabase";
+import type { DBProgramCourse, DBChapter } from "@/lib/supabase";
+import { fetchChapters, fetchProgress } from "@/lib/program";
 
 interface Props {
   courseId: string | null;
@@ -16,27 +18,39 @@ interface Props {
 }
 
 export default function CourseDetailDrawer({ courseId, onClose }: Props) {
-  const { db } = useDB();
   const { user } = useAuth();
   const open = !!courseId;
 
-  const course = db?.courses.find((c) => c.id === courseId);
-  const ue = db?.ues.find((u) => u.id === course?.ueId);
-  const chapters = (db?.chapters.filter((c) => c.courseId === courseId) || []).sort((a, b) => a.order - b.order);
-  const doneIds = new Set(db?.progress.filter((p) => p.studentId === user?.id).map((p) => p.chapterId) || []);
+  const [course, setCourse] = useState<DBProgramCourse | null>(null);
+  const [chapters, setChapters] = useState<DBChapter[]>([]);
+  const [doneIds, setDoneIds] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (!courseId) return;
+    let active = true;
+    (async () => {
+      const [{ data: c }, chs, prog] = await Promise.all([
+        supabase.from("program_courses").select("*").eq("id", courseId).maybeSingle(),
+        fetchChapters(courseId),
+        user ? fetchProgress(user.id) : Promise.resolve([]),
+      ]);
+      if (!active) return;
+      setCourse((c as DBProgramCourse) ?? null);
+      setChapters(chs);
+      setDoneIds(new Set(prog.map((p) => p.chapter_id)));
+    })();
+    return () => { active = false; };
+  }, [courseId, user]);
+
   const done = chapters.filter((c) => doneIds.has(c.id)).length;
   const pct = chapters.length ? Math.round((done / chapters.length) * 100) : 0;
-  const lives = db?.lives.filter((l) => l.courseId === courseId) || [];
-  const nextLive = lives.find((l) => l.status === "planifie" || l.status === "encours");
-  const forumCount = db?.forum.filter((f) => f.ueId === course?.ueId).length || 0;
+  const lives: unknown[] = [];
+  const nextLive = null as { id: string; title: string; date: string; durationMin: number; status: string } | null;
+  const forumCount = 0;
+  const courseSessions: string[] = [];
   const unlocked = (i: number) => i === 0 || doneIds.has(chapters[i - 1].id);
 
-  const det = course?.details;
-  const mode = db && user ? studentMode(db.studentSettings, user.id) : "presentiel";
-  const courseSessions = (db?.sessions || []).filter(
-    (s) => s.courseId === courseId && s.status === "valide" && s.modes.includes(mode),
-  );
-  const objectives = det?.objectives?.length ? det.objectives : [
+  const objectives = course?.objectives?.length ? course.objectives : [
     "Maîtriser les concepts fondamentaux de l'UE",
     "Réussir le checkpoint de chaque chapitre",
     "Être prêt pour l'examen Safe-CAMA",
@@ -58,7 +72,7 @@ export default function CourseDetailDrawer({ courseId, onClose }: Props) {
           open ? "translate-x-0" : "-translate-x-full"
         }`}>
 
-        {course && ue && (
+        {course && (
           <>
             {/* ── Header hero ── */}
             <div className="relative overflow-hidden text-white flex-shrink-0"
@@ -69,9 +83,9 @@ export default function CourseDetailDrawer({ courseId, onClose }: Props) {
               <div className="relative px-5 sm:px-8 py-5 flex items-start gap-4">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-                    <span className="text-[10px] font-black uppercase tracking-widest bg-gold text-white px-2 py-0.5">{ue.code}</span>
-                    <span className="text-[10px] font-bold text-white/60">{ue.ects} ECTS · {ue.semestre}</span>
-                    {course.profIA && <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-white/15 px-2 py-0.5"><Bot className="w-3 h-3 text-gold" /> Prof IA</span>}
+                    <span className="text-[10px] font-black uppercase tracking-widest bg-gold text-white px-2 py-0.5">{course.code}</span>
+                    <span className="text-[10px] font-bold text-white/60">{course.ects} ECTS · {course.semestre}</span>
+                    {course.prof_ia &&<span className="inline-flex items-center gap-1 text-[10px] font-bold bg-white/15 px-2 py-0.5"><Bot className="w-3 h-3 text-gold" /> Prof IA</span>}
                   </div>
                   <h2 className="text-xl sm:text-2xl font-bold leading-tight">{course.title}</h2>
                   <p className="text-xs text-white/70 mt-1 flex items-center gap-2">
@@ -109,7 +123,7 @@ export default function CourseDetailDrawer({ courseId, onClose }: Props) {
                 {/* Description */}
                 <div className="px-5 sm:px-8 py-4 border-b border-border">
                   <p className="text-[9px] font-black text-subtle uppercase tracking-widest mb-2">À propos du cours</p>
-                  <p className="text-sm text-muted leading-relaxed">{course.description}</p>
+                  <p className="text-sm text-muted leading-relaxed">{course.description ?? ""}</p>
                 </div>
 
                 {/* Live à venir */}
@@ -149,7 +163,7 @@ export default function CourseDetailDrawer({ courseId, onClose }: Props) {
                           <div className={`w-7 h-7 flex items-center justify-center text-[11px] font-bold flex-shrink-0 ${
                             isDone ? "bg-green-500 text-white" : isOpen ? "bg-cama text-white" : "bg-border text-subtle"
                           }`}>
-                            {isDone ? <Check className="w-3.5 h-3.5" /> : isOpen ? c.order : <Lock className="w-3 h-3" />}
+                            {isDone ? <Check className="w-3.5 h-3.5" /> : isOpen ? c.ordre : <Lock className="w-3 h-3" />}
                           </div>
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-semibold text-ink leading-snug">{c.title}</p>
@@ -157,7 +171,7 @@ export default function CourseDetailDrawer({ courseId, onClose }: Props) {
                               {c.natif && <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 bg-cama-50 text-cama"><MonitorPlay className="w-2.5 h-2.5" /> Natif</span>}
                               {c.pdf && <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 bg-gold/10 text-gold-dark"><FileText className="w-2.5 h-2.5" /> PDF {c.pdf.sizeMo} Mo</span>}
                               {c.video && <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 bg-cama-50 text-cama"><Video className="w-2.5 h-2.5" /> {c.video.durationMin} min</span>}
-                              {c.liveId && <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 bg-red-50 text-red-500"><Radio className="w-2.5 h-2.5" /> Live</span>}
+                              {c.live_id && <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 bg-red-50 text-red-500"><Radio className="w-2.5 h-2.5" /> Live</span>}
                             </div>
                           </div>
                           <span className="text-[9px] text-subtle flex-shrink-0 flex items-center gap-1"><Clock className="w-3 h-3" /> ~25 min</span>
@@ -193,14 +207,14 @@ export default function CourseDetailDrawer({ courseId, onClose }: Props) {
                   <p className="text-[9px] font-black text-subtle uppercase tracking-widest mb-2">Fiche du cours</p>
                   <div className="space-y-2">
                     {[
-                      { icon: GraduationCap, k: "UE", v: `${ue.code} — ${ue.title}` },
-                      { icon: Award,    k: "Crédits", v: `${ue.ects} ECTS` },
-                      { icon: CalendarClock, k: "Semestre", v: ue.semestre },
-                      { icon: BarChart2, k: "Difficulté", v: det?.difficulte || "Intermédiaire" },
-                      { icon: Clock,    k: "Volume horaire", v: det?.volume || `${chapters.length * 25} min + TD` },
-                      ...(det?.prerequis ? [{ icon: ChevronRight, k: "Prérequis", v: det.prerequis }] : []),
-                      ...(det?.audience ? [{ icon: User, k: "Public visé", v: det.audience }] : []),
-                      ...(det?.evaluation ? [{ icon: Award, k: "Évaluation", v: det.evaluation }] : [{ icon: Star, k: "Évaluation", v: "4.7/5 (142 étudiants)" }]),
+                      { icon: GraduationCap, k: "UE", v: `${course.code} — ${course.title}` },
+                      { icon: Award,    k: "Crédits", v: `${course.ects} ECTS` },
+                      { icon: CalendarClock, k: "Semestre", v: course.semestre },
+                      { icon: BarChart2, k: "Difficulté", v: course.difficulte || "Intermédiaire" },
+                      { icon: Clock,    k: "Volume horaire", v: `${chapters.length * 25} min + TD` },
+                      ...(course.prerequis ? [{ icon: ChevronRight, k: "Prérequis", v: course.prerequis }] : []),
+                      ...(course.audience ? [{ icon: User, k: "Public visé", v: course.audience }] : []),
+                      ...(course.evaluation ? [{ icon: Award, k: "Évaluation", v: course.evaluation }] : [{ icon: Star, k: "Évaluation", v: "4.7/5 (142 étudiants)" }]),
                     ].map((r) => (
                       <div key={r.k} className="flex items-start gap-2.5">
                         <r.icon className="w-3.5 h-3.5 text-cama flex-shrink-0 mt-0.5" />
@@ -222,7 +236,7 @@ export default function CourseDetailDrawer({ courseId, onClose }: Props) {
                       { icon: FileText, label: "Support PDF", sub: "Téléchargeable hors-ligne", on: chapters.some((c) => c.pdf) },
                       { icon: Video, label: "Vidéo + audio seul", sub: "240p à 720p + transcription", on: chapters.some((c) => c.video) },
                       { icon: Radio, label: "Lives + replays", sub: "Classes virtuelles synchrones", on: lives.length > 0 },
-                      { icon: Bot, label: "Prof IA", sub: "Tuteur ancré sur les ressources", on: course.profIA },
+                      { icon: Bot, label: "Prof IA", sub: "Tuteur ancré sur les ressources", on: course.prof_ia },
                     ].map((m) => (
                       <div key={m.label} className={`flex items-center gap-2.5 ${!m.on ? "opacity-40" : ""}`}>
                         <div className={`w-7 h-7 flex items-center justify-center flex-shrink-0 ${m.on ? "bg-cama-50" : "bg-surface"}`}>
@@ -247,17 +261,11 @@ export default function CourseDetailDrawer({ courseId, onClose }: Props) {
                     <p className="text-[11px] text-muted">Aucune séance planifiée pour votre mode d&apos;inscription.</p>
                   ) : (
                     <div className="space-y-1.5">
-                      {courseSessions.map((s) => {
-                        const k = SESSION_KINDS[s.kind];
-                        return (
-                          <div key={s.id} className="flex items-center gap-2 text-[11px]">
-                            <span className={`text-[8px] font-bold px-1.5 py-0.5 border flex-shrink-0 ${k.color}`}>{k.label}</span>
-                            <span className="text-ink font-semibold flex-shrink-0">{s.day}</span>
-                            <span className="text-muted">{s.end ? `${s.start}–${s.end}` : s.start}</span>
-                            {s.room && <span className="text-subtle truncate">· {s.room}</span>}
-                          </div>
-                        );
-                      })}
+                      {courseSessions.map((s, i) => (
+                        <div key={i} className="flex items-center gap-2 text-[11px]">
+                          <span className="text-ink font-semibold flex-shrink-0">{s}</span>
+                        </div>
+                      ))}
                     </div>
                   )}
                   <Link href="/calendrier" className="text-[10px] font-bold text-cama hover:underline mt-2 inline-block">Calendrier complet →</Link>
@@ -275,9 +283,9 @@ export default function CourseDetailDrawer({ courseId, onClose }: Props) {
                       </p>
                     ))}
                   </div>
-                  {det?.competences?.length ? (
+                  {course.competences?.length ? (
                     <div className="flex flex-wrap gap-1.5 mt-2.5">
-                      {det.competences.map((c) => (
+                      {course.competences.map((c) => (
                         <span key={c} className="text-[9px] font-bold px-2 py-0.5 bg-cama-50 text-cama">{c}</span>
                       ))}
                     </div>
