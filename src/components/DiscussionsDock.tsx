@@ -4,9 +4,15 @@ import { useState, useRef, useEffect } from "react";
 import { MessagesSquare, X, Send, Users, ChevronLeft, GraduationCap } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useDragOffset } from "@/hooks/useDragOffset";
+import { fetchDm, sendDm, fetchForum, postForum, profAutoReply } from "@/lib/chat";
 
 type DMsg = { from: "moi" | "prof"; text: string; time: string };
 type ForumMsg = { id: string; ueCode: string; author: string; role: string; text: string; time: string };
+
+function hhmm(iso: string) {
+  try { return new Date(iso).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }); }
+  catch { return "À l'instant"; }
+}
 
 const TEACHERS = [
   {
@@ -78,33 +84,74 @@ export default function DiscussionsDock() {
 
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth" }); }, [threads, typing, tab, activeTeacher, forumMsgs.length]);
 
+  // Charge les messages DB d'un enseignant à l'ouverture de sa conversation.
+  useEffect(() => {
+    if (!activeTeacher) return;
+    let cancelled = false;
+    (async () => {
+      const rows = await fetchDm(activeTeacher);
+      if (cancelled || rows.length === 0) return;
+      setThreads((th) => ({
+        ...th,
+        [activeTeacher]: rows.map((r) => ({
+          from: r.sender === "prof" || r.sender === "enseignant" ? "prof" as const : "moi" as const,
+          text: r.body, time: hhmm(r.created_at),
+        })),
+      }));
+    })();
+    return () => { cancelled = true; };
+  }, [activeTeacher]);
+
+  // Charge le forum de l'UE sélectionnée.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const rows = await fetchForum(forumUe);
+      if (cancelled || rows.length === 0) return;
+      setForumMsgs((prev) => {
+        const others = prev.filter((m) => m.ueCode !== forumUe);
+        return [...others, ...rows.map((r) => ({
+          id: r.id, ueCode: forumUe, author: r.author_name, role: r.role, text: r.body, time: hhmm(r.created_at),
+        }))];
+      });
+    })();
+    return () => { cancelled = true; };
+  }, [forumUe]);
+
   if (!user) return null;
 
   const currentUe = forumUe;
   const currentForumMsgs = forumMsgs.filter((f) => f.ueCode === currentUe);
   const teacher = TEACHERS.find((t) => t.id === activeTeacher);
 
-  function sendDM() {
+  async function sendDM() {
     const q = input.trim();
     if (!q || !activeTeacher) return;
     setInput("");
-    const now = "À l'instant";
-    setThreads((th) => ({ ...th, [activeTeacher]: [...th[activeTeacher], { from: "moi", text: q, time: now }] }));
+    const t = TEACHERS.find((x) => x.id === activeTeacher);
+    setThreads((th) => ({ ...th, [activeTeacher]: [...th[activeTeacher], { from: "moi", text: q, time: "À l'instant" }] }));
     setTyping(true);
-    setTimeout(() => {
-      setTyping(false);
-      setThreads((th) => ({
-        ...th,
-        [activeTeacher]: [...th[activeTeacher], { from: "prof", text: PROF_REPLIES[Math.floor(Math.random() * PROF_REPLIES.length)], time: "À l'instant" }],
-      }));
-    }, 1400 + Math.random() * 900);
+
+    // Persiste le message étudiant (best-effort).
+    void sendDm({ thread_key: activeTeacher, teacher_slug: activeTeacher, student_id: user?.id ?? null, sender: "moi", author_name: user?.name, body: q });
+
+    // Réponse du prof : IA Groq si dispo, sinon réponse générique.
+    const ai = await profAutoReply({ teacherName: t?.name ?? "L'enseignant", subject: t?.subject ?? "le cours", question: q });
+    const replyText = ai ?? PROF_REPLIES[Math.floor(Math.random() * PROF_REPLIES.length)];
+    setTyping(false);
+    setThreads((th) => ({ ...th, [activeTeacher]: [...th[activeTeacher], { from: "prof", text: replyText, time: "À l'instant" }] }));
+    void sendDm({ thread_key: activeTeacher, teacher_slug: activeTeacher, student_id: user?.id ?? null, sender: "prof", author_name: t?.name, body: replyText });
   }
 
-  function postForum() {
+  async function postForumMsg() {
     const q = forumInput.trim();
     if (!q || !user) return;
-    setForumMsgs((msgs) => [...msgs, { id: crypto.randomUUID(), ueCode: currentUe, author: user.name, role: user.role, text: q, time: "À l'instant" }]);
     setForumInput("");
+    const saved = await postForum({ channel: currentUe, user_id: user.id, author_name: user.name, role: user.role, body: q });
+    setForumMsgs((msgs) => [...msgs, {
+      id: saved?.id ?? crypto.randomUUID(), ueCode: currentUe,
+      author: user.name, role: user.role, text: q, time: "À l'instant",
+    }]);
   }
 
   return (
@@ -248,10 +295,10 @@ export default function DiscussionsDock() {
                 <div ref={endRef} />
               </div>
               <div className="p-3 border-t border-border flex items-center gap-2 flex-shrink-0 bg-white">
-                <input value={forumInput} onChange={(e) => setForumInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && postForum()}
+                <input value={forumInput} onChange={(e) => setForumInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && postForumMsg()}
                   placeholder="Poser une question à la classe…"
                   className="flex-1 text-xs bg-surface border border-border px-3 py-2.5 outline-none focus:border-cama transition-colors min-w-0" />
-                <button onClick={postForum} disabled={!forumInput.trim()}
+                <button onClick={postForumMsg} disabled={!forumInput.trim()}
                   className="w-9 h-9 bg-cama hover:bg-cama-700 disabled:opacity-40 flex items-center justify-center transition-colors flex-shrink-0">
                   <Send className="w-3.5 h-3.5 text-white" />
                 </button>

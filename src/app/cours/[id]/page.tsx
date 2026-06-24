@@ -19,6 +19,7 @@ import { supabase } from "@/lib/supabase";
 import { fetchChapters, fetchProgress, markChapter } from "@/lib/program";
 import { fetchLivesForCourses, subscribeLives } from "@/lib/lives";
 import { fetchResources } from "@/lib/resources";
+import { fetchForum, postForum } from "@/lib/chat";
 import type { DBCourseResource } from "@/lib/supabase";
 
 const RES_ICON = { syllabus: FileText, support: Download, biblio: ExternalLink, lien: ExternalLink } as const;
@@ -1104,16 +1105,48 @@ function ProfIA({ chapter, courseTitle }: { chapter: DBChapter; courseTitle: str
     return "Je ne trouve pas ce point dans les ressources déposées pour ce chapitre — je préfère ne pas inventer (réponses ancrées uniquement). Reformulez ou demandez-moi un résumé du chapitre.";
   };
 
-  const send = () => {
+  // Contexte « réel » : transcription vidéo + cours natif déposés par l'enseignant.
+  const courseContext = useMemo(() => [
+    chapter.video?.transcript ? `TRANSCRIPTION VIDÉO :\n${chapter.video.transcript}` : "",
+    chapter.natif?.blocks?.length
+      ? `COURS NATIF :\n${chapter.natif.blocks.map((b) =>
+          "terme" in b ? `${b.terme} : ${b.text}` : "text" in b ? b.text : b.type === "quiz" ? `Quiz : ${b.question}` : "").filter(Boolean).join("\n")}`
+      : "",
+  ].filter(Boolean).join("\n\n"), [chapter]);
+
+  const send = async () => {
     const q = input.trim();
     if (!q) return;
+    const history = msgs.map((m) => ({ role: (m.from === "moi" ? "user" : "assistant") as "user" | "assistant", content: m.text }));
     setMsgs((m) => [...m, { from: "moi", text: q }]);
     setInput("");
     setTyping(true);
-    setTimeout(() => {
+
+    try {
+      const res = await fetch("/api/ai/tutor", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          question: q,
+          courseTitle,
+          chapterTitle: chapter.title,
+          context: courseContext,
+          history,
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const answer = (data?.answer ?? "").trim();
+        setMsgs((m) => [...m, { from: "ia", text: answer || reply(q) }]);
+      } else {
+        // Pas de clé Groq ou erreur fournisseur → moteur local de secours.
+        setMsgs((m) => [...m, { from: "ia", text: reply(q) }]);
+      }
+    } catch {
       setMsgs((m) => [...m, { from: "ia", text: reply(q) }]);
+    } finally {
       setTyping(false);
-    }, 900 + Math.random() * 600);
+    }
   };
 
   return (
@@ -1212,18 +1245,32 @@ function ChapterNotes({ chapId }: { chapId: string }) {
 
 /* ════ FORUM UE (sidebar) ════ */
 function ForumPanel({ ueId }: { ueId: string }) {
-  void ueId;
   const { user } = useAuth();
   const [open, setOpen] = useState(false);
   const [text, setText] = useState("");
   const [msgs, setMsgs] = useState<{ id: string; author: string; role: string; text: string; time: string }[]>([]);
 
-  const post = () => {
-    if (!text.trim() || !user) return;
-    setMsgs((m) => [...m, {
-      id: `${Date.now()}`, author: user.name, role: user.role, text: text.trim(), time: "À l'instant",
-    }]);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const rows = await fetchForum(ueId);
+      if (cancelled || rows.length === 0) return;
+      setMsgs(rows.map((r) => ({
+        id: r.id, author: r.author_name, role: r.role, text: r.body,
+        time: new Date(r.created_at).toLocaleString("fr-FR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }),
+      })));
+    })();
+    return () => { cancelled = true; };
+  }, [ueId]);
+
+  const post = async () => {
+    const q = text.trim();
+    if (!q || !user) return;
     setText("");
+    const saved = await postForum({ scope: "course", channel: ueId, user_id: user.id, author_name: user.name, role: user.role, body: q });
+    setMsgs((m) => [...m, {
+      id: saved?.id ?? `${Date.now()}`, author: user.name, role: user.role, text: q, time: "À l'instant",
+    }]);
   };
 
   return (

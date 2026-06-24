@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   ArrowLeft, Newspaper, Radio, Play, Heart, Bookmark, Share2, Eye,
@@ -12,17 +12,19 @@ import {
   fetchJournal, fetchMyReactions, fetchReactionCounts, toggleReaction,
   bumpJournalViews, JOURNAL_RUBRIQUES, type DBJournalArticle,
 } from "@/lib/journal";
+import {
+  fetchCommunity, postCommunity, likeCommunity, type DBCommunityMessage,
+} from "@/lib/chat";
 
 const FALLBACK_COVER = "https://images.unsplash.com/photo-1504384308090-c894fdcc538d?w=1200&q=70";
 function cover(a: DBJournalArticle) { return a.cover_url || a.media_src || FALLBACK_COVER; }
-
-const COMMUNITY_SEED = [
-  { name: "Amine B.", avatar: "#7C3AED", msg: "Quelqu'un a les corrigés du TP3 réseaux ?", time: "Il y a 12 min", likes: 4 },
-  { name: "Fatima N.", avatar: "#0EA5E9", msg: "Le hackathon c'est trop bien organisé cette année !", time: "Il y a 28 min", likes: 12 },
-  { name: "Jean-Paul M.", avatar: "#16A34A", msg: "Qui participe au live INF201 demain ?", time: "Il y a 45 min", likes: 7 },
-  { name: "Diane A.", avatar: "#DB2777", msg: "La certification AWS vaut le coup, je l'ai passée le mois dernier.", time: "Il y a 1 h", likes: 19 },
-  { name: "Yves K.", avatar: "#D97706", msg: "RDV à la cafet à 12h30 pour le club dev mobile", time: "Il y a 2 h", likes: 3 },
-];
+function relTime(iso: string): string {
+  const s = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+  if (s < 60) return "À l'instant";
+  if (s < 3600) return `Il y a ${Math.floor(s / 60)} min`;
+  if (s < 86400) return `Il y a ${Math.floor(s / 3600)} h`;
+  return `Il y a ${Math.floor(s / 86400)} j`;
+}
 
 export default function JournalPage() {
   const { user } = useAuth();
@@ -38,6 +40,9 @@ export default function JournalPage() {
   const [reelIdx, setReelIdx] = useState(0);
   const [reelPlaying, setReelPlaying] = useState(true);
   const [showComm, setShowComm] = useState(false);
+  const [fullReel, setFullReel] = useState<number | null>(null);
+  const [comm, setComm] = useState<DBCommunityMessage[]>([]);
+  const [commInput, setCommInput] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -54,6 +59,29 @@ export default function JournalPage() {
     })();
     return () => { cancelled = true; };
   }, [user]);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchCommunity().then((rows) => { if (!cancelled) setComm(rows); });
+    return () => { cancelled = true; };
+  }, []);
+
+  const sendComm = async () => {
+    const body = commInput.trim();
+    if (!body || !user) return;
+    setCommInput("");
+    const optimistic: DBCommunityMessage = {
+      id: `tmp-${Date.now()}`, user_id: user.id, author_name: user.name,
+      avatar: "#7C3AED", body, likes: 0, created_at: new Date().toISOString(),
+    };
+    setComm((c) => [...c, optimistic]);
+    const saved = await postCommunity({ user_id: user.id, author_name: user.name, body });
+    if (saved) setComm((c) => c.map((m) => (m.id === optimistic.id ? saved : m)));
+  };
+  const likeComm = async (m: DBCommunityMessage) => {
+    setComm((c) => c.map((x) => (x.id === m.id ? { ...x, likes: x.likes + 1 } : x)));
+    await likeCommunity(m.id, m.likes);
+  };
 
   const featured = articles.find((a) => a.featured) ?? articles[0];
   const reels = useMemo(() => articles.filter((a) => a.media_kind === "reel" || a.media_kind === "video" || a.media_kind === "live"), [articles]);
@@ -166,8 +194,8 @@ export default function JournalPage() {
                 <Flame className="w-4 h-4 text-orange-500" /> Reels & Directs
               </h2>
               <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-none">
-                {reels.map((a) => (
-                  <button key={a.id} onClick={() => openReader(a)} className="group relative w-[130px] h-[210px] shrink-0 rounded-2xl overflow-hidden">
+                {reels.map((a, ri) => (
+                  <button key={a.id} onClick={() => { setFullReel(ri); bumpJournalViews(a.id, a.views); }} className="group relative w-[130px] h-[210px] shrink-0 rounded-2xl overflow-hidden">
                     <img src={cover(a)} alt="" className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/10 to-black/30" />
                     <div className={`absolute top-2 left-2 flex items-center gap-1 text-[8px] font-black uppercase px-1.5 py-0.5 rounded text-white ${a.media_kind === "live" ? "bg-red-600" : "bg-white/20 backdrop-blur"}`}>
@@ -196,7 +224,11 @@ export default function JournalPage() {
                 <div className="relative w-full max-w-[360px] mx-auto aspect-[9/16] rounded-3xl overflow-hidden bg-black">
                   {reels.map((a, i) => (
                     <div key={a.id} className={`absolute inset-0 transition-opacity duration-500 ${i === reelIdx ? "opacity-100" : "opacity-0 pointer-events-none"}`}>
-                      <img src={cover(a)} alt="" className="w-full h-full object-cover" />
+                      <img src={cover(a)} alt="" onClick={() => { setFullReel(i); bumpJournalViews(a.id, a.views); }} className="w-full h-full object-cover cursor-pointer" />
+                      <button onClick={() => { setFullReel(i); bumpJournalViews(a.id, a.views); }}
+                        className="absolute top-4 left-1/2 -translate-x-1/2 z-10 flex items-center gap-1.5 bg-white/90 text-black text-[10px] font-black uppercase tracking-wider px-3 py-1.5 rounded-full hover:scale-105 transition-transform">
+                        Plein écran TikTok
+                      </button>
                       <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/30" />
                       {a.media_kind === "live" && (
                         <span className="absolute top-4 left-4 flex items-center gap-1.5 bg-red-600 text-white text-[10px] font-black uppercase px-2.5 py-1 rounded-full">
@@ -400,16 +432,17 @@ export default function JournalPage() {
                     </span>
                   </div>
                   <div className={`divide-y ${dark ? "divide-white/5" : "divide-gray-100"} max-h-[400px] overflow-y-auto`}>
-                    {COMMUNITY_SEED.map((m, i) => (
-                      <div key={i} className={`px-4 py-3 ${dark ? "hover:bg-white/5" : "hover:bg-gray-50"} transition-colors`}>
+                    {comm.length === 0 && <p className={`text-center text-[11px] ${sub} py-6`}>Aucun message — lancez la discussion !</p>}
+                    {comm.map((m) => (
+                      <div key={m.id} className={`px-4 py-3 ${dark ? "hover:bg-white/5" : "hover:bg-gray-50"} transition-colors`}>
                         <div className="flex items-center gap-2 mb-1.5">
-                          <div className="w-6 h-6 rounded-full flex items-center justify-center text-white text-[9px] font-black" style={{ background: m.avatar }}>{m.name[0]}</div>
-                          <p className="text-[11px] font-bold flex-1">{m.name}</p>
-                          <span className={`text-[9px] ${sub}`}>{m.time}</span>
+                          <div className="w-6 h-6 rounded-full flex items-center justify-center text-white text-[9px] font-black" style={{ background: m.avatar }}>{m.author_name[0]}</div>
+                          <p className="text-[11px] font-bold flex-1">{m.author_name}</p>
+                          <span className={`text-[9px] ${sub}`}>{relTime(m.created_at)}</span>
                         </div>
-                        <p className="text-[12px] leading-relaxed">{m.msg}</p>
+                        <p className="text-[12px] leading-relaxed">{m.body}</p>
                         <div className="flex items-center gap-3 mt-2">
-                          <button className={`flex items-center gap-1 text-[10px] ${sub} hover:text-pink-500 transition-colors`}>
+                          <button onClick={() => likeComm(m)} className={`flex items-center gap-1 text-[10px] ${sub} hover:text-pink-500 transition-colors`}>
                             <Heart className="w-3 h-3" /> {m.likes}
                           </button>
                           <button className={`flex items-center gap-1 text-[10px] ${sub} hover:text-cama transition-colors`}>
@@ -420,8 +453,10 @@ export default function JournalPage() {
                     ))}
                   </div>
                   <div className={`px-3 py-2 border-t ${dark ? "border-white/10" : "border-gray-200"} flex items-center gap-2`}>
-                    <input placeholder="Écrire un message…" className={`flex-1 ${subBg} rounded-full px-3 py-1.5 text-xs ${dark ? "placeholder:text-white/30" : "placeholder:text-gray-400"} focus:outline-none`} />
-                    <button className="w-8 h-8 rounded-full bg-cama flex items-center justify-center hover:bg-cama/90 transition-colors">
+                    <input value={commInput} onChange={(e) => setCommInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && sendComm()}
+                      placeholder={user ? "Écrire un message…" : "Connectez-vous pour écrire"} disabled={!user}
+                      className={`flex-1 ${subBg} rounded-full px-3 py-1.5 text-xs ${dark ? "placeholder:text-white/30" : "placeholder:text-gray-400"} focus:outline-none disabled:opacity-50`} />
+                    <button onClick={sendComm} disabled={!user || !commInput.trim()} className="w-8 h-8 rounded-full bg-cama flex items-center justify-center hover:bg-cama/90 transition-colors disabled:opacity-40">
                       <Send className="w-3.5 h-3.5 text-white" />
                     </button>
                   </div>
@@ -434,6 +469,16 @@ export default function JournalPage() {
 
       {reader && <Reader a={reader} liked={likes.has(reader.id)} saved={saves.has(reader.id)} count={counts[reader.id] ?? 0}
         onLike={() => like(reader)} onSave={() => save(reader)} onClose={() => setReader(null)} dark={dark} />}
+
+      {fullReel !== null && reels.length > 0 && (
+        <ReelViewer
+          reels={reels} idx={fullReel} setIdx={setFullReel}
+          likes={likes} saves={saves} counts={counts}
+          onLike={like} onSave={save}
+          onOpenArticle={(a) => { setFullReel(null); openReader(a); }}
+          onClose={() => setFullReel(null)}
+        />
+      )}
 
       <style jsx global>{`
         @keyframes ticker { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
@@ -521,6 +566,125 @@ function Reader({ a, liked, saved, count, onLike, onSave, onClose, dark }: {
               </a>
             )}
           </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ════ LECTEUR REELS PLEIN ÉCRAN — façon TikTok dans CAMA ════ */
+function ReelViewer({ reels, idx, setIdx, likes, saves, counts, onLike, onSave, onOpenArticle, onClose }: {
+  reels: DBJournalArticle[]; idx: number; setIdx: (i: number | null) => void;
+  likes: Set<string>; saves: Set<string>; counts: Record<string, number>;
+  onLike: (a: DBJournalArticle) => void; onSave: (a: DBJournalArticle) => void;
+  onOpenArticle: (a: DBJournalArticle) => void; onClose: () => void;
+}) {
+  const go = (d: number) => setIdx(Math.max(0, Math.min(reels.length - 1, idx + d)));
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+      if (e.key === "ArrowDown") go(1);
+      if (e.key === "ArrowUp") go(-1);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [idx, reels.length]);
+
+  // Swipe vertical (mobile)
+  const startY = useRef<number | null>(null);
+  const onTouchStart = (e: React.TouchEvent) => { startY.current = e.touches[0].clientY; };
+  const onTouchEnd = (e: React.TouchEvent) => {
+    if (startY.current === null) return;
+    const dy = e.changedTouches[0].clientY - startY.current;
+    if (Math.abs(dy) > 60) go(dy < 0 ? 1 : -1);
+    startY.current = null;
+  };
+
+  return (
+    <div className="fixed inset-0 z-[60] bg-black flex items-center justify-center"
+      onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
+      <button onClick={onClose} className="absolute top-4 left-4 z-20 w-10 h-10 rounded-full bg-white/10 backdrop-blur flex items-center justify-center text-white hover:bg-white/20 transition-colors">
+        <X className="w-5 h-5" />
+      </button>
+      <p className="absolute top-5 left-1/2 -translate-x-1/2 z-20 text-white/70 text-xs font-bold tracking-widest uppercase">JFN Reels</p>
+
+      <div className="relative h-full w-full max-w-[440px] mx-auto overflow-hidden">
+        {reels.map((a, i) => {
+          const dy = (i - idx) * 100;
+          const liked = likes.has(a.id), saved = saves.has(a.id);
+          return (
+            <div key={a.id} className="absolute inset-0 transition-transform duration-500 ease-out"
+              style={{ transform: `translateY(${dy}%)` }}>
+              <img src={cover(a)} alt="" className="absolute inset-0 w-full h-full object-cover" />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/10 to-black/40" />
+
+              {a.media_kind === "live" && (
+                <span className="absolute top-16 left-4 flex items-center gap-1.5 bg-red-600 text-white text-[10px] font-black uppercase px-2.5 py-1 rounded-full">
+                  <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" /> Live
+                </span>
+              )}
+
+              {/* Centre : play */}
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <div className="w-16 h-16 rounded-full bg-white/15 backdrop-blur flex items-center justify-center">
+                  <Play className="w-7 h-7 text-white fill-white ml-1" />
+                </div>
+              </div>
+
+              {/* Légende bas */}
+              <div className="absolute bottom-0 left-0 right-16 p-5">
+                <p className="text-white text-sm font-bold flex items-center gap-2 mb-2">
+                  <span className="w-8 h-8 rounded-full bg-gradient-to-br from-cama to-violet-500 flex items-center justify-center text-[11px] font-black">{a.author[0]}</span>
+                  {a.author}
+                </p>
+                <p className="text-white text-[15px] font-bold leading-snug">{a.title}</p>
+                {a.subtitle && <p className="text-white/70 text-[12px] mt-1 line-clamp-2">{a.subtitle}</p>}
+                {a.tags && a.tags.length > 0 && (
+                  <p className="text-white/60 text-[12px] mt-2">{a.tags.slice(0, 4).map((t) => `#${t}`).join(" ")}</p>
+                )}
+                <button onClick={() => onOpenArticle(a)} className="mt-3 inline-flex items-center gap-1.5 bg-white/15 backdrop-blur text-white text-[12px] font-bold px-3 py-1.5 rounded-full hover:bg-white/25 transition-colors">
+                  Lire l&apos;article <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+
+              {/* Actions droite */}
+              <div className="absolute right-3 bottom-24 flex flex-col items-center gap-5 z-10">
+                <button onClick={() => onLike(a)} className="flex flex-col items-center gap-1">
+                  <div className={`w-12 h-12 rounded-full flex items-center justify-center ${liked ? "bg-pink-500/30" : "bg-black/40 backdrop-blur"}`}>
+                    <Heart className={`w-6 h-6 text-white ${liked ? "fill-pink-500" : ""}`} />
+                  </div>
+                  <span className="text-white text-[11px] font-bold">{counts[a.id] ?? 0}</span>
+                </button>
+                <button className="flex flex-col items-center gap-1">
+                  <div className="w-12 h-12 rounded-full bg-black/40 backdrop-blur flex items-center justify-center"><MessageCircle className="w-6 h-6 text-white" /></div>
+                  <span className="text-white text-[11px] font-bold">{a.views}</span>
+                </button>
+                <button onClick={() => onSave(a)} className="flex flex-col items-center gap-1">
+                  <div className={`w-12 h-12 rounded-full flex items-center justify-center ${saved ? "bg-cama/40" : "bg-black/40 backdrop-blur"}`}>
+                    <Bookmark className={`w-6 h-6 text-white ${saved ? "fill-cama" : ""}`} />
+                  </div>
+                  <span className="text-white text-[11px] font-bold">{saved ? "Saved" : "Save"}</span>
+                </button>
+                <button className="flex flex-col items-center gap-1">
+                  <div className="w-12 h-12 rounded-full bg-black/40 backdrop-blur flex items-center justify-center"><Share2 className="w-6 h-6 text-white" /></div>
+                  <span className="text-white text-[11px] font-bold">Share</span>
+                </button>
+              </div>
+            </div>
+          );
+        })}
+
+        {/* Nav haut/bas */}
+        <button onClick={() => go(-1)} disabled={idx === 0}
+          className="absolute right-4 top-1/2 -translate-y-14 z-20 w-9 h-9 rounded-full bg-white/10 backdrop-blur flex items-center justify-center text-white disabled:opacity-20 hover:bg-white/20 transition-colors"><ChevronUp className="w-5 h-5" /></button>
+        <button onClick={() => go(1)} disabled={idx >= reels.length - 1}
+          className="absolute right-4 top-1/2 translate-y-4 z-20 w-9 h-9 rounded-full bg-white/10 backdrop-blur flex items-center justify-center text-white disabled:opacity-20 hover:bg-white/20 transition-colors"><ChevronDown className="w-5 h-5" /></button>
+
+        {/* Progression */}
+        <div className="absolute left-3 top-1/2 -translate-y-1/2 flex flex-col gap-1 z-20">
+          {reels.map((_, i) => <div key={i} className={`w-1 rounded-full transition-all ${i === idx ? "h-6 bg-white" : "h-2 bg-white/30"}`} />)}
         </div>
       </div>
     </div>
