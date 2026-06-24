@@ -12,6 +12,7 @@ import { supabase } from "@/lib/supabase";
 import type { DBProgramCourse, DBChapter, DBExam } from "@/lib/supabase";
 import { fetchChapters } from "@/lib/program";
 import { fetchExamsForCourses } from "@/lib/exams";
+import { fetchLivesForCourses, type DBLive } from "@/lib/lives";
 
 interface Props {
   courseId: string | null;
@@ -31,25 +32,30 @@ export default function TeacherCourseDrawer({ courseId, onClose }: Props) {
   const [course, setCourse] = useState<DBProgramCourse | null>(null);
   const [chapters, setChapters] = useState<DBChapter[]>([]);
   const [exams, setExams] = useState<DBExam[]>([]);
+  const [lives, setLives] = useState<DBLive[]>([]);
 
   useEffect(() => {
     if (!courseId) return;
     let active = true;
     (async () => {
-      const [{ data: c }, chs, exs] = await Promise.all([
+      const [{ data: c }, chs, exs, lvs] = await Promise.all([
         supabase.from("program_courses").select("*").eq("id", courseId).maybeSingle(),
         fetchChapters(courseId),
         fetchExamsForCourses([courseId]),
+        fetchLivesForCourses([courseId]),
       ]);
       if (!active) return;
       setCourse((c as DBProgramCourse) ?? null);
       setChapters(chs);
       setExams(exs);
+      setLives(lvs);
     })();
     return () => { active = false; };
   }, [courseId]);
 
-  const lives: { id: string; title: string; date: string; durationMin: number; status: string; participants: unknown[] }[] = [];
+  const liveActive = lives.find((l) => l.status === "encours");
+  const liveNext = lives.find((l) => l.status === "planifie");
+  const liveShortcut = liveActive ?? liveNext ?? null;
   const forumCount = 0;
 
   const students = course ? cohortOf(course.id) : 0;
@@ -202,11 +208,13 @@ export default function TeacherCourseDrawer({ courseId, onClose }: Props) {
                           <div className="flex-1 min-w-0">
                             <p className="text-xs font-bold text-ink truncate">{l.title}</p>
                             <p className="text-[10px] text-muted">
-                              {new Date(l.date).toLocaleDateString("fr-FR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })} · {l.durationMin} min · {l.participants.length} inscrit(s)
+                              {l.status === "encours" ? "En direct maintenant" : l.status === "planifie" ? "Planifiée" : "Terminée"}
                             </p>
                           </div>
-                          {l.status === "encours" && (
-                            <Link href={`/live/${l.id}`} className="text-[10px] font-bold bg-red-500 text-white px-3 py-1.5 hover:bg-red-600 transition-colors flex-shrink-0">Entrer</Link>
+                          {l.status !== "termine" && (
+                            <Link href={`/live/${l.id}`} className={`text-[10px] font-bold px-3 py-1.5 transition-colors flex-shrink-0 ${l.status === "encours" ? "bg-red-500 text-white hover:bg-red-600" : "bg-cama text-white hover:bg-cama-700"}`}>
+                              {l.status === "encours" ? "Entrer" : "Démarrer"}
+                            </Link>
                           )}
                         </div>
                       ))}
@@ -243,6 +251,15 @@ export default function TeacherCourseDrawer({ courseId, onClose }: Props) {
 
                 {/* Actions principales */}
                 <div className="px-4 py-4 space-y-2">
+                  {/* Raccourci live (entrer / démarrer la classe virtuelle) */}
+                  {liveShortcut && (
+                    <Link href={`/live/${liveShortcut.id}`}
+                      className={`w-full flex items-center justify-center gap-2 py-3 text-sm font-bold text-white transition-colors ${
+                        liveActive ? "bg-red-500 hover:bg-red-600" : "bg-ink hover:bg-charcoal"}`}>
+                      <Radio className={`w-4 h-4 ${liveActive ? "animate-pulse" : ""}`} />
+                      {liveActive ? "Rejoindre le live en cours" : "Démarrer la classe virtuelle"}
+                    </Link>
+                  )}
                   <Link href={`/enseignant/cours/${course.id}`}
                     className="w-full flex items-center justify-center gap-2 py-3 bg-cama text-white text-sm font-bold hover:bg-cama-700 transition-colors">
                     <Edit3 className="w-4 h-4" /> Gérer &amp; diffuser

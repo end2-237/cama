@@ -11,6 +11,7 @@ import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabase";
 import type { DBProgramCourse, DBChapter, DBSession, CycleMode } from "@/lib/supabase";
 import { fetchChapters, fetchProgress, fetchSessions } from "@/lib/program";
+import { fetchLivesForCourses, type DBLive } from "@/lib/lives";
 
 interface Props {
   courseId: string | null;
@@ -25,30 +26,35 @@ export default function CourseDetailDrawer({ courseId, onClose }: Props) {
   const [chapters, setChapters] = useState<DBChapter[]>([]);
   const [doneIds, setDoneIds] = useState<Set<string>>(new Set());
   const [sessions, setSessions] = useState<DBSession[]>([]);
+  const [lives, setLives] = useState<DBLive[]>([]);
 
   useEffect(() => {
     if (!courseId) return;
     let active = true;
     (async () => {
-      const [{ data: c }, chs, prog, sess] = await Promise.all([
+      const [{ data: c }, chs, prog, sess, lvs] = await Promise.all([
         supabase.from("program_courses").select("*").eq("id", courseId).maybeSingle(),
         fetchChapters(courseId),
         user ? fetchProgress(user.id) : Promise.resolve([]),
         fetchSessions([courseId]),
+        fetchLivesForCourses([courseId]),
       ]);
       if (!active) return;
       setCourse((c as DBProgramCourse) ?? null);
       setChapters(chs);
       setDoneIds(new Set(prog.map((p) => p.chapter_id)));
       setSessions(sess);
+      setLives(lvs);
     })();
     return () => { active = false; };
   }, [courseId, user]);
 
   const done = chapters.filter((c) => doneIds.has(c.id)).length;
   const pct = chapters.length ? Math.round((done / chapters.length) * 100) : 0;
-  const lives: unknown[] = [];
-  const nextLive = null as { id: string; title: string; date: string; durationMin: number; status: string } | null;
+  const activeLive = lives.find((l) => l.status === "encours");
+  const nextLive = activeLive
+    ? { id: activeLive.id, title: activeLive.title, date: activeLive.started_at ?? activeLive.created_at, durationMin: 60, status: "encours" }
+    : null;
   const forumCount = 0;
   // Séances validées qui concernent le mode d'inscription de l'étudiant
   const studentMode = (user?.dossier?.mode ?? "hybride") as CycleMode;
