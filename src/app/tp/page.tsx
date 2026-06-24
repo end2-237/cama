@@ -6,7 +6,7 @@ import dynamic from "next/dynamic";
 import {
   ArrowLeft, Play, Loader2, Terminal, RotateCcw, FileCode2, Server,
   CheckCircle2, AlertCircle, ChevronDown, Cpu, Plus, Trash2, X,
-  ExternalLink, Maximize2, Wifi, Code2,
+  ExternalLink, Maximize2, Wifi, Code2, BookOpen, Copy, Check,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { fetchRuntimes, executeCode, versionFor, LANGS, type Runtime } from "@/lib/piston";
@@ -70,6 +70,7 @@ function RemoteMode({ canManage, userId }: { canManage: boolean; userId: string 
   const [form, setForm]         = useState<Partial<DBRemoteMachine>>(EMPTY_MACHINE);
   const [saving, setSaving]     = useState(false);
   const [err, setErr]           = useState<string | null>(null);
+  const [guideOpen, setGuideOpen] = useState(false);
 
   const reload = async () => {
     setLoading(true);
@@ -105,12 +106,18 @@ function RemoteMode({ canManage, userId }: { canManage: boolean; userId: string 
           <span className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
             <Server className="w-4 h-4 text-cama" /> Machines
           </span>
-          {canManage && (
-            <button onClick={() => { setAddOpen(true); setErr(null); }} title="Ajouter une machine"
+          <div className="flex items-center gap-2">
+            <button onClick={() => setGuideOpen(true)} title="Guide d'installation"
               className="text-white/60 hover:text-cama transition-colors">
-              <Plus className="w-4 h-4" />
+              <BookOpen className="w-4 h-4" />
             </button>
-          )}
+            {canManage && (
+              <button onClick={() => { setAddOpen(true); setErr(null); }} title="Ajouter une machine"
+                className="text-white/60 hover:text-cama transition-colors">
+                <Plus className="w-4 h-4" />
+              </button>
+            )}
+          </div>
         </div>
 
         {loading ? (
@@ -144,11 +151,11 @@ function RemoteMode({ canManage, userId }: { canManage: boolean; userId: string 
         )}
 
         {/* Aide setup */}
-        <div className="mt-auto p-3 border-t border-black/30 text-[10px] text-white/40 leading-relaxed">
-          <p className="font-bold text-white/60 mb-1">Exposer un vrai PC Linux :</p>
-          <code className="block bg-black/30 rounded p-1.5 mb-1 text-white/70">ttyd -p 7681 bash</code>
-          <p>puis tunnel HTTPS (Cloudflare Tunnel / ngrok) et collez l&apos;URL ici.</p>
-        </div>
+        <button onClick={() => setGuideOpen(true)}
+          className="mt-auto p-3 border-t border-black/30 text-[10px] text-white/40 leading-relaxed text-left hover:bg-white/5 transition-colors">
+          <p className="font-bold text-white/60 mb-1 flex items-center gap-1.5"><BookOpen className="w-3 h-3" /> Connecter un vrai PC Linux</p>
+          <p>Un seul script installe le terminal web + le tunnel HTTPS sur votre VPS ou VM. <span className="text-cama font-bold">Voir le guide →</span></p>
+        </button>
       </aside>
 
       {/* Terminal embarqué */}
@@ -242,6 +249,84 @@ function RemoteMode({ canManage, userId }: { canManage: boolean; userId: string 
           </div>
         </div>
       )}
+
+      {guideOpen && <SetupGuide onClose={() => setGuideOpen(false)} />}
+    </div>
+  );
+}
+
+/* ════════════════════════════════════════════════════════════
+   Guide d'installation — connecter une vraie machine Linux
+════════════════════════════════════════════════════════════ */
+const SETUP_BRANCH = "claude/happy-fermat-dBByg";
+const ONE_LINER = `curl -fsSL https://raw.githubusercontent.com/end2-237/cama/${SETUP_BRANCH}/scripts/cama-tp-setup.sh | sudo bash`;
+
+function CopyLine({ cmd }: { cmd: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <div className="relative group">
+      <pre className="bg-black rounded-lg p-3 pr-10 text-[12px] text-green-300 font-mono overflow-x-auto whitespace-pre-wrap break-all">{cmd}</pre>
+      <button onClick={() => { navigator.clipboard.writeText(cmd); setCopied(true); setTimeout(() => setCopied(false), 1500); }}
+        className="absolute top-2 right-2 text-white/40 hover:text-white transition-colors" title="Copier">
+        {copied ? <Check className="w-4 h-4 text-green-400" /> : <Copy className="w-4 h-4" />}
+      </button>
+    </div>
+  );
+}
+
+function SetupGuide({ onClose }: { onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-[#1e1e1e] border border-white/10 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[88vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        <div className="sticky top-0 bg-[#252526] border-b border-white/10 px-6 py-4 flex items-center gap-2 z-10">
+          <BookOpen className="w-5 h-5 text-cama" />
+          <h2 className="text-base font-bold text-white">Connecter une vraie machine Linux</h2>
+          <button onClick={onClose} className="ml-auto text-white/50 hover:text-white"><X className="w-5 h-5" /></button>
+        </div>
+
+        <div className="p-6 space-y-5 text-sm text-white/80 leading-relaxed">
+          <p>CAMA embarque le terminal web de votre machine (VPS, VM, serveur de TP) dans un iframe.
+            Un seul script installe <strong className="text-white">ttyd</strong> (terminal web) +
+            <strong className="text-white"> cloudflared</strong> (tunnel HTTPS gratuit, sans nom de domaine).</p>
+
+          <div>
+            <p className="text-xs font-bold text-cama uppercase tracking-wider mb-2">1 · Sur la machine (en root)</p>
+            <p className="mb-2">Connectez-vous en SSH (ex. votre VPS) puis lancez :</p>
+            <CopyLine cmd="ssh root@187.127.226.96" />
+            <div className="h-2" />
+            <CopyLine cmd={ONE_LINER} />
+            <p className="text-[12px] text-white/50 mt-2">Compatible Ubuntu 18 → 24 et Debian (architectures x86_64 / arm64).
+              Le script crée des services systemd (démarrage auto) et affiche à la fin l&apos;URL HTTPS + un login/mot de passe.</p>
+          </div>
+
+          <div>
+            <p className="text-xs font-bold text-cama uppercase tracking-wider mb-2">2 · Personnaliser (optionnel)</p>
+            <p className="mb-2">Imposez vos identifiants ou un accès lecture seule :</p>
+            <CopyLine cmd={`TP_USER=jfn TP_PASS=monMotDePasse TP_WRITABLE=1 sudo -E bash -c "$(curl -fsSL https://raw.githubusercontent.com/end2-237/cama/${SETUP_BRANCH}/scripts/cama-tp-setup.sh)"`} />
+            <p className="text-[12px] text-white/50 mt-2">
+              <code className="text-white/70">TP_WRITABLE=0</code> = terminal en lecture seule (démo non interactive).
+            </p>
+          </div>
+
+          <div>
+            <p className="text-xs font-bold text-cama uppercase tracking-wider mb-2">3 · Dans CAMA</p>
+            <p>Cliquez sur <strong className="text-white">«+»</strong>, collez l&apos;URL <code className="text-white/70">https://…trycloudflare.com</code>,
+              choisissez le type <strong className="text-white">ttyd</strong>, enregistrez.
+              Le terminal s&apos;ouvre dans CAMA et demande le login/mot de passe affichés par le script.</p>
+          </div>
+
+          <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-3 text-[12px] text-amber-200/90">
+            <p className="font-bold mb-1 flex items-center gap-1.5"><AlertCircle className="w-3.5 h-3.5" /> Sécurité</p>
+            <p>Le terminal donne un shell réel sur la machine. Gardez le mot de passe, n&apos;utilisez pas un compte root critique pour des TP publics,
+              et arrêtez le service après la séance : <code className="text-amber-100">systemctl disable --now cama-ttyd cama-tunnel</code>.</p>
+          </div>
+
+          <div className="text-[12px] text-white/50">
+            <p className="font-bold text-white/70 mb-1">Vérifier / dépanner sur la machine :</p>
+            <CopyLine cmd="systemctl status cama-ttyd cama-tunnel && tail -n 20 /var/log/cama-tunnel.log" />
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
