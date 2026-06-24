@@ -70,8 +70,9 @@ const spec = {
     "/api/search": {
       get: {
         tags: ["Recherche"],
-        summary: "Recherche web (Brave Search)",
-        description: "Renvoie des résultats web pour enrichir CAMA Search. Nécessite BRAVE_API_KEY côté serveur.",
+        summary: "Recherche web (multi-provider)",
+        description: "Renvoie des résultats web pour enrichir CAMA Search. Provider auto selon l'env " +
+          "(TAVILY_API_KEY > SERPER_API_KEY > BRAVE_API_KEY). Sans aucune clé, retombe sur l'API Wikipédia (gratuit).",
         parameters: [
           { name: "q", in: "query", required: true, schema: { type: "string" }, description: "Termes de recherche", example: "complexité algorithmique" },
           { name: "count", in: "query", required: false, schema: { type: "integer", default: 8, maximum: 20 }, description: "Nombre de résultats" },

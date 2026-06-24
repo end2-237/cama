@@ -342,8 +342,8 @@ function SearchEngine() {
                   {!webLoading && cat === "Web" && web.length === 0 && (
                     <div className="py-16 text-center">
                       <Globe className="w-10 h-10 text-border mx-auto mb-3" />
-                      <p className="text-sm font-bold text-ink mb-1">Aucun résultat web</p>
-                      <p className="text-xs text-muted">La recherche web nécessite la clé <code>BRAVE_API_KEY</code> configurée côté serveur.</p>
+                      <p className="text-sm font-bold text-ink mb-1">Aucun résultat web pour « {q} »</p>
+                      <p className="text-xs text-muted">Essayez d&apos;autres termes — la recherche web utilise Wikipédia par défaut (gratuit).</p>
                     </div>
                   )}
                   <div className="space-y-6">
