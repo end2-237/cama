@@ -24,7 +24,7 @@ export default function StudentExamsPage() {
     const slug = user.dossier?.parcoursSlug;
     if (!slug) { setFetching(false); return; }
     (async () => {
-      const cs = await fetchStudentProgram(slug);
+      const cs = await fetchStudentProgram(slug, user.dossier?.level);
       setCourses(cs);
       setExams(await fetchOpenExams(cs.map((c) => c.id)));
       setAttempts(await fetchAttemptsForStudent(user.id));

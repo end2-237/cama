@@ -98,11 +98,15 @@ export async function deleteChapter(id: string) {
 // ════════════════════════════════════════════════════════════
 // ÉTUDIANT — programme + progression
 // ════════════════════════════════════════════════════════════
-/** Matières du programme de l'étudiant (sa filière), publiées. */
-export async function fetchStudentProgram(parcoursSlug: string): Promise<DBProgramCourse[]> {
-  const { data } = await supabase.from("program_courses").select("*")
-    .eq("parcours_slug", parcoursSlug).eq("published", true)
-    .order("semestre").order("ordre");
+/**
+ * Matières du programme de l'étudiant (sa filière), publiées et limitées à
+ * son année/cycle (annee_niveau : L1..M2). Un L3 ne voit que les UE de L3.
+ */
+export async function fetchStudentProgram(parcoursSlug: string, anneeNiveau?: string): Promise<DBProgramCourse[]> {
+  let q = supabase.from("program_courses").select("*")
+    .eq("parcours_slug", parcoursSlug).eq("published", true);
+  if (anneeNiveau) q = q.eq("annee_niveau", anneeNiveau);
+  const { data } = await q.order("semestre").order("ordre");
   return (data as DBProgramCourse[]) ?? [];
 }
 

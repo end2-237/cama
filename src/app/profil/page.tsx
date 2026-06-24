@@ -51,7 +51,7 @@ export default function ProfilePage() {
       setResults(delibs.filter((d) => d.student_id === user.id));
 
       if (!slug) return;
-      const progCourses = await fetchStudentProgram(slug);
+      const progCourses = await fetchStudentProgram(slug, user.dossier?.level);
       if (cancelled) return;
       setCourses(progCourses);
       const chapterLists = await Promise.all(progCourses.map((c) => fetchChapters(c.id)));

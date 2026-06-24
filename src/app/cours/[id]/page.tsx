@@ -28,6 +28,9 @@ interface CourseRow {
   prof_ia: boolean;
   description: string | null;
   objectives: string | null;
+  parcours_slug: string;
+  annee_niveau: string;
+  published: boolean;
 }
 
 type Mode = "pdf" | "video" | "natif" | "live" | "ia";
@@ -87,7 +90,19 @@ export default function CoursePlayer() {
         fetchProgress(user.id),
       ]);
       if (cancelled) return;
-      setCourse((courseRow as CourseRow) ?? null);
+      const row = (courseRow as CourseRow) ?? null;
+      // Contrôle d'accès : un étudiant n'accède qu'aux cours publiés de sa
+      // filière ET de son année/cycle (un L3 ne peut pas ouvrir un cours L1).
+      if (row && user.role === "etudiant") {
+        const d = user.dossier;
+        const wrongFiliere = d?.parcoursSlug && row.parcours_slug !== d.parcoursSlug;
+        const wrongAnnee   = d?.level && row.annee_niveau !== d.level;
+        if (!row.published || wrongFiliere || wrongAnnee) {
+          router.replace("/dashboard");
+          return;
+        }
+      }
+      setCourse(row);
       setChapters(
         supaChapters.map((c) => ({
           id: c.id,

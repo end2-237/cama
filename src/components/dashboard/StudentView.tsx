@@ -279,7 +279,7 @@ function CoursesTab() {
     (async () => {
       const [progList, list] = await Promise.all([
         fetchProgress(user.id),
-        fetchStudentProgram(slug),
+        fetchStudentProgram(slug, user.dossier?.level),
       ]);
       if (cancelled) return;
       const chaptersEntries = await Promise.all(list.map(async (c) => [c.id, await fetchChapters(c.id)] as const));
@@ -488,7 +488,7 @@ function ExamsTab() {
     if (!user || !slug) return;
     let cancelled = false;
     (async () => {
-      const courses = await fetchStudentProgram(slug);
+      const courses = await fetchStudentProgram(slug, user.dossier?.level);
       if (cancelled) return;
       const [openExams, atts] = await Promise.all([
         fetchOpenExams(courses.map((c) => c.id)),

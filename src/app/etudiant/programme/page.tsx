@@ -8,7 +8,7 @@ import {
   CalendarClock, TrendingUp, ChevronDown, ChevronRight, Bot,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
-import type { DBProgramCourse, DBChapter, DBSession, DBChapterProgress } from "@/lib/supabase";
+import type { DBProgramCourse, DBChapter, DBSession, DBChapterProgress, CycleMode } from "@/lib/supabase";
 import {
   fetchStudentProgram, fetchProgress, markChapter, fetchChapters, fetchSessions,
 } from "@/lib/program";
@@ -35,7 +35,7 @@ export default function StudentProgramPage() {
     const slug = user.dossier?.parcoursSlug;
     if (!slug) { setFetching(false); return; }
     (async () => {
-      const [cs, prog] = await Promise.all([fetchStudentProgram(slug), fetchProgress(user.id)]);
+      const [cs, prog] = await Promise.all([fetchStudentProgram(slug, user.dossier?.level), fetchProgress(user.id)]);
       setCourses(cs);
       setProgress(prog);
       setSessions(await fetchSessions(cs.map((c) => c.id)));
@@ -69,14 +69,17 @@ export default function StudentProgramPage() {
     return Object.entries(m).sort(([a], [b]) => a.localeCompare(b));
   }, [courses]);
 
-  // Cours de la semaine (séances validées, triées par jour)
+  // Mode d'inscription de l'étudiant (présentiel / hybride / en ligne)
+  const studentMode = (user?.dossier?.mode ?? "hybride") as CycleMode;
+
+  // Cours de la semaine — séances validées qui concernent le mode de l'étudiant
   const weekSessions = useMemo(() => {
     const courseById = new Map(courses.map((c) => [c.id, c]));
     return sessions
-      .filter((s) => s.status === "valide")
+      .filter((s) => s.status === "valide" && (s.modes?.includes(studentMode) ?? false))
       .map((s) => ({ ...s, course: courseById.get(s.program_course_id) }))
       .sort((a, b) => JOUR_ORDER.indexOf(a.day ?? "") - JOUR_ORDER.indexOf(b.day ?? ""));
-  }, [sessions, courses]);
+  }, [sessions, courses, studentMode]);
 
   if (loading || !user) return (
     <div className="min-h-screen flex items-center justify-center">
@@ -201,11 +204,12 @@ export default function StudentProgramPage() {
 
                 {/* Cette semaine */}
                 <aside className="bg-white border border-border rounded-xl p-4 lg:sticky lg:top-16">
-                  <h2 className="text-[11px] font-black text-ink uppercase tracking-widest mb-3 flex items-center gap-1.5">
+                  <h2 className="text-[11px] font-black text-ink uppercase tracking-widest mb-2 flex items-center gap-1.5">
                     <CalendarClock className="w-3.5 h-3.5 text-cama" /> Cette semaine
                   </h2>
+                  <p className="text-[10px] text-muted mb-3">Séances de votre mode <span className="font-bold text-cama">{d.modeLabel}</span></p>
                   {weekSessions.length === 0 ? (
-                    <p className="text-[11px] text-muted italic">Aucune séance planifiée.</p>
+                    <p className="text-[11px] text-muted italic">Aucune séance planifiée pour le mode {d.modeLabel.toLowerCase()}.</p>
                   ) : (
                     <div className="space-y-2">
                       {weekSessions.map((s) => (

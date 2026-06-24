@@ -9,8 +9,8 @@ import {
 import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabase";
-import type { DBProgramCourse, DBChapter } from "@/lib/supabase";
-import { fetchChapters, fetchProgress } from "@/lib/program";
+import type { DBProgramCourse, DBChapter, DBSession, CycleMode } from "@/lib/supabase";
+import { fetchChapters, fetchProgress, fetchSessions } from "@/lib/program";
 
 interface Props {
   courseId: string | null;
@@ -24,20 +24,23 @@ export default function CourseDetailDrawer({ courseId, onClose }: Props) {
   const [course, setCourse] = useState<DBProgramCourse | null>(null);
   const [chapters, setChapters] = useState<DBChapter[]>([]);
   const [doneIds, setDoneIds] = useState<Set<string>>(new Set());
+  const [sessions, setSessions] = useState<DBSession[]>([]);
 
   useEffect(() => {
     if (!courseId) return;
     let active = true;
     (async () => {
-      const [{ data: c }, chs, prog] = await Promise.all([
+      const [{ data: c }, chs, prog, sess] = await Promise.all([
         supabase.from("program_courses").select("*").eq("id", courseId).maybeSingle(),
         fetchChapters(courseId),
         user ? fetchProgress(user.id) : Promise.resolve([]),
+        fetchSessions([courseId]),
       ]);
       if (!active) return;
       setCourse((c as DBProgramCourse) ?? null);
       setChapters(chs);
       setDoneIds(new Set(prog.map((p) => p.chapter_id)));
+      setSessions(sess);
     })();
     return () => { active = false; };
   }, [courseId, user]);
@@ -47,7 +50,9 @@ export default function CourseDetailDrawer({ courseId, onClose }: Props) {
   const lives: unknown[] = [];
   const nextLive = null as { id: string; title: string; date: string; durationMin: number; status: string } | null;
   const forumCount = 0;
-  const courseSessions: string[] = [];
+  // Séances validées qui concernent le mode d'inscription de l'étudiant
+  const studentMode = (user?.dossier?.mode ?? "hybride") as CycleMode;
+  const courseSessions = sessions.filter((s) => s.status === "valide" && (s.modes?.includes(studentMode) ?? false));
   const unlocked = (i: number) => i === 0 || doneIds.has(chapters[i - 1].id);
 
   const objectives = course?.objectives?.length ? course.objectives : [
@@ -261,9 +266,12 @@ export default function CourseDetailDrawer({ courseId, onClose }: Props) {
                     <p className="text-[11px] text-muted">Aucune séance planifiée pour votre mode d&apos;inscription.</p>
                   ) : (
                     <div className="space-y-1.5">
-                      {courseSessions.map((s, i) => (
-                        <div key={i} className="flex items-center gap-2 text-[11px]">
-                          <span className="text-ink font-semibold flex-shrink-0">{s}</span>
+                      {courseSessions.map((s) => (
+                        <div key={s.id} className="flex items-center gap-2 text-[11px]">
+                          <span className="text-ink font-semibold flex-shrink-0">{s.day}</span>
+                          <span className="text-muted">{s.end_time ? `${s.start_time}–${s.end_time}` : s.start_time}</span>
+                          <span className="text-subtle">· {s.kind}</span>
+                          {s.room && <span className="text-subtle truncate">· {s.room}</span>}
                         </div>
                       ))}
                     </div>
