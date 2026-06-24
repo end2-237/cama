@@ -12,7 +12,7 @@ import { useAuth } from "@/context/AuthContext";
 import { fetchStudentProgram, fetchChapters, fetchProgress } from "@/lib/program";
 import { fetchOpenExams, fetchAttemptsForStudent, fetchDeliberations } from "@/lib/exams";
 import { fetchLivesForCourses, subscribeLives } from "@/lib/lives";
-import { fetchExtraCourses, fetchMyEnrollments, enrollExtra, unenrollExtra, MODE_LABEL } from "@/lib/extra";
+import { fetchExtraCourses, fetchMyEnrollments, MODE_LABEL } from "@/lib/extra";
 import type { DBProgramCourse, DBChapter, DBExam, DBExamAttempt, DBExtraCourse, DBExtraEnrollment } from "@/lib/supabase";
 import type { DelibWithMeta } from "@/lib/exams";
 
@@ -418,21 +418,20 @@ function CoursesTab() {
               const img = EXTRA_IMG[c.category] ?? EXTRA_IMG["Autre"];
               return (
                 <div key={c.id} className="bg-white group cursor-pointer hover:bg-cama-50/30 transition-colors">
-                  <div className="relative h-24 overflow-hidden">
+                  <Link href={`/etudiant/parascolaire/cours/${c.id}`} className="block relative h-24 overflow-hidden">
                     <img src={img} alt={c.title}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
                     <span className="absolute top-1.5 right-1.5 text-[9px] font-black px-1.5 py-0.5 text-white" style={{ background: c.color }}>{c.category}</span>
                     <span className="absolute bottom-1.5 left-1.5 text-[9px] font-bold text-white bg-black/50 px-1.5 py-0.5">{c.sessions_count} séances · {MODE_LABEL[c.mode]}</span>
-                  </div>
+                  </Link>
                   <div className="p-2.5">
                     <h3 className="text-xs font-bold text-ink leading-snug group-hover:text-cama transition-colors">{c.title}</h3>
                     <p className="text-[10px] text-muted leading-snug mt-0.5 line-clamp-2">{c.description}</p>
-                    <button
-                      onClick={async (e) => { e.preventDefault(); if (enrolled) await unenrollExtra(c.id, user!.id); else await enrollExtra(c.id, user!.id); const [ex2, mex2] = await Promise.all([fetchExtraCourses(true), fetchMyEnrollments(user!.id)]); setExtraCourses(ex2); setMyExtra(mex2); }}
-                      className={`mt-1.5 text-[10px] font-bold px-2 py-1 transition-colors ${enrolled ? "border border-green-500 text-green-600 bg-green-50" : "text-white bg-ink hover:bg-cama"}`}>
-                      {enrolled ? "Inscrit" : "S'inscrire"}
-                    </button>
+                    <Link href={`/etudiant/parascolaire/cours/${c.id}`}
+                      className={`mt-1.5 inline-flex items-center gap-1 text-[10px] font-bold px-2 py-1 transition-colors ${enrolled ? "border border-green-500 text-green-600 bg-green-50" : "text-white bg-ink hover:bg-cama"}`}>
+                      <Play className="w-2.5 h-2.5" /> {enrolled ? "Continuer" : "Commencer"}
+                    </Link>
                   </div>
                 </div>
               );
