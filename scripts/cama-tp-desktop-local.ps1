@@ -143,6 +143,15 @@ if (-not (Test-Path $tvn)) {
 }
 if (Test-Path $tvn) {
   Ok "TightVNC installe."
+  # websockify se connecte via 127.0.0.1 : TightVNC refuse le loopback par defaut.
+  try {
+    New-Item -Path 'HKLM:\SOFTWARE\TightVNC\Server' -Force | Out-Null
+    Set-ItemProperty 'HKLM:\SOFTWARE\TightVNC\Server' -Name AllowLoopback -Value 1 -Type DWord
+    Restart-Service tvnserver -ErrorAction SilentlyContinue
+    Ok "Connexions loopback autorisees dans TightVNC."
+  } catch {
+    Warn "Active manuellement 'Allow loopback connections' (Configuration -> Administration)."
+  }
   Warn "Ouvre TightVNC (zone de notification) -> onglet Server -> definis un MOT DE PASSE VNC."
 }
 
