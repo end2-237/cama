@@ -55,7 +55,9 @@ if (-not (Test-Path $py)) {
 } else { Ok "Python deja present." }
 
 # -- 2. pip + websockify ---------------------------------------------
-if (-not (& $py -m pip --version 2>$null)) {
+$hasPip = $false
+try { & $py -m pip --version 2>&1 | Out-Null; if ($LASTEXITCODE -eq 0) { $hasPip = $true } } catch {}
+if (-not $hasPip) {
   Info "Installation de pip..."
   $getpip = Join-Path $Root "get-pip.py"
   Invoke-WebRequest "https://bootstrap.pypa.io/get-pip.py" -OutFile $getpip
