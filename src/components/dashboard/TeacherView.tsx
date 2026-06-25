@@ -7,14 +7,14 @@ import {
   Radio, Bot, FileText, Video, MonitorPlay, ShieldCheck,
   AlertTriangle, Check, Eye, EyeOff, TrendingUp, Terminal,
   Newspaper, BookMarked, ExternalLink, Play, Sparkles, Inbox, Target,
-  Trash2, X,
+  Trash2, X, CalendarClock, Edit3 as EditIcon,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { fetchTeacherCourses, fetchChapters } from "@/lib/program";
 import {
   fetchExamsForCourses, fetchAttemptsForExam, fetchQuestions,
-  createExam, setExamStatus, deleteExam, gradeAttempt,
-  addQuestion, deleteQuestion,
+  createExam, updateExam, setExamStatus, deleteExam, gradeAttempt,
+  addQuestion, updateQuestion, deleteQuestion,
 } from "@/lib/exams";
 import { fetchUsers } from "@/lib/admin";
 import { fetchLivesForCourses, subscribeLives } from "@/lib/lives";
@@ -439,8 +439,11 @@ function EvalTab() {
   const [tab, setTab] = useState<"questions" | "copies">("questions");
   const [filter, setFilter] = useState<"all" | "examen" | "tp">("all");
 
-  // formulaire question
+  const [sched, setSched] = useState("");        // date/heure planifiée (création)
+
+  // formulaire question (création + édition)
   const [qOpen, setQOpen] = useState(false);
+  const [editingQ, setEditingQ] = useState<string | null>(null);  // id si édition
   const [q, setQ] = useState<Partial<DBExamQuestion>>({ type: "qcm", text: "", options: ["", "", "", ""], correct_index: 0, points: 1 });
 
   const reload = useCallback(async () => {
@@ -486,9 +489,17 @@ function EvalTab() {
       title: (examType === "tp" ? "TP : " : "") + title.trim(),
       duration_min: examType === "tp" ? 120 : (parseInt(dur) || 45),
       status: "planifie",
+      scheduled_at: sched ? new Date(sched).toISOString() : null,
       created_by: user.id,
     });
-    setTitle(""); setShowNew(false);
+    setTitle(""); setSched(""); setShowNew(false);
+    await reload();
+  };
+
+  // Met à jour la date planifiée d'un examen existant (alimente le calendrier étudiant).
+  const onSchedChange = async (id: string, value: string) => {
+    await updateExam(id, { scheduled_at: value ? new Date(value).toISOString() : null });
+    if (selExam?.id === id) setSelExam((s) => s ? { ...s, scheduled_at: value ? new Date(value).toISOString() : null } : s);
     await reload();
   };
 
@@ -514,23 +525,44 @@ function EvalTab() {
     setAttemptsByExam((p) => ({ ...p, [e.id]: atts }));
   };
 
-  const onAddQuestion = async () => {
+  const openNewQuestion = () => {
+    setEditingQ(null);
+    setQ({ type: "qcm", text: "", options: ["", "", "", ""], correct_index: 0, points: 1 });
+    setQOpen(true);
+  };
+
+  const openEditQuestion = (qq: DBExamQuestion) => {
+    setEditingQ(qq.id);
+    setQ({
+      type: qq.type, text: qq.text, points: qq.points,
+      options: qq.type === "qcm" ? [...qq.options, "", "", "", ""].slice(0, Math.max(4, qq.options.length)) : ["", "", "", ""],
+      correct_index: qq.correct_index ?? 0,
+    });
+    setQOpen(true);
+  };
+
+  const onSaveQuestion = async () => {
     if (!selExam || !q.text?.trim()) return;
-    await addQuestion({
-      exam_id: selExam.id, ordre: (questionsByExam[selExam.id] ?? []).length, type: q.type,
-      text: q.text, points: q.points ?? 1,
+    const payload = {
+      type: q.type, text: q.text, points: q.points ?? 1,
       options: q.type === "qcm" ? (q.options ?? []).filter(Boolean) : [],
       correct_index: q.type === "qcm" ? q.correct_index : null,
-    });
-    setQuestionsByExam((p) => ({ ...p, [selExam.id]: [...(p[selExam.id] ?? []), { id: Math.random().toString(), exam_id: selExam.id, ordre: 0, type: q.type ?? "qcm", text: q.text ?? "", options: q.options ?? [], correct_index: q.correct_index ?? null, points: q.points ?? 1 }] }));
+    };
+    if (editingQ) {
+      await updateQuestion(editingQ, payload);
+    } else {
+      await addQuestion({ exam_id: selExam.id, ordre: (questionsByExam[selExam.id] ?? []).length, ...payload });
+    }
     const qs = await fetchQuestions(selExam.id);
     setQuestionsByExam((p) => ({ ...p, [selExam.id]: qs }));
     setQOpen(false);
+    setEditingQ(null);
     setQ({ type: "qcm", text: "", options: ["", "", "", ""], correct_index: 0, points: 1 });
   };
 
   const onDelQuestion = async (id: string) => {
     if (!selExam) return;
+    if (!confirm("Supprimer cette question ?")) return;
     await deleteQuestion(id);
     setQuestionsByExam((p) => ({ ...p, [selExam.id]: (p[selExam.id] ?? []).filter((x) => x.id !== id) }));
   };
@@ -670,6 +702,14 @@ function EvalTab() {
             )}
             <button onClick={doCreateExam} className="bg-cama text-white text-sm font-bold px-5 hover:bg-cama-700 transition-colors">Créer</button>
           </div>
+          <div className="flex items-center gap-2 mt-2">
+            <label className="text-[10px] font-bold text-muted uppercase tracking-wider flex items-center gap-1">
+              <CalendarClock className="w-3 h-3" /> Date planifiée
+            </label>
+            <input type="datetime-local" value={sched} onChange={(e) => setSched(e.target.value)}
+              className="text-sm border border-border px-3 py-1.5 outline-none focus:border-cama" />
+            <span className="text-[10px] text-subtle">apparaît dans le calendrier de l&apos;étudiant</span>
+          </div>
           {examType === "tp" && (
             <p className="text-[10px] text-muted mt-2 flex items-center gap-1">
               <Terminal className="w-3 h-3" /> L&apos;évaluation TP permet de corriger le travail des étudiants sur machine distante.
@@ -732,6 +772,15 @@ function EvalTab() {
                   {courseById.get(selExam.program_course_id)?.code} · {(questionsByExam[selExam.id] ?? []).length} questions · {(questionsByExam[selExam.id] ?? []).reduce((a, x) => a + x.points, 0)} pts · {selExam.duration_min} min
                 </p>
               </div>
+              <div className="flex flex-col gap-0.5">
+                <label className="text-[9px] font-bold text-subtle uppercase tracking-wider flex items-center gap-1">
+                  <CalendarClock className="w-2.5 h-2.5" /> Planifié le
+                </label>
+                <input type="datetime-local"
+                  value={selExam.scheduled_at ? new Date(selExam.scheduled_at).toISOString().slice(0, 16) : ""}
+                  onChange={(ev) => onSchedChange(selExam.id, ev.target.value)}
+                  className="text-xs border border-border px-2 py-1 outline-none focus:border-cama" />
+              </div>
               <select
                 value={selExam.status}
                 onChange={(ev) => onStatusChange(selExam.id, ev.target.value as ExamStatus)}
@@ -756,7 +805,7 @@ function EvalTab() {
               <div className="bg-white border border-border p-4">
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="text-[11px] font-black text-ink uppercase tracking-widest">Questions</h3>
-                  <button onClick={() => setQOpen(true)} className="text-[11px] font-bold text-cama hover:underline flex items-center gap-1"><PlusCircle className="w-3 h-3" /> Ajouter</button>
+                  <button onClick={openNewQuestion} className="text-[11px] font-bold text-cama hover:underline flex items-center gap-1"><PlusCircle className="w-3 h-3" /> Ajouter</button>
                 </div>
                 {(questionsByExam[selExam.id] ?? []).length === 0 ? (
                   <p className="text-xs text-muted italic">Aucune question. Ajoutez-en avant d&apos;ouvrir l&apos;évaluation.</p>
@@ -779,7 +828,10 @@ function EvalTab() {
                               </ul>
                             )}
                           </div>
-                          <button onClick={() => onDelQuestion(qq.id)} className="text-subtle hover:text-red-500"><Trash2 className="w-3.5 h-3.5" /></button>
+                          <div className="flex items-center gap-1 flex-shrink-0">
+                            <button onClick={() => openEditQuestion(qq)} className="text-subtle hover:text-cama" title="Modifier"><EditIcon className="w-3.5 h-3.5" /></button>
+                            <button onClick={() => onDelQuestion(qq.id)} className="text-subtle hover:text-red-500" title="Supprimer"><Trash2 className="w-3.5 h-3.5" /></button>
+                          </div>
                         </div>
                       </div>
                     ))}
@@ -819,8 +871,8 @@ function EvalTab() {
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={(ev) => { if (ev.target === ev.currentTarget) setQOpen(false); }}>
           <div className="bg-white shadow-2xl w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-base font-bold text-ink">Nouvelle question</h2>
-              <button onClick={() => setQOpen(false)} className="text-muted hover:text-ink"><X className="w-5 h-5" /></button>
+              <h2 className="text-base font-bold text-ink">{editingQ ? "Modifier la question" : "Nouvelle question"}</h2>
+              <button onClick={() => { setQOpen(false); setEditingQ(null); }} className="text-muted hover:text-ink"><X className="w-5 h-5" /></button>
             </div>
             <div className="space-y-3">
               <div className="flex gap-2">
@@ -853,9 +905,9 @@ function EvalTab() {
               )}
             </div>
             <div className="flex gap-2 mt-5">
-              <button onClick={() => setQOpen(false)} className="flex-1 border border-border py-2.5 text-sm font-semibold text-muted">Annuler</button>
-              <button onClick={onAddQuestion} className="flex-1 bg-cama text-white py-2.5 text-sm font-bold flex items-center justify-center gap-2 hover:bg-cama-700">
-                <Check className="w-4 h-4" /> Ajouter
+              <button onClick={() => { setQOpen(false); setEditingQ(null); }} className="flex-1 border border-border py-2.5 text-sm font-semibold text-muted">Annuler</button>
+              <button onClick={onSaveQuestion} className="flex-1 bg-cama text-white py-2.5 text-sm font-bold flex items-center justify-center gap-2 hover:bg-cama-700">
+                <Check className="w-4 h-4" /> {editingQ ? "Enregistrer" : "Ajouter"}
               </button>
             </div>
           </div>

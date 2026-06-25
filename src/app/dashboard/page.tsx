@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import DashNav from "@/components/dashboard/DashNav";
 import Banner from "@/components/dashboard/Banner";
@@ -25,15 +25,19 @@ const tabsMap: Record<string, string[]> = {
 export default function DashboardPage() {
   const { user, loading } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const maintenance = useMaintenance();
 
   const tabs = user ? tabsMap[user.role] : [];
   const [activeTab, setActiveTab] = useState("");
 
   useEffect(() => {
-    if (user) setActiveTab(tabsMap[user.role][0]);
+    if (!user) return;
+    const roleTabs = tabsMap[user.role];
+    const wanted = searchParams.get("tab");
+    setActiveTab(wanted && roleTabs.includes(wanted) ? wanted : roleTabs[0]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.role]);
+  }, [user?.role, searchParams]);
 
   useEffect(() => {
     if (!loading && !user) router.replace("/auth/login");

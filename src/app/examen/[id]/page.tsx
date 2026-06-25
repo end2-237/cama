@@ -6,6 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 import {
   ShieldCheck, Clock, AlertTriangle, Lock, Save, CheckCircle2,
   Maximize, Award, Loader2, ChevronLeft, ChevronRight, FileText, Hourglass,
+  BookOpen, Layers, ListChecks, Eye,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import type { DBExam, DBExamQuestion, DBExamAttempt } from "@/lib/supabase";
@@ -323,92 +324,170 @@ export default function ExamPage() {
   const ss = remaining !== null ? String(remaining % 60).padStart(2, "0") : "--";
   const lowTime = remaining !== null && remaining < 60;
 
+  const totalPoints = questions.reduce((s, qq) => s + qq.points, 0);
+  const progressPct = questions.length ? (answered / questions.length) * 100 : 0;
+
   return (
     <div className="min-h-screen bg-surface select-none">
       {/* Barre surveillée */}
-      <header className="bg-ink text-white sticky top-0 z-40">
-        <div className="max-w-[800px] mx-auto px-4 flex items-center gap-3 h-12">
-          <ShieldCheck className="w-4 h-4 text-green-400" />
-          <span className="text-xs font-bold">Safe-CAMA · {exam?.title}</span>
+      <header className="bg-ink text-white sticky top-0 z-40 border-b border-white/10">
+        <div className="px-4 sm:px-6 flex items-center gap-3 h-12">
+          <ShieldCheck className="w-4 h-4 text-green-400 flex-shrink-0" />
+          <span className="text-[10px] font-black uppercase tracking-widest text-green-400">Safe-CAMA</span>
+          <span className="hidden sm:inline text-white/20">|</span>
+          <span className="hidden sm:inline text-xs font-bold truncate">{exam?.title}</span>
           <div className="flex-1" />
-          {alerts > 0 && (
-            <span className="flex items-center gap-1 text-[11px] text-red-300"><AlertTriangle className="w-3.5 h-3.5" /> {alerts} alerte(s)</span>
+          {alerts > 0 ? (
+            <span className="flex items-center gap-1 text-[11px] font-bold text-red-300 bg-red-500/15 px-2 py-1 rounded-lg">
+              <AlertTriangle className="w-3.5 h-3.5" /> {alerts} alerte{alerts > 1 ? "s" : ""}
+            </span>
+          ) : (
+            <span className="hidden sm:flex items-center gap-1.5 text-[11px] text-white/50">
+              <span className="w-1.5 h-1.5 rounded-full bg-green-400" /> Environnement surveillé
+            </span>
           )}
-          <span className={`flex items-center gap-1.5 font-mono text-sm font-bold ${lowTime ? "text-red-400 animate-pulse" : "text-white"}`}>
+          <span className={`flex items-center gap-1.5 font-mono text-sm font-bold px-2 py-1 rounded-lg ${lowTime ? "text-red-300 bg-red-500/15 animate-pulse" : "text-white bg-white/10"}`}>
             <Clock className="w-4 h-4" /> {mm}:{ss}
           </span>
         </div>
       </header>
 
-      <main className="max-w-[800px] mx-auto px-4 py-6">
-        {/* Progression */}
-        <div className="flex items-center gap-2 mb-4">
-          <span className="text-xs font-bold text-muted">Question {idx + 1}/{questions.length}</span>
-          <div className="flex-1 h-1.5 bg-white rounded-full overflow-hidden border border-border">
-            <div className="h-full bg-cama" style={{ width: `${((idx + 1) / questions.length) * 100}%` }} />
+      <div className="grid lg:grid-cols-[260px_1fr]">
+        {/* ── RAIL GAUCHE ── */}
+        <aside className="hidden lg:flex flex-col bg-white border-r border-border lg:sticky lg:top-12 lg:h-[calc(100vh-3rem)] overflow-y-auto">
+          {/* Infos examen */}
+          <div className="p-4 border-b border-border">
+            <p className="text-[10px] font-black uppercase tracking-widest text-muted mb-2">Examen</p>
+            <p className="text-sm font-bold text-ink leading-snug mb-3">{exam?.title}</p>
+            <div className="space-y-1.5 text-[11px]">
+              <p className="flex items-center gap-1.5 text-muted"><BookOpen className="w-3.5 h-3.5 text-cama" /> {exam?.shuffle ? "Questions melangees" : "Ordre fixe"}</p>
+              <p className="flex items-center gap-1.5 text-muted"><ListChecks className="w-3.5 h-3.5 text-cama" /> {questions.length} question{questions.length > 1 ? "s" : ""}</p>
+              <p className="flex items-center gap-1.5 text-muted"><Layers className="w-3.5 h-3.5 text-cama" /> {totalPoints} point{totalPoints > 1 ? "s" : ""}</p>
+              <p className="flex items-center gap-1.5 text-muted"><Clock className="w-3.5 h-3.5 text-cama" /> {exam?.duration_min} min</p>
+            </div>
           </div>
-          <span className="text-xs text-muted">{answered} répondues</span>
-        </div>
 
-        {q && (
-          <div className="bg-white border border-border rounded-2xl p-6 mb-4">
-            <p className="text-[11px] font-bold text-cama uppercase tracking-wider mb-2">{q.points} point{q.points > 1 ? "s" : ""} · {q.type === "qcm" ? "Choix unique" : "Réponse libre"}</p>
-            <p className="text-base text-ink font-medium mb-5">{q.text}</p>
+          {/* Progression */}
+          <div className="p-4 border-b border-border">
+            <p className="text-[10px] font-black uppercase tracking-widest text-muted mb-2">Progression</p>
+            <div className="flex items-baseline gap-1.5 mb-2">
+              <span className="text-2xl font-black text-ink">{answered}</span>
+              <span className="text-sm text-muted">/ {questions.length} répondues</span>
+            </div>
+            <div className="h-1.5 bg-surface border border-border overflow-hidden">
+              <div className="h-full bg-cama transition-all" style={{ width: `${progressPct}%` }} />
+            </div>
+          </div>
 
-            {q.type === "qcm" ? (
-              <div className="space-y-2">
-                {q.options.map((o, oi) => (
-                  <button key={oi} onClick={() => setAnswers((a) => ({ ...a, [q.id]: oi }))}
-                    className={`w-full text-left flex items-center gap-3 p-3 rounded-xl border-2 transition-all ${
-                      answers[q.id] === oi ? "border-cama bg-cama-50" : "border-border hover:border-cama/40"}`}>
-                    <span className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
-                      answers[q.id] === oi ? "border-cama bg-cama" : "border-border"}`}>
-                      {answers[q.id] === oi && <CheckCircle2 className="w-4 h-4 text-white" />}
-                    </span>
-                    <span className="text-sm text-ink">{o}</span>
-                  </button>
-                ))}
+          {/* Navigateur de questions */}
+          <div className="p-4 border-b border-border">
+            <p className="text-[10px] font-black uppercase tracking-widest text-muted mb-2.5">Navigateur</p>
+            <div className="grid grid-cols-6 gap-1.5">
+              {questions.map((qq, i) => (
+                <button key={qq.id} onClick={() => setIdx(i)}
+                  className={`aspect-square text-[11px] font-bold border transition-all ${
+                    i === idx ? "bg-cama text-white border-cama" :
+                    answers[qq.id] !== undefined ? "bg-cama-50 text-cama border-cama/30" :
+                    "bg-white text-muted border-border hover:border-cama/40"}`}>
+                  {i + 1}
+                </button>
+              ))}
+            </div>
+            <div className="flex flex-col gap-1.5 mt-3 text-[10px] text-muted">
+              <span className="flex items-center gap-1.5"><span className="w-3 h-3 bg-cama-50 border border-cama/30 inline-block" /> Répondue</span>
+              <span className="flex items-center gap-1.5"><span className="w-3 h-3 bg-cama border border-cama inline-block" /> En cours</span>
+              <span className="flex items-center gap-1.5"><span className="w-3 h-3 bg-white border border-border inline-block" /> Vide</span>
+            </div>
+          </div>
+
+          {/* Intégrité Safe-CAMA */}
+          <div className="p-4 mt-auto">
+            <p className="text-[10px] font-black uppercase tracking-widest text-muted mb-2">Intégrité</p>
+            <div className={`border p-3 ${alerts > 0 ? "border-red-200 bg-red-50" : "border-border bg-surface"}`}>
+              <div className="flex items-center gap-2 mb-1">
+                {alerts > 0 ? (
+                  <><AlertTriangle className="w-3.5 h-3.5 text-red-500" /><span className="text-xs font-bold text-red-600">{alerts} alerte{alerts > 1 ? "s" : ""}</span></>
+                ) : (
+                  <><span className="w-2 h-2 rounded-full bg-green-500" /><span className="text-xs font-bold text-ink">Aucune alerte</span></>
+                )}
               </div>
+              <p className="flex items-center gap-1.5 text-[10px] text-muted">
+                <Eye className="w-3 h-3" /> Environnement surveillé
+              </p>
+            </div>
+          </div>
+        </aside>
+
+        {/* ── ZONE PRINCIPALE ── */}
+        <main className="px-4 sm:px-8 py-6 max-w-[820px] w-full">
+          {/* Barre de progression mobile */}
+          <div className="lg:hidden flex items-center gap-2 mb-4">
+            <span className="text-xs font-bold text-muted whitespace-nowrap">{idx + 1}/{questions.length}</span>
+            <div className="flex-1 h-1.5 bg-white border border-border overflow-hidden">
+              <div className="h-full bg-cama" style={{ width: `${((idx + 1) / questions.length) * 100}%` }} />
+            </div>
+            <span className="text-xs text-muted whitespace-nowrap">{answered} ok</span>
+          </div>
+
+          {q && (
+            <div className="bg-white border border-border p-6 sm:p-8 mb-4">
+              <div className="flex items-center justify-between mb-4 pb-4 border-b border-border">
+                <div className="flex items-center gap-2">
+                  <span className="w-7 h-7 bg-ink text-white text-xs font-black flex items-center justify-center">{idx + 1}</span>
+                  <span className="text-[10px] font-black uppercase tracking-widest text-muted">Question {idx + 1} / {questions.length}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide ${q.type === "qcm" ? "bg-cama-50 text-cama" : "bg-gold/10 text-gold-dark"}`}>
+                    {q.type === "qcm" ? "Choix unique" : "Réponse libre"}
+                  </span>
+                  <span className="text-[11px] font-bold text-gold-dark">{q.points} pt{q.points > 1 ? "s" : ""}</span>
+                </div>
+              </div>
+
+              <p className="text-base sm:text-lg text-ink font-medium mb-6 leading-relaxed">{q.text}</p>
+
+              {q.type === "qcm" ? (
+                <div className="space-y-2">
+                  {q.options.map((o, oi) => (
+                    <button key={oi} onClick={() => setAnswers((a) => ({ ...a, [q.id]: oi }))}
+                      className={`w-full text-left flex items-center gap-3 p-3 border-2 transition-all ${
+                        answers[q.id] === oi ? "border-cama bg-cama-50" : "border-border hover:border-cama/40"}`}>
+                      <span className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
+                        answers[q.id] === oi ? "border-cama bg-cama" : "border-border"}`}>
+                        {answers[q.id] === oi && <CheckCircle2 className="w-4 h-4 text-white" />}
+                      </span>
+                      <span className="text-sm text-ink">{o}</span>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <textarea value={(answers[q.id] as string) ?? ""} onChange={(e) => setAnswers((a) => ({ ...a, [q.id]: e.target.value }))}
+                  rows={7} placeholder="Votre réponse…"
+                  className="w-full border border-border px-4 py-3 text-sm outline-none focus:border-cama resize-y" />
+              )}
+            </div>
+          )}
+
+          {/* Navigation */}
+          <div className="flex items-center justify-between border-t border-border pt-4">
+            <button onClick={() => setIdx((i) => Math.max(0, i - 1))} disabled={idx === 0}
+              className="flex items-center gap-1 text-sm font-semibold text-muted disabled:opacity-40 hover:text-ink transition-colors">
+              <ChevronLeft className="w-4 h-4" /> Précédent
+            </button>
+            {idx < questions.length - 1 ? (
+              <button onClick={() => setIdx((i) => Math.min(questions.length - 1, i + 1))}
+                className="flex items-center gap-1 text-sm font-bold bg-cama text-white px-4 py-2 rounded-lg hover:bg-cama-700 transition-colors">
+                Suivant <ChevronRight className="w-4 h-4" />
+              </button>
             ) : (
-              <textarea value={(answers[q.id] as string) ?? ""} onChange={(e) => setAnswers((a) => ({ ...a, [q.id]: e.target.value }))}
-                rows={6} placeholder="Votre réponse…"
-                className="w-full border border-border rounded-xl px-4 py-3 text-sm outline-none focus:border-cama resize-y" />
+              <button onClick={doSubmit}
+                className="flex items-center gap-1.5 text-sm font-bold bg-green-600 text-white px-5 py-2 rounded-lg hover:bg-green-700 transition-colors">
+                <Save className="w-4 h-4" /> Terminer & soumettre
+              </button>
             )}
           </div>
-        )}
-
-        {/* Navigation */}
-        <div className="flex items-center justify-between">
-          <button onClick={() => setIdx((i) => Math.max(0, i - 1))} disabled={idx === 0}
-            className="flex items-center gap-1 text-sm font-semibold text-muted disabled:opacity-40 hover:text-ink transition-colors">
-            <ChevronLeft className="w-4 h-4" /> Précédent
-          </button>
-          {idx < questions.length - 1 ? (
-            <button onClick={() => setIdx((i) => Math.min(questions.length - 1, i + 1))}
-              className="flex items-center gap-1 text-sm font-bold bg-cama text-white px-4 py-2 rounded-lg hover:bg-cama-700 transition-colors">
-              Suivant <ChevronRight className="w-4 h-4" />
-            </button>
-          ) : (
-            <button onClick={doSubmit}
-              className="flex items-center gap-1.5 text-sm font-bold bg-green-600 text-white px-5 py-2 rounded-lg hover:bg-green-700 transition-colors">
-              <Save className="w-4 h-4" /> Terminer & soumettre
-            </button>
-          )}
-        </div>
-
-        {/* Grille de navigation rapide */}
-        <div className="flex flex-wrap gap-1.5 mt-6">
-          {questions.map((qq, i) => (
-            <button key={qq.id} onClick={() => setIdx(i)}
-              className={`w-8 h-8 rounded-lg text-xs font-bold transition-all ${
-                i === idx ? "bg-cama text-white" :
-                answers[qq.id] !== undefined ? "bg-cama-50 text-cama border border-cama/30" :
-                "bg-white text-muted border border-border"}`}>
-              {i + 1}
-            </button>
-          ))}
-        </div>
-      </main>
+        </main>
+      </div>
     </div>
   );
 }

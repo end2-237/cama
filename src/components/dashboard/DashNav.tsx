@@ -143,7 +143,7 @@ export default function DashNav({ activeTab, onTab, tabs }: DashNavProps) {
                   {moreOpen && (
                     <div className="absolute left-0 top-full mt-0 w-52 bg-white rounded-xl border border-border shadow-xl overflow-hidden z-50 animate-scale-in">
                       {[
-                        { href: "/enseignant/examens", icon: BookOpen,      label: "Examens" },
+                        { href: "/dashboard?tab=%C3%89valuations", icon: BookOpen,      label: "Évaluations" },
                         { href: "/presences",          icon: ClipboardList, label: "Présences" },
                       ].map((l) => (
                         <Link key={l.href} href={l.href} onClick={() => setMoreOpen(false)}

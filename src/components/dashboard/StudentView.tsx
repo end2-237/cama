@@ -2,19 +2,20 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
-  BookOpen, Clock, ChevronRight, Play, Radio, ShieldCheck,
+  BookOpen, Clock, ChevronRight, Play, Radio,
   FileText, Video, MonitorPlay, Bot, CheckCircle2, TrendingUp,
-  Star, Award, GraduationCap, QrCode, AlertCircle, Calendar,
+  Star, Award, GraduationCap, QrCode,
   Newspaper, ExternalLink, BookMarked,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { fetchStudentProgram, fetchChapters, fetchProgress } from "@/lib/program";
-import { fetchOpenExams, fetchAttemptsForStudent, fetchDeliberations } from "@/lib/exams";
+import { fetchDeliberations } from "@/lib/exams";
 import { fetchLivesForCourses, subscribeLives } from "@/lib/lives";
 import { fetchExtraCourses, fetchMyEnrollments, MODE_LABEL } from "@/lib/extra";
 import { fetchJournal, type DBJournalArticle } from "@/lib/journal";
-import type { DBProgramCourse, DBChapter, DBExam, DBExamAttempt, DBExtraCourse, DBExtraEnrollment } from "@/lib/supabase";
+import type { DBProgramCourse, DBChapter, DBExam, DBExtraCourse, DBExtraEnrollment } from "@/lib/supabase";
 import type { DelibWithMeta } from "@/lib/exams";
 
 const EXTRA_IMG: Record<string, string> = {
@@ -526,140 +527,14 @@ function CoursesTab() {
 }
 
 /* ════ EXAMENS ════ */
+/* La gestion des examens étudiant vit dans la page riche /etudiant/examens.
+   L'onglet « Examens » du dashboard y redirige (suppression de la redondance). */
 function ExamsTab() {
-  const { user } = useAuth();
-  const [exams, setExams] = useState<DBExam[]>([]);
-  const [attempts, setAttempts] = useState<DBExamAttempt[]>([]);
-
-  useEffect(() => {
-    const slug = user?.dossier?.parcoursSlug;
-    if (!user || !slug) return;
-    let cancelled = false;
-    (async () => {
-      const courses = await fetchStudentProgram(slug, user.dossier?.level);
-      if (cancelled) return;
-      const [openExams, atts] = await Promise.all([
-        fetchOpenExams(courses.map((c) => c.id)),
-        fetchAttemptsForStudent(user.id),
-      ]);
-      if (cancelled) return;
-      setExams(openExams);
-      setAttempts(atts);
-    })();
-    return () => { cancelled = true; };
-  }, [user]);
-
-  if (!user) return null;
-
-  const articles = buildNews([], {}, exams);
-
+  const router = useRouter();
+  useEffect(() => { router.replace("/etudiant/examens"); }, [router]);
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-[290px_1fr_250px] items-start">
-
-      {/* ── COL GAUCHE : Journal campus ── */}
-      <NewsFeed articles={articles} />
-
-      {/* ── COL CENTRE : Examens ── */}
-      <div className="px-4 py-3 border-r border-border min-h-full">
-        <div className="flex items-center gap-2 mb-3 pb-2 border-b border-border">
-          <ShieldCheck className="w-5 h-5 text-ink" strokeWidth={1.5} />
-          <h1 className="text-xl font-light text-ink">Mes Examens</h1>
-        </div>
-
-        <div className="border border-border divide-y divide-border bg-white">
-          {exams.map((e) => {
-            const attempt = attempts.find((a) => a.exam_id === e.id);
-            return (
-              <div key={e.id} className="p-3 flex items-center gap-3 flex-wrap hover:bg-cama-50/30 transition-colors">
-                <div className={`w-10 h-10 flex items-center justify-center flex-shrink-0 ${
-                  e.status === "ouvert" ? "bg-cama-50" : "bg-surface"}`}>
-                  <ShieldCheck className={`w-4 h-4 ${e.status === "ouvert" ? "text-cama" : "text-subtle"}`} />
-                </div>
-                <div className="flex-1 min-w-[180px]">
-                  <p className="text-[10px] text-subtle">{e.duration_min} min</p>
-                  <p className="font-bold text-ink text-sm">{e.title}</p>
-                  {e.scheduled_at && (
-                    <p className="text-[10px] text-muted flex items-center gap-1 mt-0.5">
-                      <Calendar className="w-3 h-3" />
-                      {new Date(e.scheduled_at).toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" })}
-                    </p>
-                  )}
-                </div>
-                {attempt ? (
-                  <div className="text-right">
-                    <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 bg-green-50 text-green-600">
-                      {attempt.status === "corrige" ? `Corrigé · ${attempt.score}/20` : `Soumis${attempt.score !== null && attempt.score !== undefined ? ` · QCM ${attempt.score}/20` : ""}`}
-                    </span>
-                    {attempt.alerts.length > 0 && (
-                      <p className="text-[10px] text-gold-dark flex items-center gap-1 mt-1 justify-end">
-                        <AlertCircle className="w-3 h-3" /> {attempt.alerts.length} signalement(s)
-                      </p>
-                    )}
-                  </div>
-                ) : e.status === "ouvert" ? (
-                  <Link href={`/examen/${e.id}`}
-                    className="inline-flex items-center gap-1.5 text-xs font-bold text-white bg-cama px-4 py-2 hover:bg-cama-700 transition-colors">
-                    <ShieldCheck className="w-3.5 h-3.5" /> Passer l&apos;examen
-                  </Link>
-                ) : (
-                  <span className="text-[10px] font-bold px-2 py-0.5 bg-surface text-muted">{e.status === "planifie" ? "Planifié" : "Terminé"}</span>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* ── COL DROITE : Consignes Safe-CAMA + prochaines sessions ── */}
-      <div className="bg-white min-h-full">
-        <div className="px-4 py-3 border-b border-border">
-          <h2 className="text-[10px] font-black text-ink uppercase tracking-widest mb-2">Consignes Safe-CAMA</h2>
-          <div className="space-y-2">
-            {[
-              "Plein écran obligatoire pendant toute l'épreuve",
-              "Copier-coller et clic droit désactivés",
-              "Tout changement d'onglet est signalé au jury",
-              "Sauvegarde automatique toutes les 15 secondes",
-              "Aucune image ne quitte votre appareil",
-            ].map((r, i) => (
-              <div key={i} className="flex gap-2 items-start">
-                <CheckCircle2 className="w-3.5 h-3.5 text-green-500 flex-shrink-0 mt-0.5" />
-                <p className="text-xs text-ink leading-snug">{r}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="px-4 py-3 border-b border-border">
-          <h2 className="text-[10px] font-black text-ink uppercase tracking-widest mb-2">Prochaines sessions</h2>
-          <div className="space-y-2">
-            {exams.map((e) => (
-              <div key={e.id} className="flex items-center gap-2.5">
-                <div className="w-1.5 h-1.5 rounded-full flex-shrink-0 bg-cama" />
-                <div>
-                  <p className="text-[10px] font-bold text-cama leading-none">
-                    {e.scheduled_at
-                      ? new Date(e.scheduled_at).toLocaleDateString("fr-FR", { day: "numeric", month: "short" })
-                      : `${e.duration_min} min`}
-                  </p>
-                  <p className="text-xs text-ink">{e.title}</p>
-                </div>
-              </div>
-            ))}
-            {exams.length === 0 && <p className="text-xs text-muted">Aucune session à venir.</p>}
-          </div>
-          <Link href="/calendrier" className="block text-[10px] font-bold text-cama hover:underline mt-2">
-            Calendrier académique →
-          </Link>
-        </div>
-
-        <div className="p-4 text-white"
-          style={{ background: "linear-gradient(135deg, #1E1B4B 0%, #4F46E5 100%)" }}>
-          <ShieldCheck className="w-5 h-5 text-gold mb-1.5" />
-          <p className="font-bold text-sm leading-snug mb-1">Human-in-the-loop</p>
-          <p className="text-white/60 text-xs leading-relaxed">L&apos;IA signale, le jury décide. Aucune sanction automatique — vous disposez toujours d&apos;un droit d&apos;appel.</p>
-        </div>
-      </div>
+    <div className="min-h-[40vh] flex items-center justify-center">
+      <div className="w-6 h-6 rounded-full border-4 border-cama border-t-transparent animate-spin" />
     </div>
   );
 }
