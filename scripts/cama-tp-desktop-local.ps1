@@ -131,7 +131,7 @@ if ($url) {
   Ok "Bureau Windows prêt — 100% local, sans Docker, sans VPS !"
   Write-Host ""
   Write-Host "   URL à coller dans CAMA (type « vnc ») :"
-  Write-Host "      $url/vnc.html?autoconnect=true&resize=remote"
+  Write-Host ("      " + $url + '/vnc.html?autoconnect=true&resize=remote')
 } else {
   Warn "URL pas encore visible : Get-Content `"$log`""
 }
@@ -142,5 +142,5 @@ Info "Dans CAMA : TP → Machine distante → « + » → type « vnc » → col
 Write-Host ""
 Warn "Le navigateur demandera le mot de passe VNC. Le bureau partagé = ta session Windows."
 Info  "Arrêter le partage :"
-Write-Host "   Get-Process cloudflared | Stop-Process -Force"
-Write-Host "   Get-CimInstance Win32_Process -Filter \"Name='python.exe'\" | ? { `$_.CommandLine -match 'websockify' } | % { Stop-Process -Id `$_.ProcessId -Force }"
+Write-Host '   Get-Process cloudflared | Stop-Process -Force'
+Write-Host '   Get-CimInstance Win32_Process | ? { $_.CommandLine -match ''websockify'' } | % { Stop-Process -Id $_.ProcessId -Force }'
