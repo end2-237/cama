@@ -75,19 +75,23 @@ fi
 # ── 3. Service systemd pour ttyd ─────────────────────────────────────
 WRITABLE_FLAG=""
 [ "$TP_WRITABLE" = "1" ] && WRITABLE_FLAG="--writable"
-RUN_AS="${SUDO_USER:-root}"
+# Le shell servi : si on tourne en root et qu'un SUDO_USER existe, on bascule
+# sur ce compte (plus sûr) ; sinon on lance directement le shell.
+if [ -n "${SUDO_USER:-}" ] && [ "${SUDO_USER}" != "root" ]; then
+  SHELL_CMD="su - ${SUDO_USER}"
+else
+  SHELL_CMD="${TP_SHELL}"
+fi
 
+# Unité systemd minimale : pas de quotes complexes (systemd parse mal les
+# guillemets imbriqués → ttyd ne démarre pas).
 cat >/etc/systemd/system/cama-ttyd.service <<EOF
 [Unit]
 Description=CAMA ttyd web terminal
 After=network.target
 
 [Service]
-ExecStart=${TTYD_BIN} -p ${TP_PORT} -i 127.0.0.1 ${WRITABLE_FLAG} \\
-  -c ${TP_USER}:${TP_PASS} \\
-  -t fontSize=15 -t 'theme={"background":"#0b0b0f"}' \\
-  --max-clients 5 \\
-  su - ${RUN_AS} -c ${TP_SHELL}
+ExecStart=${TTYD_BIN} -p ${TP_PORT} -i 127.0.0.1 ${WRITABLE_FLAG} -c ${TP_USER}:${TP_PASS} -t fontSize=15 -m 5 ${SHELL_CMD}
 Restart=always
 RestartSec=2
 
@@ -96,9 +100,15 @@ WantedBy=multi-user.target
 EOF
 
 systemctl daemon-reload
-systemctl enable --now cama-ttyd >/dev/null 2>&1 || systemctl restart cama-ttyd
-sleep 1
-systemctl is-active --quiet cama-ttyd && c_ok "ttyd actif sur 127.0.0.1:${TP_PORT}" || { c_err "ttyd n'a pas démarré (journalctl -u cama-ttyd)"; exit 1; }
+systemctl enable cama-ttyd >/dev/null 2>&1 || true
+systemctl restart cama-ttyd
+sleep 1.5
+if ! systemctl is-active --quiet cama-ttyd; then
+  c_err "ttyd n'a pas démarré. Dernières lignes du journal :"
+  journalctl -u cama-ttyd --no-pager -n 12 || true
+  exit 1
+fi
+c_ok "ttyd actif sur 127.0.0.1:${TP_PORT}"
 
 # ── 4. Tunnel HTTPS cloudflared (quick tunnel, URL aléatoire) ────────
 cat >/etc/systemd/system/cama-tunnel.service <<EOF
