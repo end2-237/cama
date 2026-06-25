@@ -21,3 +21,8 @@ export async function updateMachine(id: string, patch: Partial<DBRemoteMachine>)
 export async function deleteMachine(id: string) {
   return supabase.from("remote_machines").delete().eq("id", id);
 }
+
+// Ouvre / ferme l'accès étudiant à une machine (séance de TP).
+export async function setMachineAvailable(id: string, available: boolean) {
+  return supabase.from("remote_machines").update({ available }).eq("id", id);
+}

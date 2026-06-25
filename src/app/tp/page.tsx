@@ -8,10 +8,13 @@ import {
   CheckCircle2, AlertCircle, ChevronDown, Cpu, Plus, Trash2, X,
   ExternalLink, Maximize2, Wifi, Code2, BookOpen, Copy, Check,
 } from "lucide-react";
-import { useAuth } from "@/context/AuthContext";
+import { useAuth, type AppUser } from "@/context/AuthContext";
 import { fetchRuntimes, executeCode, versionFor, LANGS, type Runtime } from "@/lib/piston";
-import { fetchMachines, addMachine, deleteMachine } from "@/lib/tp";
-import type { DBRemoteMachine } from "@/lib/supabase";
+import { fetchMachines, addMachine, deleteMachine, setMachineAvailable } from "@/lib/tp";
+import { fetchTeacherCourses, fetchProgram, fetchStudentProgram } from "@/lib/program";
+import type { DBRemoteMachine, DBProgramCourse } from "@/lib/supabase";
+
+type CourseLite = { id: string; code: string; title: string };
 
 const MonacoEditor = dynamic(() => import("@monaco-editor/react"), {
   ssr: false,
@@ -20,13 +23,12 @@ const MonacoEditor = dynamic(() => import("@monaco-editor/react"), {
 
 const EMPTY_MACHINE: Partial<DBRemoteMachine> = {
   name: "", os: "Ubuntu 22.04", kind: "ttyd", web_url: "", description: "", status: "unknown",
+  program_course_id: null, available: false,
 };
 
 export default function TPPage() {
   const { user } = useAuth();
   const [mode, setMode] = useState<"remote" | "sandbox">("remote");
-
-  const canManage = user?.role === "admin" || user?.role === "enseignant";
 
   return (
     <div className="h-screen flex flex-col bg-[#1e1e1e]">
@@ -53,7 +55,7 @@ export default function TPPage() {
       </header>
 
       <div className="flex-1 min-h-0">
-        {mode === "remote" ? <RemoteMode canManage={canManage} userId={user?.id ?? null} /> : <SandboxMode />}
+        {mode === "remote" ? <RemoteMode user={user} /> : <SandboxMode />}
       </div>
     </div>
   );
@@ -62,8 +64,12 @@ export default function TPPage() {
 /* ════════════════════════════════════════════════════════════
    MODE 1 — Machine Linux distante (terminal web embarqué)
 ════════════════════════════════════════════════════════════ */
-function RemoteMode({ canManage, userId }: { canManage: boolean; userId: string | null }) {
+function RemoteMode({ user }: { user: AppUser | null }) {
+  const canManage = user?.role === "admin" || user?.role === "enseignant";
+  const userId = user?.id ?? null;
+
   const [machines, setMachines] = useState<DBRemoteMachine[]>([]);
+  const [courses, setCourses]   = useState<CourseLite[]>([]);
   const [selected, setSelected] = useState<DBRemoteMachine | null>(null);
   const [loading, setLoading]   = useState(true);
   const [addOpen, setAddOpen]   = useState(false);
@@ -72,23 +78,58 @@ function RemoteMode({ canManage, userId }: { canManage: boolean; userId: string 
   const [err, setErr]           = useState<string | null>(null);
   const [guideOpen, setGuideOpen] = useState(false);
 
+  // Cours pertinents pour cet utilisateur (sert au filtrage + au menu déroulant).
+  const loadCourses = async (): Promise<CourseLite[]> => {
+    let rows: DBProgramCourse[] = [];
+    if (user?.role === "admin") rows = await fetchProgram();
+    else if (user?.role === "enseignant" && user.id) rows = await fetchTeacherCourses(user.id);
+    else if (user?.role === "etudiant" && user.dossier?.parcoursSlug)
+      rows = await fetchStudentProgram(user.dossier.parcoursSlug, user.dossier.level);
+    return rows.map((c) => ({ id: c.id, code: c.code, title: c.title }));
+  };
+
   const reload = async () => {
     setLoading(true);
-    const m = await fetchMachines();
-    setMachines(m);
-    setSelected((s) => s ?? m[0] ?? null);
+    const [allMachines, myCourses] = await Promise.all([fetchMachines(), loadCourses()]);
+    const courseIds = new Set(myCourses.map((c) => c.id));
+
+    // Filtrage selon le rôle :
+    //  • étudiant : machines de SES cours ET marquées « disponibles »
+    //  • enseignant : machines de SES cours (toutes, dispo ou non)
+    //  • admin : toutes les machines
+    let visible = allMachines;
+    if (user?.role === "etudiant")
+      visible = allMachines.filter((m) => m.available && m.program_course_id && courseIds.has(m.program_course_id));
+    else if (user?.role === "enseignant")
+      visible = allMachines.filter((m) => m.program_course_id && courseIds.has(m.program_course_id));
+
+    setCourses(myCourses);
+    setMachines(visible);
+    setSelected((s) => (s && visible.some((m) => m.id === s.id) ? s : visible[0] ?? null));
     setLoading(false);
   };
-  useEffect(() => { reload(); }, []);
+  useEffect(() => { reload(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [user?.id, user?.role]);
+
+  const courseLabel = (id: string | null) => {
+    if (!id) return null;
+    const c = courses.find((x) => x.id === id);
+    return c ? `${c.code} · ${c.title}` : null;
+  };
 
   const save = async () => {
     if (!form.name || !form.web_url) { setErr("Nom et URL du terminal obligatoires."); return; }
     if (!/^https:\/\//.test(form.web_url)) { setErr("L'URL doit être en HTTPS."); return; }
+    if (!form.program_course_id) { setErr("Choisissez le cours auquel rattacher la machine."); return; }
     setSaving(true);
     const { error } = await addMachine({ ...form, added_by: userId });
     setSaving(false);
     if (error) setErr(error.message);
     else { setAddOpen(false); setForm(EMPTY_MACHINE); setErr(null); reload(); }
+  };
+
+  const toggleAvail = async (m: DBRemoteMachine) => {
+    await setMachineAvailable(m.id, !m.available);
+    reload();
   };
 
   const del = async (id: string) => {
@@ -124,8 +165,11 @@ function RemoteMode({ canManage, userId }: { canManage: boolean; userId: string 
           <div className="py-10 text-center"><Loader2 className="w-5 h-5 animate-spin text-cama mx-auto" /></div>
         ) : machines.length === 0 ? (
           <div className="p-4 text-xs text-white/50 leading-relaxed">
-            Aucune machine enregistrée.
-            {canManage && <> Cliquez sur <strong className="text-white">+</strong> pour en ajouter une.</>}
+            {user?.role === "etudiant"
+              ? "Aucune machine de TP disponible pour vos cours en ce moment. Votre enseignant l'ouvrira au moment de la séance."
+              : canManage
+                ? <>Aucune machine pour vos cours. Cliquez sur <strong className="text-white">+</strong> pour en rattacher une.</>
+                : "Aucune machine enregistrée."}
           </div>
         ) : (
           <div className="divide-y divide-black/20">
@@ -134,15 +178,23 @@ function RemoteMode({ canManage, userId }: { canManage: boolean; userId: string 
                 className={`w-full text-left p-3 hover:bg-white/5 transition-colors flex items-center gap-2 ${
                   selected?.id === m.id ? "bg-white/10" : ""}`}>
                 <div className={`w-2 h-2 rounded-full flex-shrink-0 ${
-                  m.status === "up" ? "bg-green-500" : m.status === "down" ? "bg-red-500" : "bg-white/30"}`} />
+                  m.available ? "bg-green-500" : "bg-white/30"}`} title={m.available ? "Disponible" : "Indisponible"} />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-bold text-white truncate">{m.name}</p>
-                  <p className="text-[11px] text-white/50 truncate">{m.os} · {m.kind}</p>
+                  <p className="text-[11px] text-white/50 truncate">{courseLabel(m.program_course_id) ?? `${m.os} · ${m.kind}`}</p>
                 </div>
                 {canManage && (
-                  <span onClick={(e) => { e.stopPropagation(); del(m.id); }}
-                    className="text-white/30 hover:text-red-400 transition-colors cursor-pointer">
-                    <Trash2 className="w-3.5 h-3.5" />
+                  <span className="flex items-center gap-1.5 flex-shrink-0">
+                    <span onClick={(e) => { e.stopPropagation(); toggleAvail(m); }}
+                      title={m.available ? "Fermer l'accès étudiant" : "Ouvrir aux étudiants"}
+                      className={`text-[9px] font-bold px-1.5 py-0.5 rounded cursor-pointer transition-colors ${
+                        m.available ? "bg-green-600/30 text-green-300 hover:bg-green-600/50" : "bg-white/10 text-white/50 hover:bg-white/20"}`}>
+                      {m.available ? "OUVERT" : "FERMÉ"}
+                    </span>
+                    <span onClick={(e) => { e.stopPropagation(); del(m.id); }}
+                      className="text-white/30 hover:text-red-400 transition-colors cursor-pointer">
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </span>
                   </span>
                 )}
               </button>
@@ -205,6 +257,16 @@ function RemoteMode({ canManage, userId }: { canManage: boolean; userId: string 
             {err && <div className="flex items-center gap-2 text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2 mb-3"><AlertCircle className="w-4 h-4" /> {err}</div>}
             <div className="space-y-3">
               <div>
+                <label className="block text-xs font-semibold text-ink mb-1">Cours rattaché *</label>
+                <select value={form.program_course_id ?? ""} onChange={(e) => setForm((f) => ({ ...f, program_course_id: e.target.value || null }))}
+                  className="input-auth text-sm bg-white">
+                  <option value="">— Choisir un cours —</option>
+                  {courses.map((c) => <option key={c.id} value={c.id}>{c.code} · {c.title}</option>)}
+                </select>
+                {courses.length === 0 && <p className="text-[10px] text-amber-600 mt-1">Aucun cours ne vous est assigné. L&apos;admin doit d&apos;abord vous affecter à un cours.</p>}
+                <p className="text-[10px] text-muted mt-1">La machine ne sera visible que par les étudiants de ce cours, une fois marquée « ouverte ».</p>
+              </div>
+              <div>
                 <label className="block text-xs font-semibold text-ink mb-1">Nom *</label>
                 <input value={form.name ?? ""} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
                   placeholder="Serveur TP Réseau" className="input-auth text-sm" />
@@ -238,6 +300,11 @@ function RemoteMode({ canManage, userId }: { canManage: boolean; userId: string 
                 <input value={form.description ?? ""} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
                   placeholder="TP configuration réseau Cisco" className="input-auth text-sm" />
               </div>
+              <label className="flex items-center gap-2 text-xs font-semibold text-ink cursor-pointer">
+                <input type="checkbox" checked={!!form.available} onChange={(e) => setForm((f) => ({ ...f, available: e.target.checked }))}
+                  className="w-4 h-4 accent-cama" />
+                Ouvrir immédiatement aux étudiants du cours
+              </label>
             </div>
             <div className="flex gap-2 mt-5">
               <button onClick={() => setAddOpen(false)} className="flex-1 border border-border rounded-xl py-2.5 text-sm font-semibold text-muted">Annuler</button>

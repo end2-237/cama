@@ -282,6 +282,8 @@ export interface DBRemoteMachine {
   web_url: string;          // URL HTTPS du terminal web
   description: string | null;
   status: "up" | "down" | "unknown";
+  program_course_id: string | null;  // cours auquel la machine est rattachée
+  available: boolean;                 // ouverte aux étudiants (séance de TP active)
   added_by: string | null;
   created_at: string;
 }
