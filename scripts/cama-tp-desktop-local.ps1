@@ -86,6 +86,12 @@ if (-not (Test-Path $py)) {
 } else { Ok "Python deja present." }
 
 # -- 2. pip + websockify ---------------------------------------------
+# Force TEMP et le cache pip sur le meme disque que Root (souvent C: est plein).
+$tmp = Join-Path $Root "tmp"
+New-Item -ItemType Directory -Force -Path $tmp | Out-Null
+$env:TMP = $tmp; $env:TEMP = $tmp
+$env:PIP_NO_CACHE_DIR = "1"
+
 $hasPip = $false
 try { & $py -m pip --version 2>&1 | Out-Null; if ($LASTEXITCODE -eq 0) { $hasPip = $true } } catch {}
 if (-not $hasPip) {
@@ -96,7 +102,12 @@ if (-not $hasPip) {
   Remove-Item $getpip
 }
 Info "Installation de websockify..."
-& $py -m pip install --quiet --no-warn-script-location websockify
+& $py -m pip install --no-cache-dir --no-warn-script-location websockify
+if ($LASTEXITCODE -ne 0) {
+  Die "Echec installation websockify (souvent: disque plein). Libere de l'espace sur $drive puis relance."
+}
+& $py -c "import websockify" 2>$null
+if ($LASTEXITCODE -ne 0) { Die "websockify non importable. Relance le script." }
 Ok "websockify installe."
 
 # -- 3. noVNC (fichiers web statiques) -------------------------------
