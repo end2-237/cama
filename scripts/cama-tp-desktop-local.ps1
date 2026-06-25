@@ -1,11 +1,15 @@
 # ====================================================================
-# CAMA - Bureau Windows graphique EN LOCAL (sans Docker, sans VPS)
+# CAMA - Bureau Windows graphique dans le navigateur
 #
-# Installe tout dans D:\cama (configurable) :
+# Script officiel d'installation CAMA TP Desktop.
+# Au lancement, une fenetre d'explorateur de fichiers permet de choisir
+# le dossier d'installation (tout y est stocke : Python, noVNC, etc.).
+#
+# Installe :
 #   - Python "embeddable" (zip ~15 Mo, aucune install systeme)
 #   - websockify + noVNC  (pont VNC -> HTML5 dans le navigateur)
 #   - cloudflared          (tunnel HTTPS public)
-# Le serveur d'affichage = TightVNC (~3 Mo, installe via winget).
+#   - TightVNC             (serveur d'affichage, ~3 Mo, via winget)
 #
 # Schema :
 #   TightVNC (5900) -> websockify/noVNC (6080) -> cloudflared (HTTPS) -> CAMA
@@ -14,19 +18,20 @@
 #   Set-ExecutionPolicy -Scope Process Bypass -Force
 #   .\cama-tp-desktop-local.ps1
 #
-# Reglages :
-#   -Root D:\cama       dossier d'installation (defaut: D:\cama)
+# Options avancees (passees en param, sinon valeurs par defaut) :
 #   -WebPort 6080       port web local de noVNC
 #   -VncPort 5900       port du serveur VNC (TightVNC = 5900)
+#   -SkipPicker         saute l'explorateur, utilise -Root directement
+#   -Root D:\cama       dossier par defaut si -SkipPicker
 #
-# NB: script volontairement en ASCII pur (Windows PowerShell 5.1 lit
-# les .ps1 en ANSI et casse sur les accents/symboles Unicode sans BOM).
+# NB: script en ASCII pur (Windows PowerShell 5.1 + ANSI).
 # ====================================================================
 [CmdletBinding()]
 param(
-  [string]$Root    = "D:\cama",
+  [string]$Root    = "",
   [int]$WebPort    = 6080,
-  [int]$VncPort    = 5900
+  [int]$VncPort    = 5900,
+  [switch]$SkipPicker
 )
 $ErrorActionPreference = "Stop"
 function Ok  ($m){ Write-Host "[OK]  $m" -ForegroundColor Green }
@@ -34,9 +39,36 @@ function Info($m){ Write-Host "[..]  $m" -ForegroundColor Cyan }
 function Warn($m){ Write-Host "[!]   $m" -ForegroundColor Yellow }
 function Die ($m){ Write-Host "[X]   $m" -ForegroundColor Red; exit 1 }
 
-# Verifie que le lecteur de destination existe (D: par defaut).
+# -- 0. Choix du dossier d'installation (explorateur Windows) --------
+if (-not $SkipPicker -and ($Root -eq "")) {
+  Write-Host ""
+  Write-Host "================================================================"
+  Write-Host "   CAMA - Installation du bureau distant (TP)"
+  Write-Host "================================================================"
+  Write-Host ""
+  Info "Choisis le dossier d'installation dans la fenetre qui va s'ouvrir..."
+  Info "(Un sous-dossier 'cama' sera cree dedans.)"
+  Write-Host ""
+
+  Add-Type -AssemblyName System.Windows.Forms
+  $picker = New-Object System.Windows.Forms.FolderBrowserDialog
+  $picker.Description = "CAMA - Choisis le dossier d'installation"
+  $picker.RootFolder = [System.Environment+SpecialFolder]::MyComputer
+  $picker.ShowNewFolderButton = $true
+
+  $result = $picker.ShowDialog()
+  if ($result -ne [System.Windows.Forms.DialogResult]::OK) {
+    Die "Installation annulee."
+  }
+  $Root = Join-Path $picker.SelectedPath "cama"
+  Ok "Dossier choisi : $Root"
+}
+
+if ($Root -eq "") { $Root = "D:\cama" }
+
+# Verifie que le lecteur existe.
 $drive = (Split-Path $Root -Qualifier)
-if (-not (Test-Path $drive)) { Die "Lecteur $drive introuvable. Choisis -Root sur un disque existant." }
+if (-not (Test-Path $drive)) { Die "Lecteur $drive introuvable." }
 New-Item -ItemType Directory -Force -Path $Root | Out-Null
 Info "Installation dans : $Root"
 
@@ -48,7 +80,6 @@ if (-not (Test-Path $py)) {
   Invoke-WebRequest "https://www.python.org/ftp/python/3.12.7/python-3.12.7-embed-amd64.zip" -OutFile $zip
   Expand-Archive $zip -DestinationPath (Join-Path $Root "python") -Force
   Remove-Item $zip
-  # Active site-packages (decommente "import site" dans le fichier ._pth).
   $pth = Get-ChildItem (Join-Path $Root "python") -Filter "python*._pth" | Select-Object -First 1
   (Get-Content $pth.FullName) -replace '^#\s*import site','import site' | Set-Content $pth.FullName
   Ok "Python embeddable pret."
@@ -81,7 +112,7 @@ if (-not (Test-Path (Join-Path $novnc "vnc.html"))) {
   Ok "noVNC pret."
 } else { Ok "noVNC deja present." }
 
-# -- 4. cloudflared (sur D:) -----------------------------------------
+# -- 4. cloudflared --------------------------------------------------
 $cf = Join-Path $Root "cloudflared.exe"
 if (-not (Test-Path $cf)) {
   Info "Telechargement de cloudflared..."
@@ -133,7 +164,7 @@ foreach ($i in 1..30) {
 Write-Host ""
 Write-Host "================================================================"
 if ($url) {
-  Ok "Bureau Windows pret - 100% local, sans Docker, sans VPS !"
+  Ok "Bureau Windows pret !"
   Write-Host ""
   Write-Host "   URL a coller dans CAMA (type vnc) :"
   Write-Host ("      " + $url + "/vnc.html?autoconnect=true" + [char]38 + "resize=remote")
@@ -146,6 +177,9 @@ Info "Avant de tester : TightVNC doit tourner avec un MOT DE PASSE defini."
 Info "Dans CAMA : TP -> Machine distante -> + -> type vnc -> colle l'URL."
 Write-Host ""
 Warn "Le navigateur demandera le mot de passe VNC. Le bureau partage = ta session Windows."
+Write-Host ""
+Info "Dossier d'installation : $Root"
 Info "Arreter le partage :"
 Write-Host "   Stop-Process -Name cloudflared -Force"
 Write-Host "   Stop-Process -Name python -Force"
+Info "Desinstaller : supprime le dossier $Root"
