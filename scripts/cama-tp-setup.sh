@@ -99,6 +99,12 @@ RestartSec=2
 WantedBy=multi-user.target
 EOF
 
+# Libère le port 7681 d'un éventuel ttyd resté d'un essai précédent (errno 98).
+systemctl stop cama-ttyd 2>/dev/null || true
+pkill -f "ttyd" 2>/dev/null || true
+command -v fuser >/dev/null 2>&1 && fuser -k "${TP_PORT}/tcp" 2>/dev/null || true
+sleep 1
+
 systemctl daemon-reload
 systemctl enable cama-ttyd >/dev/null 2>&1 || true
 systemctl restart cama-ttyd
