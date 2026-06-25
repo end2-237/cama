@@ -142,5 +142,5 @@ Info "Dans CAMA : TP → Machine distante → « + » → type « vnc » → col
 Write-Host ""
 Warn "Le navigateur demandera le mot de passe VNC. Le bureau partagé = ta session Windows."
 Info  "Arrêter le partage :"
-Write-Host '   Get-Process cloudflared | Stop-Process -Force'
-Write-Host '   Get-CimInstance Win32_Process | ? { $_.CommandLine -match ''websockify'' } | % { Stop-Process -Id $_.ProcessId -Force }'
+Write-Host '   Stop-Process -Name cloudflared -Force'
+Write-Host '   Stop-Process -Name python -Force'
