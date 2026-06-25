@@ -826,7 +826,7 @@ function PlanningTab() {
                 <p className="text-sm font-semibold text-ink">{s.title}</p>
                 <p className="text-[11px] text-muted flex items-center gap-2 flex-wrap mt-0.5">
                   <span>{ue?.code}</span>
-                  <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {s.day} · {s.end_time ? `${s.start_time}–${s.end_time}` : s.start_time}</span>
+                  <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {s.week_start ? new Date(s.week_start + "T00:00:00").toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "short" }) : s.day} · {s.end_time ? `${s.start_time}–${s.end_time}` : s.start_time}</span>
                   {s.room && <span className="flex items-center gap-1"><MapPin className="w-3 h-3" /> {s.room}</span>}
                 </p>
                 <div className="flex items-center gap-1 mt-1 flex-wrap">

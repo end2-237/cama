@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import {
-  BookOpen, Users, PlusCircle, Edit3, ChevronDown, ChevronRight, Info,
+  BookOpen, Users, PlusCircle, Edit3, ChevronRight, Info,
   Radio, Bot, FileText, Video, MonitorPlay, ShieldCheck,
   AlertTriangle, Check, Eye, EyeOff, TrendingUp, Terminal,
   Newspaper, BookMarked, ExternalLink, Play, Sparkles, Inbox, Target,
@@ -424,7 +424,6 @@ function CoursesTab() {
 ════════════════════════════════════════════════════════════ */
 function EvalTab() {
   const { user } = useAuth();
-  const [open, setOpen] = useState<string | null>(null);
   const [showNew, setShowNew] = useState(false);
   const [title, setTitle] = useState("");
   const [ueId, setUeId] = useState("");

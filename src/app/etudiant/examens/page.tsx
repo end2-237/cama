@@ -6,10 +6,10 @@ import { useRouter } from "next/navigation";
 import {
   ArrowLeft, Loader2, FileQuestion, Clock, CheckCircle2, Play, Award,
   BookOpen, Shield, AlertTriangle, Calendar, Timer, BarChart3,
-  ChevronRight, Filter, Target, TrendingUp, Eye, Info,
+  ChevronRight, Filter, Target, TrendingUp, Info,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
-import type { DBProgramCourse, DBExam, DBExamAttempt, DBExamQuestion } from "@/lib/supabase";
+import type { DBProgramCourse, DBExam, DBExamAttempt } from "@/lib/supabase";
 import { fetchStudentProgram } from "@/lib/program";
 import { fetchExamsForCourses, fetchAttemptsForStudent, fetchQuestions } from "@/lib/exams";
 

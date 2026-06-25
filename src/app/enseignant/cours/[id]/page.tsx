@@ -7,7 +7,7 @@ import {
   ArrowLeft, Plus, FileText, Video, MonitorPlay, Radio, Bot,
   Trash2, Upload, Check, X, GripVertical, Eye, EyeOff,
   Sparkles, Calendar, Type, List as ListIcon, HelpCircle,
-  Target, CalendarClock, Clock, Send,
+  Target, CalendarClock, Clock, Send, AlertTriangle,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { BlocNatif } from "@/lib/db";
@@ -596,12 +596,32 @@ function ResourcesEditor({ courseId }: { courseId: string }) {
   );
 }
 
+/* Convertit une chaîne horaire ("08h00", "8:30", "18h") en minutes depuis minuit. */
+function timeToMinutes(t: string | null): number | null {
+  if (!t) return null;
+  const m = t.match(/(\d{1,2})\s*[h:]\s*(\d{0,2})/i);
+  if (!m) return null;
+  const hh = parseInt(m[1], 10);
+  const mm = m[2] ? parseInt(m[2], 10) : 0;
+  if (isNaN(hh)) return null;
+  return hh * 60 + mm;
+}
+
+/* Jour de la semaine (FR) à partir d'une date ISO (YYYY-MM-DD). */
+function dayFromISO(iso: string): string {
+  if (!iso) return DAYS[0];
+  const d = new Date(iso + "T00:00:00");
+  // getDay: 0=dim … 6=sam ; DAYS = [Lun..Sam]
+  const map = ["", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
+  return map[d.getDay()] || "Dimanche";
+}
+
 /* ════ Planificateur de séances (propositions) ════ */
 function SessionPlanner({ courseId, teacherId, courseTitle }: { courseId: string; teacherId: string; courseTitle: string }) {
   const [sessions, setSessions] = useState<DBSession[]>([]);
-  const [day, setDay] = useState<string>(DAYS[0]);
-  const [start, setStart] = useState("08h00");
-  const [end, setEnd] = useState("10h00");
+  const [date, setDate] = useState<string>("");          // YYYY-MM-DD
+  const [start, setStart] = useState("08:00");            // HH:MM
+  const [end, setEnd] = useState("10:00");
   const [kind, setKind] = useState<SessionKind>("campus");
   const [room, setRoom] = useState("");
   const [modes, setModes] = useState<CycleMode[]>(["presentiel"]);
@@ -614,12 +634,40 @@ function SessionPlanner({ courseId, teacherId, courseTitle }: { courseId: string
 
   const toggleMode = (m: CycleMode) => setModes((arr) => arr.includes(m) ? arr.filter((x) => x !== m) : [...arr, m]);
 
+  const day = date ? dayFromISO(date) : "";
+
+  /* Détection de conflits : séances existantes le même jour/date dont la plage horaire chevauche. */
+  const conflicts = (() => {
+    if (!date || kind === "async") return [];
+    const ns = timeToMinutes(start);
+    const ne = timeToMinutes(end);
+    if (ns === null || ne === null || ne <= ns) return [];
+    return sessions.filter((s) => {
+      if (s.status === "rejete") return false;
+      // même date (week_start) si renseignée, sinon même jour de semaine
+      const sameSlot = s.week_start ? s.week_start === date : s.day === day;
+      if (!sameSlot) return false;
+      const ss = timeToMinutes(s.start_time);
+      const se = timeToMinutes(s.end_time) ?? (ss !== null ? ss + 60 : null);
+      if (ss === null || se === null) return false;
+      return ns < se && ss < ne; // chevauchement
+    });
+  })();
+
+  const startMin = timeToMinutes(start);
+  const endMin = timeToMinutes(end);
+  const timeInvalid = kind !== "async" && (startMin === null || endMin === null || endMin <= startMin);
+  const canPropose = !!date && modes.length > 0 && conflicts.length === 0 && !timeInvalid;
+
+  // Affichage "08h00" à partir de "08:00"
+  const fmt = (t: string) => t.replace(":", "h");
+
   const propose = async () => {
-    if (modes.length === 0) return;
+    if (!canPropose) return;
     await upsertSession({
       program_course_id: courseId, title: courseTitle,
-      day, start_time: start.trim(), end_time: kind === "async" ? null : end.trim(),
-      kind, room: room.trim() || null, modes,
+      day, start_time: fmt(start), end_time: kind === "async" ? null : fmt(end),
+      kind, room: room.trim() || null, modes, week_start: date || null,
       proposed_by: teacherId, status: "propose", semestre: "S4",
     });
     setRoom("");
@@ -634,6 +682,7 @@ function SessionPlanner({ courseId, teacherId, courseTitle }: { courseId: string
     rejete:  { label: "Refusée", cls: "bg-red-50 text-red-500" },
   } as const;
   const field = "text-sm border border-border rounded-lg px-3 py-2 outline-none focus:border-cama";
+  const todayISO = new Date().toISOString().slice(0, 10);
 
   return (
     <div className="bg-white rounded-2xl border border-border overflow-hidden">
@@ -641,10 +690,10 @@ function SessionPlanner({ courseId, teacherId, courseTitle }: { courseId: string
       <div className="p-5 border-b border-border bg-surface/50">
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
           <div>
-            <label className="text-[10px] font-bold text-muted uppercase tracking-wider mb-1 block">Jour</label>
-            <select value={day} onChange={(e) => setDay(e.target.value)} className={`${field} bg-white w-full`}>
-              {DAYS.map((d) => <option key={d}>{d}</option>)}
-            </select>
+            <label className="text-[10px] font-bold text-muted uppercase tracking-wider mb-1 block">Date</label>
+            <input type="date" value={date} min={todayISO} onChange={(e) => setDate(e.target.value)}
+              className={`${field} bg-white w-full`} />
+            {day && <p className="text-[10px] text-cama font-bold mt-1">{day}</p>}
           </div>
           <div>
             <label className="text-[10px] font-bold text-muted uppercase tracking-wider mb-1 block">Type</label>
@@ -654,11 +703,11 @@ function SessionPlanner({ courseId, teacherId, courseTitle }: { courseId: string
           </div>
           <div>
             <label className="text-[10px] font-bold text-muted uppercase tracking-wider mb-1 block">Début</label>
-            <input value={start} onChange={(e) => setStart(e.target.value)} placeholder="08h00" className={`${field} w-full`} />
+            <input type="time" value={start} onChange={(e) => setStart(e.target.value)} className={`${field} w-full`} />
           </div>
           <div>
             <label className="text-[10px] font-bold text-muted uppercase tracking-wider mb-1 block">{kind === "async" ? "— (libre accès)" : "Fin"}</label>
-            <input value={end} onChange={(e) => setEnd(e.target.value)} placeholder="10h00" disabled={kind === "async"}
+            <input type="time" value={end} onChange={(e) => setEnd(e.target.value)} disabled={kind === "async"}
               className={`${field} w-full disabled:bg-surface disabled:text-subtle`} />
           </div>
         </div>
@@ -680,7 +729,35 @@ function SessionPlanner({ courseId, teacherId, courseTitle }: { courseId: string
             </div>
           </div>
         </div>
-        <button onClick={propose} className="btn-primary py-2.5 px-6 text-sm gap-2 mt-4">
+
+        {/* Avertissements : date manquante / horaire invalide / conflit */}
+        {!date && (
+          <p className="text-[11px] text-muted mt-3 flex items-center gap-1.5">
+            <Calendar className="w-3.5 h-3.5" /> Choisissez une date pour planifier la séance.
+          </p>
+        )}
+        {timeInvalid && date && (
+          <p className="text-[11px] text-red-500 mt-3 flex items-center gap-1.5">
+            <AlertTriangle className="w-3.5 h-3.5" /> L&apos;heure de fin doit être après l&apos;heure de début.
+          </p>
+        )}
+        {conflicts.length > 0 && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-3 mt-3">
+            <p className="text-xs font-bold text-red-600 flex items-center gap-1.5 mb-1.5">
+              <AlertTriangle className="w-3.5 h-3.5" /> Conflit d&apos;horaire détecté
+            </p>
+            {conflicts.map((c) => (
+              <p key={c.id} className="text-[11px] text-red-500">
+                {c.day} · {c.start_time}{c.end_time ? ` – ${c.end_time}` : ""} — {SESSION_KINDS[c.kind].label}
+                {c.room ? ` · ${c.room}` : ""}
+              </p>
+            ))}
+            <p className="text-[10px] text-muted mt-1 italic">Modifiez la date ou l&apos;horaire pour éviter le chevauchement.</p>
+          </div>
+        )}
+
+        <button onClick={propose} disabled={!canPropose}
+          className="btn-primary py-2.5 px-6 text-sm gap-2 mt-4 disabled:opacity-40 disabled:cursor-not-allowed">
           <Send className="w-4 h-4" /> Proposer cette séance
         </button>
       </div>
@@ -696,7 +773,11 @@ function SessionPlanner({ courseId, teacherId, courseTitle }: { courseId: string
               <span className={`text-[9px] font-bold px-1.5 py-0.5 border flex-shrink-0 ${k.color}`}>{k.label}</span>
               <div className="flex-1 min-w-[160px]">
                 <p className="text-sm font-semibold text-ink flex items-center gap-2">
-                  <Clock className="w-3.5 h-3.5 text-subtle" /> {s.day} · {s.end_time ? `${s.start_time} – ${s.end_time}` : s.start_time}
+                  <Clock className="w-3.5 h-3.5 text-subtle" />
+                  {s.week_start
+                    ? new Date(s.week_start + "T00:00:00").toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "short" })
+                    : s.day}
+                  {" · "}{s.end_time ? `${s.start_time} – ${s.end_time}` : s.start_time}
                   {s.room && <span className="text-[11px] text-muted font-normal">· {s.room}</span>}
                 </p>
                 <div className="flex items-center gap-1 mt-1 flex-wrap">
