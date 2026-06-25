@@ -135,24 +135,36 @@ Ok "cloudflared pret."
 $tvn = "C:\Program Files\TightVNC\tvnserver.exe"
 if (-not (Test-Path $tvn)) {
   if (Get-Command winget -ErrorAction SilentlyContinue) {
-    Info "Installation de TightVNC (~3 Mo)..."
-    winget install -e --id GlavSoft.TightVNC --accept-source-agreements --accept-package-agreements
+    Info "Installation de TightVNC (installeur graphique)..."
+    Info "Dans l'installeur : mets un mot de passe VNC, coche 'Allow loopback connections'."
+    winget install -e --id GlavSoft.TightVNC --accept-source-agreements --accept-package-agreements -i
   } else {
     Warn "winget absent - installe TightVNC a la main : https://www.tightvnc.com/download.php"
   }
 }
 if (Test-Path $tvn) {
   Ok "TightVNC installe."
-  # websockify se connecte via 127.0.0.1 : TightVNC refuse le loopback par defaut.
+  # Autorise le loopback via registre (au cas ou l'utilisateur n'a pas coche).
   try {
-    New-Item -Path 'HKLM:\SOFTWARE\TightVNC\Server' -Force | Out-Null
-    Set-ItemProperty 'HKLM:\SOFTWARE\TightVNC\Server' -Name AllowLoopback -Value 1 -Type DWord
-    Restart-Service tvnserver -ErrorAction SilentlyContinue
-    Ok "Connexions loopback autorisees dans TightVNC."
-  } catch {
-    Warn "Active manuellement 'Allow loopback connections' (Configuration -> Administration)."
+    New-Item -Path 'HKLM:\SOFTWARE\TightVNC\Server' -Force -ErrorAction SilentlyContinue | Out-Null
+    Set-ItemProperty 'HKLM:\SOFTWARE\TightVNC\Server' -Name AllowLoopback -Value 1 -Type DWord -ErrorAction SilentlyContinue
+  } catch {}
+  # Demarre le service s'il ne tourne pas.
+  $svc = Get-Service tvnserver -ErrorAction SilentlyContinue
+  if ($svc -and $svc.Status -ne 'Running') {
+    Start-Service tvnserver -ErrorAction SilentlyContinue
   }
-  Warn "Ouvre TightVNC (zone de notification) -> onglet Server -> definis un MOT DE PASSE VNC."
+  if (-not $svc) {
+    try { & $tvn -install; Start-Service tvnserver } catch {}
+  }
+  $svc = Get-Service tvnserver -ErrorAction SilentlyContinue
+  if ($svc -and $svc.Status -eq 'Running') {
+    Ok "TightVNC actif (service tvnserver)."
+  } else {
+    Warn "TightVNC installe mais le service ne tourne pas. Lance-le manuellement."
+  }
+} else {
+  Warn "TightVNC non trouve. Installe-le avant de continuer."
 }
 
 # -- 6. Demarrage : websockify (noVNC) puis cloudflared --------------
