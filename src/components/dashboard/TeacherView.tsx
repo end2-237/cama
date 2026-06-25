@@ -7,12 +7,14 @@ import {
   Radio, Bot, FileText, Video, MonitorPlay, ShieldCheck,
   AlertTriangle, Check, Eye, EyeOff, TrendingUp, Terminal,
   Newspaper, BookMarked, ExternalLink, Play, Sparkles, Inbox, Target,
+  Trash2, X,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { fetchTeacherCourses, fetchChapters } from "@/lib/program";
 import {
   fetchExamsForCourses, fetchAttemptsForExam, fetchQuestions,
-  createExam, setExamStatus, gradeAttempt,
+  createExam, setExamStatus, deleteExam, gradeAttempt,
+  addQuestion, deleteQuestion,
 } from "@/lib/exams";
 import { fetchUsers } from "@/lib/admin";
 import { fetchLivesForCourses, subscribeLives } from "@/lib/lives";
@@ -418,7 +420,7 @@ function CoursesTab() {
 }
 
 /* ════════════════════════════════════════════════════════════
-   ÉVALUATIONS (création + correction)
+   ÉVALUATIONS (fusion examens + correction + évaluation TP)
 ════════════════════════════════════════════════════════════ */
 function EvalTab() {
   const { user } = useAuth();
@@ -427,12 +429,20 @@ function EvalTab() {
   const [title, setTitle] = useState("");
   const [ueId, setUeId] = useState("");
   const [dur, setDur] = useState("45");
+  const [examType, setExamType] = useState<"examen" | "tp">("examen");
 
   const [courses, setCourses] = useState<DBProgramCourse[]>([]);
   const [exams, setExams] = useState<DBExam[]>([]);
   const [attemptsByExam, setAttemptsByExam] = useState<Record<string, DBExamAttempt[]>>({});
   const [questionsByExam, setQuestionsByExam] = useState<Record<string, DBExamQuestion[]>>({});
   const [users, setUsers] = useState<Map<string, DBUser>>(new Map());
+  const [selExam, setSelExam] = useState<DBExam | null>(null);
+  const [tab, setTab] = useState<"questions" | "copies">("questions");
+  const [filter, setFilter] = useState<"all" | "examen" | "tp">("all");
+
+  // formulaire question
+  const [qOpen, setQOpen] = useState(false);
+  const [q, setQ] = useState<Partial<DBExamQuestion>>({ type: "qcm", text: "", options: ["", "", "", ""], correct_index: 0, points: 1 });
 
   const reload = useCallback(async () => {
     if (!user) return;
@@ -454,18 +464,28 @@ function EvalTab() {
 
   const allAttempts = Object.values(attemptsByExam).flat();
   const pending = allAttempts.filter((a) => a.status === "soumis").length;
+  const corrected = allAttempts.filter((a) => a.status === "corrige").length;
   const flagged = allAttempts.filter((a) => a.alerts.length > 0).length;
+  const avgScore = (() => {
+    const graded = allAttempts.filter((a) => a.status === "corrige" && a.score !== null && a.score_max);
+    if (!graded.length) return 0;
+    return Math.round(graded.reduce((s, a) => s + (Number(a.score) / Number(a.score_max)) * 20, 0) / graded.length * 10) / 10;
+  })();
 
   const courseById = new Map(courses.map((c) => [c.id, c]));
   const chapterCounts: Record<string, number> = {};
   const articles = buildArticles(courses, chapterCounts);
 
+  // Classification TP vs Examen (convention: titre contient "TP" ou dur <= 0 = TP)
+  const isTP = (e: DBExam) => /\bTP\b/i.test(e.title);
+  const filteredExams = filter === "all" ? exams : filter === "tp" ? exams.filter(isTP) : exams.filter((e) => !isTP(e));
+
   const doCreateExam = async () => {
     if (!title.trim() || !ueId) return;
     await createExam({
       program_course_id: ueId,
-      title: title.trim(),
-      duration_min: parseInt(dur) || 45,
+      title: (examType === "tp" ? "TP : " : "") + title.trim(),
+      duration_min: examType === "tp" ? 120 : (parseInt(dur) || 45),
       status: "planifie",
       created_by: user.id,
     });
@@ -475,21 +495,80 @@ function EvalTab() {
 
   const onStatusChange = async (id: string, status: ExamStatus) => {
     await setExamStatus(id, status);
+    if (selExam?.id === id) setSelExam((s) => s ? { ...s, status } : s);
     await reload();
+  };
+
+  const onDelExam = async (id: string) => {
+    if (!confirm("Supprimer cette évaluation ?")) return;
+    await deleteExam(id);
+    if (selExam?.id === id) setSelExam(null);
+    await reload();
+  };
+
+  const openExam = async (e: DBExam) => {
+    setSelExam(e);
+    setTab("questions");
+    const qs = await fetchQuestions(e.id);
+    const atts = await fetchAttemptsForExam(e.id);
+    setQuestionsByExam((p) => ({ ...p, [e.id]: qs }));
+    setAttemptsByExam((p) => ({ ...p, [e.id]: atts }));
+  };
+
+  const onAddQuestion = async () => {
+    if (!selExam || !q.text?.trim()) return;
+    await addQuestion({
+      exam_id: selExam.id, ordre: (questionsByExam[selExam.id] ?? []).length, type: q.type,
+      text: q.text, points: q.points ?? 1,
+      options: q.type === "qcm" ? (q.options ?? []).filter(Boolean) : [],
+      correct_index: q.type === "qcm" ? q.correct_index : null,
+    });
+    setQuestionsByExam((p) => ({ ...p, [selExam.id]: [...(p[selExam.id] ?? []), { id: Math.random().toString(), exam_id: selExam.id, ordre: 0, type: q.type ?? "qcm", text: q.text ?? "", options: q.options ?? [], correct_index: q.correct_index ?? null, points: q.points ?? 1 }] }));
+    const qs = await fetchQuestions(selExam.id);
+    setQuestionsByExam((p) => ({ ...p, [selExam.id]: qs }));
+    setQOpen(false);
+    setQ({ type: "qcm", text: "", options: ["", "", "", ""], correct_index: 0, points: 1 });
+  };
+
+  const onDelQuestion = async (id: string) => {
+    if (!selExam) return;
+    await deleteQuestion(id);
+    setQuestionsByExam((p) => ({ ...p, [selExam.id]: (p[selExam.id] ?? []).filter((x) => x.id !== id) }));
   };
 
   const right = (
     <>
+      {/* Stats de correction */}
       <div className="px-4 py-3 border-b border-border">
         <h2 className="text-[10px] font-black text-ink uppercase tracking-widest mb-2">File de correction</h2>
         <div className="grid grid-cols-2 gap-px bg-border border border-border">
           {[
             { value: String(pending), label: "à corriger", color: "text-gold-dark" },
+            { value: String(corrected), label: "corrigées", color: "text-green-600" },
             { value: String(flagged), label: "signalées", color: "text-red-500" },
+            { value: String(avgScore || "—"), label: "moy. /20", color: "text-cama" },
           ].map((s, i) => (
             <div key={i} className="bg-white p-2.5 text-center">
               <p className={`text-lg font-bold leading-none ${s.color}`}>{s.value}</p>
               <p className="text-[9px] text-muted mt-1">{s.label}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Répartition par statut */}
+      <div className="px-4 py-3 border-b border-border">
+        <h2 className="text-[10px] font-black text-ink uppercase tracking-widest mb-2">Répartition examens</h2>
+        <div className="space-y-2">
+          {[
+            { label: "Planifiés", count: exams.filter((e) => e.status === "planifie").length, color: "bg-gold/40" },
+            { label: "Ouverts", count: exams.filter((e) => e.status === "ouvert").length, color: "bg-green-500" },
+            { label: "Terminés", count: exams.filter((e) => e.status === "termine").length, color: "bg-surface" },
+          ].map((r) => (
+            <div key={r.label} className="flex items-center gap-2">
+              <div className={`w-2.5 h-2.5 flex-shrink-0 ${r.color}`} />
+              <span className="text-xs text-muted flex-1">{r.label}</span>
+              <span className="text-xs font-bold text-ink">{r.count}</span>
             </div>
           ))}
         </div>
@@ -514,6 +593,22 @@ function EvalTab() {
 
       <GradientNote icon={ShieldCheck} title="L'IA signale, vous décidez"
         body="Aucune sanction automatique : les signalements sont indicatifs. Vous corrigez et transmettez au jury, l'étudiant garde un droit d'appel." />
+
+      {/* Évaluation TP */}
+      <div className="px-4 py-3 border-b border-border">
+        <h2 className="text-[10px] font-black text-ink uppercase tracking-widest mb-2">Évaluation TP</h2>
+        <div className="space-y-2">
+          <div className="flex gap-2 items-start">
+            <Terminal className="w-3.5 h-3.5 text-cama flex-shrink-0 mt-0.5" />
+            <p className="text-xs text-ink leading-snug">Créez un examen TP pour évaluer le travail pratique sur machine.</p>
+          </div>
+          <div className="flex gap-2 items-start">
+            <Eye className="w-3.5 h-3.5 text-cama flex-shrink-0 mt-0.5" />
+            <p className="text-xs text-ink leading-snug">Accédez aux machines des étudiants en temps réel.</p>
+          </div>
+          <Link href="/tp" className="block text-[10px] font-bold text-cama hover:underline mt-1">Ouvrir le gestionnaire de TP →</Link>
+        </div>
+      </div>
     </>
   );
 
@@ -523,83 +618,276 @@ function EvalTab() {
         <ShieldCheck className="w-5 h-5 text-ink" strokeWidth={1.5} />
         <h1 className="text-xl font-light text-ink">Évaluations</h1>
         <div className="flex-1" />
+        <div className="flex items-center gap-0.5 bg-surface p-0.5">
+          {([["all", "Tout"], ["examen", "Examens"], ["tp", "TP"]] as const).map(([k, l]) => (
+            <button key={k} onClick={() => setFilter(k)}
+              className={`px-2.5 py-1 text-[10px] font-bold transition-all ${filter === k ? "bg-white text-ink shadow-sm" : "text-muted hover:text-ink"}`}>{l}</button>
+          ))}
+        </div>
         <button onClick={() => setShowNew(!showNew)} className="flex items-center gap-1.5 px-3 py-1.5 bg-cama text-white text-[11px] font-bold hover:bg-cama-700 transition-colors">
-          <PlusCircle className="w-3.5 h-3.5" /> Nouvel examen
+          <PlusCircle className="w-3.5 h-3.5" /> Nouvelle évaluation
         </button>
       </div>
 
+      {/* KPIs */}
+      <div className="grid grid-cols-4 border border-border divide-x divide-border mb-2 bg-white">
+        {[
+          { icon: FileText, label: "Évaluations", value: String(exams.length), color: "text-cama" },
+          { icon: Users, label: "Copies reçues", value: String(allAttempts.length), color: "text-ink" },
+          { icon: Inbox, label: "À corriger", value: String(pending), color: "text-gold-dark" },
+          { icon: Target, label: "Moyenne", value: avgScore ? `${avgScore}/20` : "—", color: "text-green-600" },
+        ].map(({ icon: Icon, label, value, color }) => (
+          <div key={label} className="p-2.5 flex items-center gap-2.5">
+            <Icon className={`w-4 h-4 flex-shrink-0 ${color}`} />
+            <div>
+              <p className={`text-base font-bold leading-none ${color}`}>{value}</p>
+              <p className="text-[10px] text-muted leading-tight mt-0.5">{label}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Formulaire création */}
       {showNew && (
-        <div className="bg-white border-2 border-cama/30 p-4 mb-2 animate-scale-in flex gap-2 flex-wrap">
-          <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Titre de l'examen…"
-            className="flex-1 min-w-[200px] text-sm border border-border px-4 py-2.5 outline-none focus:border-cama" />
-          <select value={ueId} onChange={(e) => setUeId(e.target.value)}
-            className="text-sm border border-border px-3 py-2.5 outline-none bg-white">
-            <option value="">UE…</option>
-            {courses.map((u) => <option key={u.id} value={u.id}>{u.code}</option>)}
-          </select>
-          <input value={dur} onChange={(e) => setDur(e.target.value)} type="number" min="5" placeholder="Durée"
-            className="w-24 text-sm border border-border px-3 py-2.5 outline-none" />
-          <button onClick={doCreateExam} className="bg-cama text-white text-sm font-bold px-5 hover:bg-cama-700 transition-colors">Créer</button>
+        <div className="bg-white border-2 border-cama/30 p-4 mb-2 animate-scale-in">
+          <p className="text-sm font-bold text-ink mb-3">Nouvelle évaluation</p>
+          <div className="flex gap-1.5 mb-3">
+            {([["examen", "Examen classique"], ["tp", "Évaluation TP"]] as const).map(([k, l]) => (
+              <button key={k} onClick={() => setExamType(k)}
+                className={`px-3 py-1.5 text-xs font-bold border-2 transition-all ${examType === k ? "border-cama bg-cama text-white" : "border-border text-muted"}`}>{l}</button>
+            ))}
+          </div>
+          <div className="flex gap-2 flex-wrap">
+            <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={examType === "tp" ? "Titre du TP..." : "Titre de l'examen..."}
+              className="flex-1 min-w-[200px] text-sm border border-border px-4 py-2.5 outline-none focus:border-cama" />
+            <select value={ueId} onChange={(e) => setUeId(e.target.value)}
+              className="text-sm border border-border px-3 py-2.5 outline-none bg-white">
+              <option value="">UE...</option>
+              {courses.map((u) => <option key={u.id} value={u.id}>{u.code}</option>)}
+            </select>
+            {examType === "examen" && (
+              <input value={dur} onChange={(e) => setDur(e.target.value)} type="number" min="5" placeholder="Durée (min)"
+                className="w-28 text-sm border border-border px-3 py-2.5 outline-none" />
+            )}
+            <button onClick={doCreateExam} className="bg-cama text-white text-sm font-bold px-5 hover:bg-cama-700 transition-colors">Créer</button>
+          </div>
+          {examType === "tp" && (
+            <p className="text-[10px] text-muted mt-2 flex items-center gap-1">
+              <Terminal className="w-3 h-3" /> L&apos;évaluation TP permet de corriger le travail des étudiants sur machine distante.
+            </p>
+          )}
         </div>
       )}
 
-      <div className="space-y-2">
-        {exams.map((e) => {
-          const ue = courseById.get(e.program_course_id);
-          const attempts = attemptsByExam[e.id] ?? [];
-          const questions = questionsByExam[e.id] ?? [];
-          return (
-            <div key={e.id} className="bg-white border border-border overflow-hidden">
-              <div className="p-3 flex items-center gap-3 flex-wrap">
-                <div className={`w-10 h-10 flex items-center justify-center flex-shrink-0 ${e.status === "ouvert" ? "bg-cama-50" : "bg-surface"}`}>
-                  <ShieldCheck className={`w-4 h-4 ${e.status === "ouvert" ? "text-cama" : "text-subtle"}`} />
+      {/* Liste principale - vue détailée avec sélection */}
+      <div className="grid lg:grid-cols-[340px_1fr] gap-2">
+        {/* Sidebar examens */}
+        <div className="border border-border divide-y divide-border bg-white">
+          {filteredExams.length === 0 && (
+            <p className="text-sm text-muted text-center py-6">Aucune évaluation. Créez-en une ci-dessus.</p>
+          )}
+          {filteredExams.map((e) => {
+            const ue = courseById.get(e.program_course_id);
+            const attempts = attemptsByExam[e.id] ?? [];
+            const questions = questionsByExam[e.id] ?? [];
+            const tp = isTP(e);
+            return (
+              <button key={e.id} onClick={() => openExam(e)}
+                className={`w-full text-left p-3 hover:bg-cama-50/40 transition-colors flex items-center gap-3 ${selExam?.id === e.id ? "bg-cama-50/60 border-l-2 border-l-cama" : ""}`}>
+                <div className={`w-10 h-10 flex items-center justify-center flex-shrink-0 ${e.status === "ouvert" ? "bg-green-50" : tp ? "bg-cama-50" : "bg-surface"}`}>
+                  {tp
+                    ? <Terminal className={`w-4 h-4 ${e.status === "ouvert" ? "text-green-600" : "text-cama"}`} />
+                    : <ShieldCheck className={`w-4 h-4 ${e.status === "ouvert" ? "text-green-600" : "text-subtle"}`} />}
                 </div>
-                <div className="flex-1 min-w-[180px]">
-                  <p className="text-[10px] text-subtle">{ue?.code} · {e.duration_min} min · {questions.length} questions</p>
-                  <p className="font-bold text-ink text-sm">{e.title}</p>
+                <div className="flex-1 min-w-0">
+                  <p className="text-[10px] text-subtle">{ue?.code} {tp ? "· TP" : ""} · {e.duration_min} min · {questions.length}q · {attempts.length} copie(s)</p>
+                  <p className="font-bold text-ink text-sm truncate">{e.title}</p>
                 </div>
-                <select
-                  value={e.status}
-                  onChange={(ev) => onStatusChange(e.id, ev.target.value as ExamStatus)}
-                  className={`text-xs font-bold px-3 py-1.5 border-2 outline-none ${
-                    e.status === "ouvert" ? "border-green-500 text-green-600 bg-green-50" : "border-border text-muted bg-white"}`}>
-                  <option value="planifie">Planifié</option>
-                  <option value="ouvert">Ouvert</option>
-                  <option value="termine">Terminé</option>
-                </select>
-                <button onClick={() => setOpen(open === e.id ? null : e.id)}
-                  className="flex items-center gap-1.5 text-xs font-bold text-cama border-2 border-cama/30 px-3 py-1.5 hover:bg-cama-50 transition-colors">
-                  {attempts.length} copie(s) <ChevronDown className={`w-3.5 h-3.5 transition-transform ${open === e.id ? "rotate-180" : ""}`} />
-                </button>
+                <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                  <span className={`text-[9px] font-bold px-1.5 py-0.5 ${
+                    e.status === "ouvert" ? "bg-green-50 text-green-600" : e.status === "termine" ? "bg-surface text-muted" : "bg-gold/10 text-gold-dark"
+                  }`}>{e.status === "ouvert" ? "Ouvert" : e.status === "termine" ? "Terminé" : "Planifié"}</span>
+                  {attempts.filter((a) => a.status === "soumis").length > 0 && (
+                    <span className="text-[9px] font-bold text-gold-dark">{attempts.filter((a) => a.status === "soumis").length} à corriger</span>
+                  )}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Détail de l'évaluation sélectionnée */}
+        {!selExam ? (
+          <div className="bg-white border border-border p-8 text-center">
+            <ShieldCheck className="w-8 h-8 text-muted mx-auto mb-2" />
+            <p className="text-sm text-muted">Sélectionnez ou créez une évaluation.</p>
+            <p className="text-[10px] text-subtle mt-1">Les examens et les évaluations TP sont gérés ici.</p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {/* En-tête + statut */}
+            <div className="bg-white border border-border p-3 flex flex-wrap items-center gap-3">
+              <div className="flex-1 min-w-[160px]">
+                <h2 className="text-base font-bold text-ink">{selExam.title}</h2>
+                <p className="text-[11px] text-muted">
+                  {courseById.get(selExam.program_course_id)?.code} · {(questionsByExam[selExam.id] ?? []).length} questions · {(questionsByExam[selExam.id] ?? []).reduce((a, x) => a + x.points, 0)} pts · {selExam.duration_min} min
+                </p>
               </div>
-              {open === e.id && (
-                <div className="border-t border-border bg-surface p-3 space-y-3 animate-fade-up">
-                  {attempts.length === 0 && <p className="text-sm text-muted text-center py-3">Aucune copie soumise pour le moment.</p>}
-                  {attempts.map((a) => (
-                    <AttemptCard key={a.id} attempt={a} questions={questions} users={users} onGraded={reload} />
+              <select
+                value={selExam.status}
+                onChange={(ev) => onStatusChange(selExam.id, ev.target.value as ExamStatus)}
+                className={`text-xs font-bold px-3 py-1.5 border-2 outline-none ${
+                  selExam.status === "ouvert" ? "border-green-500 text-green-600 bg-green-50" : "border-border text-muted bg-white"}`}>
+                <option value="planifie">Planifié</option>
+                <option value="ouvert">Ouvert</option>
+                <option value="termine">Terminé</option>
+              </select>
+              <button onClick={() => onDelExam(selExam.id)} className="text-subtle hover:text-red-500 p-1.5"><Trash2 className="w-4 h-4" /></button>
+            </div>
+
+            {/* Onglets */}
+            <div className="flex gap-0.5 bg-white border border-border p-1 w-fit">
+              {([["questions", "Questions"], ["copies", `Copies (${(attemptsByExam[selExam.id] ?? []).length})`]] as const).map(([k, l]) => (
+                <button key={k} onClick={() => setTab(k)}
+                  className={`px-4 py-1.5 text-xs font-bold transition-all ${tab === k ? "bg-cama text-white" : "text-muted hover:text-ink"}`}>{l}</button>
+              ))}
+            </div>
+
+            {tab === "questions" ? (
+              <div className="bg-white border border-border p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-[11px] font-black text-ink uppercase tracking-widest">Questions</h3>
+                  <button onClick={() => setQOpen(true)} className="text-[11px] font-bold text-cama hover:underline flex items-center gap-1"><PlusCircle className="w-3 h-3" /> Ajouter</button>
+                </div>
+                {(questionsByExam[selExam.id] ?? []).length === 0 ? (
+                  <p className="text-xs text-muted italic">Aucune question. Ajoutez-en avant d&apos;ouvrir l&apos;évaluation.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {(questionsByExam[selExam.id] ?? []).map((qq, i) => (
+                      <div key={qq.id} className="border border-border p-3">
+                        <div className="flex items-start gap-2">
+                          <span className="text-[10px] font-bold text-subtle w-5 h-5 bg-surface flex items-center justify-center flex-shrink-0">{i + 1}</span>
+                          <div className="flex-1">
+                            <p className="text-sm text-ink">{qq.text} <span className="text-[10px] text-muted">({qq.points} pt{qq.points > 1 ? "s" : ""} · {qq.type})</span></p>
+                            {qq.type === "qcm" && (
+                              <ul className="mt-1 space-y-0.5">
+                                {qq.options.map((o, oi) => (
+                                  <li key={oi} className={`text-[11px] flex items-center gap-1.5 ${oi === qq.correct_index ? "text-green-600 font-bold" : "text-muted"}`}>
+                                    {oi === qq.correct_index ? <Check className="w-3 h-3" /> : <span className="w-3 h-3 border border-border inline-block" />}
+                                    {o}
+                                  </li>
+                                ))}
+                              </ul>
+                            )}
+                          </div>
+                          <button onClick={() => onDelQuestion(qq.id)} className="text-subtle hover:text-red-500"><Trash2 className="w-3.5 h-3.5" /></button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* TP : lien vers les machines */}
+                {isTP(selExam) && (
+                  <div className="mt-3 p-3 bg-cama-50 border border-cama/20">
+                    <p className="text-xs font-bold text-cama flex items-center gap-1.5 mb-1"><Terminal className="w-3.5 h-3.5" /> Machines de TP</p>
+                    <p className="text-[11px] text-muted mb-2">Accédez aux machines distantes des étudiants pour observer leur travail en temps réel.</p>
+                    <Link href="/tp" className="text-[10px] font-bold text-cama hover:underline">Ouvrir le gestionnaire de machines →</Link>
+                  </div>
+                )}
+              </div>
+            ) : (
+              /* Copies / correction */
+              <div className="bg-white border border-border p-4">
+                <h3 className="text-[11px] font-black text-ink uppercase tracking-widest mb-3 flex items-center gap-1.5"><Users className="w-3.5 h-3.5 text-cama" /> Copies soumises</h3>
+                {(attemptsByExam[selExam.id] ?? []).length === 0 ? (
+                  <p className="text-xs text-muted italic">Aucune copie soumise pour le moment.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {(attemptsByExam[selExam.id] ?? []).map((a) => (
+                      <AttemptCard key={a.id} attempt={a} questions={questionsByExam[selExam.id] ?? []} users={users} onGraded={reload} isTP={isTP(selExam)} />
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Modal ajout question */}
+      {qOpen && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={(ev) => { if (ev.target === ev.currentTarget) setQOpen(false); }}>
+          <div className="bg-white shadow-2xl w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-base font-bold text-ink">Nouvelle question</h2>
+              <button onClick={() => setQOpen(false)} className="text-muted hover:text-ink"><X className="w-5 h-5" /></button>
+            </div>
+            <div className="space-y-3">
+              <div className="flex gap-2">
+                {(["qcm", "ouverte"] as const).map((t) => (
+                  <button key={t} onClick={() => setQ((x) => ({ ...x, type: t }))}
+                    className={`px-3 py-1.5 text-xs font-bold border-2 ${q.type === t ? "border-cama bg-cama text-white" : "border-border text-muted"}`}>
+                    {t === "qcm" ? "QCM" : "Question ouverte"}
+                  </button>
+                ))}
+                <div className="flex-1" />
+                <div className="flex items-center gap-1">
+                  <input type="number" min={1} value={q.points ?? 1} onChange={(e) => setQ((x) => ({ ...x, points: parseInt(e.target.value) || 1 }))}
+                    className="w-14 border border-border px-2 py-1.5 text-xs text-center outline-none focus:border-cama" />
+                  <span className="text-[11px] text-muted">pts</span>
+                </div>
+              </div>
+              <textarea value={q.text ?? ""} onChange={(e) => setQ((x) => ({ ...x, text: e.target.value }))} rows={2}
+                placeholder="Énoncé de la question..." className="w-full border border-border px-3 py-2 text-sm outline-none focus:border-cama resize-y" />
+              {q.type === "qcm" && (
+                <div className="space-y-2">
+                  <p className="text-[11px] font-semibold text-ink">Options (cochez la bonne réponse)</p>
+                  {(q.options ?? []).map((o, i) => (
+                    <div key={i} className="flex items-center gap-2">
+                      <input type="radio" checked={q.correct_index === i} onChange={() => setQ((x) => ({ ...x, correct_index: i }))} className="accent-cama" />
+                      <input value={o} onChange={(e) => setQ((x) => { const opts = [...(x.options ?? [])]; opts[i] = e.target.value; return { ...x, options: opts }; })}
+                        placeholder={`Option ${i + 1}`} className="flex-1 border border-border px-3 py-1.5 text-sm outline-none focus:border-cama" />
+                    </div>
                   ))}
                 </div>
               )}
             </div>
-          );
-        })}
-      </div>
+            <div className="flex gap-2 mt-5">
+              <button onClick={() => setQOpen(false)} className="flex-1 border border-border py-2.5 text-sm font-semibold text-muted">Annuler</button>
+              <button onClick={onAddQuestion} className="flex-1 bg-cama text-white py-2.5 text-sm font-bold flex items-center justify-center gap-2 hover:bg-cama-700">
+                <Check className="w-4 h-4" /> Ajouter
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </TeacherShell>
   );
 }
 
 function AttemptCard({
-  attempt: a, questions, users, onGraded,
+  attempt: a, questions, users, onGraded, isTP,
 }: {
   attempt: DBExamAttempt;
   questions: DBExamQuestion[];
   users: Map<string, DBUser>;
   onGraded: () => void | Promise<void>;
+  isTP?: boolean;
 }) {
   const [note, setNote] = useState("");
   const [fb, setFb] = useState("");
   const name = studentName(a.student_id, users);
-  const open = questions.filter((q) => q.type === "ouverte");
+  const openQs = questions.filter((q) => q.type === "ouverte");
+  const qcmQs = questions.filter((q) => q.type === "qcm");
+  const hasOpen = openQs.length > 0;
+
+  // Calcul note QCM auto
+  let qcmScore = 0, qcmMax = 0;
+  qcmQs.forEach((q) => {
+    qcmMax += q.points;
+    if (a.answers[q.id] !== undefined && Number(a.answers[q.id]) === q.correct_index) qcmScore += q.points;
+  });
 
   const grade = async () => {
     const n = parseFloat(note);
@@ -611,42 +899,73 @@ function AttemptCard({
   return (
     <div className="bg-white border border-border p-4">
       <div className="flex items-center gap-3 flex-wrap mb-3">
+        <div className="w-8 h-8 bg-cama-50 text-cama flex items-center justify-center text-xs font-bold flex-shrink-0">
+          {name.split(" ").map((x) => x[0]).join("").slice(0, 2)}
+        </div>
         <p className="text-sm font-bold text-ink flex-1">{name}</p>
         {a.alerts.length > 0 ? (
-          <span className="badge bg-gold/10 text-gold-dark text-[10px]"><AlertTriangle className="w-3 h-3" /> {a.alerts.length} signalement(s)</span>
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-gold/10 text-gold-dark text-[10px] font-bold"><AlertTriangle className="w-3 h-3" /> {a.alerts.length} signalement(s)</span>
         ) : (
-          <span className="badge bg-green-50 text-green-600 text-[10px]"><Check className="w-3 h-3" /> Aucun incident</span>
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-green-50 text-green-600 text-[10px] font-bold"><Check className="w-3 h-3" /> Aucun incident</span>
         )}
-        <span className={`badge text-[10px] ${a.status === "corrige" ? "bg-green-50 text-green-600" : "bg-cama-50 text-cama"}`}>
-          {a.status === "corrige" ? `Corrigé · ${a.score}/20` : `QCM auto : ${a.score ?? "—"}/20`}
+        <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold ${a.status === "corrige" ? "bg-green-50 text-green-600" : "bg-cama-50 text-cama"}`}>
+          {a.status === "corrige" ? `Corrigé · ${a.score}/20` : hasOpen ? "QCM auto + ouvertes à corriger" : `QCM auto : ${qcmScore}/${qcmMax} pts`}
         </span>
       </div>
 
+      {/* Détail par type de question */}
+      {hasOpen && (
+        <div className="grid grid-cols-2 gap-2 mb-3">
+          <div className="bg-surface p-2.5">
+            <p className="text-[10px] text-muted">QCM ({qcmQs.length}q)</p>
+            <p className="text-sm font-bold text-cama">{qcmScore}/{qcmMax} pts</p>
+          </div>
+          <div className="bg-surface p-2.5">
+            <p className="text-[10px] text-muted">Ouvertes ({openQs.length}q)</p>
+            <p className="text-sm font-bold text-gold-dark">{a.status === "corrige" ? "Corrigées" : "À corriger"}</p>
+          </div>
+        </div>
+      )}
+
       {a.alerts.length > 0 && (
         <div className="bg-gold/5 border border-gold/20 p-3 mb-3 space-y-1">
-          {a.alerts.map((al, i) => (
-            <p key={i} className="text-[11px] text-gold-dark">⚠ {al.time} — {al.detail}</p>
+          {a.alerts.slice(0, 5).map((al, i) => (
+            <p key={i} className="text-[11px] text-gold-dark">⚠ {al.time.slice(11, 16)} — {al.detail}</p>
           ))}
+          {a.alerts.length > 5 && <p className="text-[10px] text-muted">... et {a.alerts.length - 5} autre(s)</p>}
           <p className="text-[10px] text-muted italic">L&apos;IA signale, vous décidez — l&apos;étudiant dispose d&apos;un droit d&apos;appel.</p>
         </div>
       )}
 
-      {open.map((q) => (
-        <div key={q.id} className="mb-3">
-          <p className="text-xs font-semibold text-ink mb-1">{q.text}</p>
+      {/* Réponses ouvertes */}
+      {openQs.map((qq) => (
+        <div key={qq.id} className="mb-3">
+          <p className="text-xs font-semibold text-ink mb-1">{qq.text} <span className="text-[10px] text-muted">({qq.points} pts)</span></p>
           <p className="text-xs text-muted bg-surface p-3 leading-relaxed">
-            {(a.answers[q.id] as string) || <em className="text-subtle">Pas de réponse</em>}
+            {(a.answers[qq.id] as string) || <em className="text-subtle">Pas de réponse</em>}
           </p>
         </div>
       ))}
+
+      {/* TP : lien observation machine */}
+      {isTP && (
+        <div className="bg-cama-50 border border-cama/20 p-2.5 mb-3 flex items-center gap-2">
+          <Terminal className="w-4 h-4 text-cama flex-shrink-0" />
+          <div className="flex-1">
+            <p className="text-[11px] font-bold text-cama">Machine distante</p>
+            <p className="text-[10px] text-muted">Observez le travail de l&apos;étudiant en temps réel.</p>
+          </div>
+          <Link href="/tp" className="text-[10px] font-bold text-white bg-cama px-2.5 py-1 hover:bg-cama-700">Voir</Link>
+        </div>
+      )}
 
       {a.status !== "corrige" && (
         <div className="flex gap-2 flex-wrap items-center pt-2 border-t border-border">
           <input value={note} onChange={(e) => setNote(e.target.value)} type="number" min="0" max="20" placeholder="Note /20"
             className="w-24 text-xs border border-border px-3 py-2 outline-none focus:border-cama" />
-          <input value={fb} onChange={(e) => setFb(e.target.value)} placeholder="Feedback formatif (assisté IA hors examen)…"
+          <input value={fb} onChange={(e) => setFb(e.target.value)} placeholder="Feedback formatif..."
             className="flex-1 min-w-[180px] text-xs border border-border px-3 py-2 outline-none focus:border-cama" />
-          <button onClick={grade} className="bg-cama text-white text-xs font-bold px-4 py-2 hover:bg-cama-700 transition-colors flex items-center gap-1"><Check className="w-3.5 h-3.5" /> Corriger &amp; transmettre</button>
+          <button onClick={grade} className="bg-cama text-white text-xs font-bold px-4 py-2 hover:bg-cama-700 transition-colors flex items-center gap-1"><Check className="w-3.5 h-3.5" /> Corriger</button>
         </div>
       )}
     </div>

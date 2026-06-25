@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import {
   ShieldCheck, Clock, AlertTriangle, Lock, Save, CheckCircle2,
-  Maximize, Award, Loader2, ChevronLeft, ChevronRight,
+  Maximize, Award, Loader2, ChevronLeft, ChevronRight, FileText, Hourglass,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import type { DBExam, DBExamQuestion, DBExamAttempt } from "@/lib/supabase";
@@ -36,7 +36,12 @@ export default function ExamPage() {
   const [remaining, setRemaining] = useState<number | null>(null);
   const [alerts, setAlerts] = useState(0);
   const [phase, setPhase] = useState<"loading" | "ready" | "running" | "done" | "blocked">("loading");
-  const [result, setResult] = useState<{ score: number; max: number; note: number } | null>(null);
+  const [result, setResult] = useState<{
+    score: number; max: number; note: number;
+    hasOpen: boolean; qcmScore: number; qcmMax: number;
+    answeredCount: number; totalCount: number;
+    alertCount: number; durationMin: number;
+  } | null>(null);
   const submitting = useRef(false);
 
   useEffect(() => { if (!loading && !user) router.replace("/auth/login"); }, [loading, user, router]);
@@ -50,8 +55,27 @@ export default function ExamPage() {
       setExam(e);
       const att = await fetchAttempt(id, user.id);
       if (att && att.status !== "encours") {
-        setResult({ score: Number(att.score ?? 0), max: Number(att.score_max ?? 0),
-          note: att.score_max ? Math.round((Number(att.score) / Number(att.score_max)) * 20 * 10) / 10 : 0 });
+        const qs = await fetchQuestions(id);
+        const hasOpen = qs.some((q) => q.type === "ouverte");
+        let qcmScore = 0, qcmMax = 0;
+        qs.forEach((q) => {
+          if (q.type === "qcm") {
+            qcmMax += q.points;
+            if (att.answers && Number(att.answers[q.id]) === q.correct_index) qcmScore += q.points;
+          }
+        });
+        const startMs = new Date(att.started_at).getTime();
+        const endMs = att.submitted_at ? new Date(att.submitted_at).getTime() : startMs;
+        const durationMin = Math.round((endMs - startMs) / 60000);
+        const answeredCount = att.answers ? Object.keys(att.answers).length : 0;
+        setQuestions(qs);
+        setAttempt(att);
+        setResult({
+          score: Number(att.score ?? 0), max: Number(att.score_max ?? 0),
+          note: att.score_max ? Math.round((Number(att.score) / Number(att.score_max)) * 20 * 10) / 10 : 0,
+          hasOpen, qcmScore, qcmMax, answeredCount, totalCount: qs.length,
+          alertCount: att.alerts?.length ?? 0, durationMin,
+        });
         setPhase("done");
         return;
       }
@@ -119,9 +143,23 @@ export default function ExamPage() {
     submitting.current = true;
     await submitAttempt(attempt.id, answers, questions);
     if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
-    let score = 0, max = 0;
-    questions.forEach((q) => { max += q.points; if (q.type === "qcm" && Number(answers[q.id]) === q.correct_index) score += q.points; });
-    setResult({ score, max, note: max ? Math.round((score / max) * 20 * 10) / 10 : 0 });
+    let score = 0, max = 0, qcmScore = 0, qcmMax = 0;
+    const hasOpen = questions.some((q) => q.type === "ouverte");
+    questions.forEach((q) => {
+      max += q.points;
+      if (q.type === "qcm") {
+        qcmMax += q.points;
+        if (Number(answers[q.id]) === q.correct_index) { score += q.points; qcmScore += q.points; }
+      }
+    });
+    const startMs = attempt ? new Date(attempt.started_at).getTime() : Date.now();
+    const durationMin = Math.round((Date.now() - startMs) / 60000);
+    setResult({
+      score, max, note: max ? Math.round((score / max) * 20 * 10) / 10 : 0,
+      hasOpen, qcmScore, qcmMax,
+      answeredCount: Object.keys(answers).length, totalCount: questions.length,
+      alertCount: alerts, durationMin,
+    });
     setPhase("done");
   };
 
@@ -146,22 +184,117 @@ export default function ExamPage() {
   );
 
   // ── Résultat ──
-  if (phase === "done" && result) return (
-    <div className="min-h-screen flex items-center justify-center bg-surface p-4">
-      <div className="bg-white border border-border rounded-2xl p-8 text-center max-w-sm">
-        <div className={`w-16 h-16 rounded-full mx-auto mb-4 flex items-center justify-center ${result.note >= 10 ? "bg-green-50" : "bg-gold/10"}`}>
-          <Award className={`w-8 h-8 ${result.note >= 10 ? "text-green-600" : "text-gold-dark"}`} />
+  if (phase === "done" && result) {
+    const isPending = result.hasOpen;
+    const qcmNote = result.qcmMax ? Math.round((result.qcmScore / result.qcmMax) * 20 * 10) / 10 : 0;
+    const openQuestions = questions.filter((q) => q.type === "ouverte");
+    const qcmQuestions = questions.filter((q) => q.type === "qcm");
+
+    return (
+      <div className="min-h-screen bg-surface p-4">
+        <div className="max-w-lg mx-auto pt-8 space-y-4">
+          {/* En-tête */}
+          <div className="bg-white border border-border rounded-2xl p-6 text-center">
+            <div className={`w-16 h-16 rounded-full mx-auto mb-4 flex items-center justify-center ${
+              isPending ? "bg-gold/10" : result.note >= 10 ? "bg-green-50" : "bg-gold/10"
+            }`}>
+              <Award className={`w-8 h-8 ${isPending ? "text-gold-dark" : result.note >= 10 ? "text-green-600" : "text-gold-dark"}`} />
+            </div>
+            <h1 className="text-lg font-bold text-ink mb-1">{exam?.title}</h1>
+            <p className="text-xs text-muted mb-4">
+              {isPending ? "Correction en attente" : "Note finale"}
+            </p>
+
+            {!isPending ? (
+              <>
+                <p className="text-4xl font-black text-ink mb-1">{result.note}<span className="text-lg text-muted">/20</span></p>
+                <p className="text-xs text-muted">{result.score}/{result.max} points</p>
+              </>
+            ) : (
+              <>
+                <p className="text-4xl font-black text-gold-dark mb-1">{qcmNote}<span className="text-lg text-muted">/20</span></p>
+                <p className="text-xs text-muted mb-3">Note provisoire (QCM uniquement)</p>
+              </>
+            )}
+          </div>
+
+          {/* Messages pour examen mixte */}
+          {isPending && (
+            <div className="bg-gold/10 border border-gold-dark/20 rounded-2xl p-4 space-y-2">
+              <div className="flex items-start gap-2">
+                <Hourglass className="w-4 h-4 text-gold-dark mt-0.5 flex-shrink-0" />
+                <div className="text-xs text-gold-dark space-y-1.5">
+                  <p>Vos réponses QCM ont été corrigées automatiquement : <strong>{result.qcmScore}/{result.qcmMax} points</strong></p>
+                  <p>Vos questions ouvertes ont été soumises à l&apos;enseignant pour correction.</p>
+                  <p className="font-semibold">Vous recevrez votre note finale après correction complète.</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Statistiques */}
+          <div className="bg-white border border-border rounded-2xl p-4">
+            <div className="grid grid-cols-3 gap-3 text-center">
+              <div>
+                <p className="text-xs text-muted mb-0.5">Durée</p>
+                <p className="text-sm font-bold text-ink">{result.durationMin} min</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted mb-0.5">Répondues</p>
+                <p className="text-sm font-bold text-ink">{result.answeredCount}/{result.totalCount}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted mb-0.5">Alertes</p>
+                <p className={`text-sm font-bold ${result.alertCount > 0 ? "text-red-500" : "text-ink"}`}>
+                  {result.alertCount > 0 && <AlertTriangle className="w-3.5 h-3.5 inline mr-0.5 -mt-0.5" />}
+                  {result.alertCount}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Alertes warning */}
+          {result.alertCount > 0 && (
+            <div className="bg-red-50 border border-red-200 rounded-2xl px-4 py-3 flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 text-red-500 flex-shrink-0" />
+              <p className="text-xs text-red-600">{result.alertCount} alerte(s) de surveillance enregistrée(s). Le jury en sera informé.</p>
+            </div>
+          )}
+
+          {/* Récapitulatif des questions */}
+          {questions.length > 0 && (
+            <div className="bg-white border border-border rounded-2xl p-4">
+              <p className="text-xs font-bold text-ink mb-3 flex items-center gap-1.5">
+                <FileText className="w-3.5 h-3.5 text-cama" /> Récapitulatif
+              </p>
+              <div className="space-y-1.5">
+                {questions.map((q, i) => (
+                  <div key={q.id} className="flex items-center gap-2 text-xs">
+                    <span className="w-6 h-6 rounded-lg bg-surface flex items-center justify-center text-muted font-bold flex-shrink-0">{i + 1}</span>
+                    <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold uppercase ${
+                      q.type === "qcm" ? "bg-cama-50 text-cama" : "bg-gold/10 text-gold-dark"
+                    }`}>{q.type === "qcm" ? "QCM" : "Ouverte"}</span>
+                    <span className="text-muted truncate flex-1">{q.text}</span>
+                    <span className="text-muted flex-shrink-0">{q.points} pt{q.points > 1 ? "s" : ""}</span>
+                  </div>
+                ))}
+              </div>
+              {questions.length > 0 && (
+                <div className="flex justify-between text-xs font-bold text-ink mt-3 pt-2 border-t border-border">
+                  <span>{qcmQuestions.length} QCM · {openQuestions.length} ouverte(s)</span>
+                  <span>{result.max} points total</span>
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="text-center pt-2 pb-8">
+            <Link href="/etudiant/examens" className="inline-block text-xs font-bold bg-cama text-white px-5 py-2.5 rounded-lg hover:bg-cama-700">← Mes examens</Link>
+          </div>
         </div>
-        <p className="text-sm text-muted mb-1">{exam?.title}</p>
-        <p className="text-4xl font-black text-ink mb-1">{result.note}<span className="text-lg text-muted">/20</span></p>
-        <p className="text-xs text-muted mb-4">{result.score}/{result.max} points (QCM corrigé automatiquement)</p>
-        {questions.some((q) => q.type === "ouverte") && (
-          <p className="text-[11px] text-gold-dark bg-gold/10 rounded-lg px-3 py-2 mb-4">Des questions ouvertes seront corrigées par l&apos;enseignant — la note pourra évoluer.</p>
-        )}
-        <Link href="/etudiant/examens" className="inline-block text-xs font-bold bg-cama text-white px-4 py-2 rounded-lg hover:bg-cama-700">← Mes examens</Link>
       </div>
-    </div>
-  );
+    );
+  }
 
   // ── Salle d'attente (consignes) ──
   if (phase === "ready") return (
