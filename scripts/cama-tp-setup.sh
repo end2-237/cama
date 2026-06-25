@@ -25,6 +25,11 @@ TP_PASS="${TP_PASS:-$(head -c 9 /dev/urandom | base64 | tr -dc 'A-Za-z0-9' | hea
 TP_PORT="${TP_PORT:-7681}"
 TP_SHELL="${TP_SHELL:-bash}"
 TP_WRITABLE="${TP_WRITABLE:-1}"
+# Limites de ressources (cgroup systemd) pour ne pas saturer la machine.
+TP_CPU="${TP_CPU:-80%}"      # part CPU max (80% = ~0,8 cœur)
+TP_MEM="${TP_MEM:-1G}"       # RAM max pour TOUTES les sessions terminal
+TP_TASKS="${TP_TASKS:-400}"  # nb max de processus/threads
+TP_CLIENTS="${TP_CLIENTS:-5}" # nb max de sessions simultanées
 
 c_ok()   { printf "\033[1;32m✔\033[0m %s\n" "$*"; }
 c_info() { printf "\033[1;36mℹ\033[0m %s\n" "$*"; }
@@ -91,9 +96,13 @@ Description=CAMA ttyd web terminal
 After=network.target
 
 [Service]
-ExecStart=${TTYD_BIN} -p ${TP_PORT} -i 127.0.0.1 ${WRITABLE_FLAG} -c ${TP_USER}:${TP_PASS} -t fontSize=15 -m 5 ${SHELL_CMD}
+ExecStart=${TTYD_BIN} -p ${TP_PORT} -i 127.0.0.1 ${WRITABLE_FLAG} -c ${TP_USER}:${TP_PASS} -t fontSize=15 -m ${TP_CLIENTS} ${SHELL_CMD}
 Restart=always
 RestartSec=2
+# Garde-fous ressources (cgroup) — évite la saturation CPU/RAM
+CPUQuota=${TP_CPU}
+MemoryMax=${TP_MEM}
+TasksMax=${TP_TASKS}
 
 [Install]
 WantedBy=multi-user.target
