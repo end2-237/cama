@@ -15,6 +15,7 @@ export interface LibraryDoc {
   title: string;
   url: string | null;
   sizeMo: number | null;
+  coverUrl: string | null;    // image de couverture du cours (visuel bibliothèque)
   // Rattachement académique
   courseId: string;
   courseCode: string;
@@ -28,6 +29,23 @@ export interface LibraryDoc {
   authorId: string | null;
   authorName: string;
   date: string;               // ISO created_at
+}
+
+/* Visuels génériques par type (utilisés si le cours n'a pas d'image). */
+export const KIND_FALLBACK_IMG: Record<LibraryKind, string> = {
+  pdf:      "https://images.unsplash.com/photo-1481627834876-b7833e8f5570?w=640&q=70",
+  video:    "https://images.unsplash.com/photo-1516280440614-37939bbacd81?w=640&q=70",
+  natif:    "https://images.unsplash.com/photo-1517694712202-14dd9538aa97?w=640&q=70",
+  syllabus: "https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?w=640&q=70",
+  support:  "https://images.unsplash.com/photo-1497633762265-9d179a990aa6?w=640&q=70",
+  biblio:   "https://images.unsplash.com/photo-1507842217343-583bb7270b66?w=640&q=70",
+  lien:     "https://images.unsplash.com/photo-1558494949-ef010cbdcc31?w=640&q=70",
+  epreuve:  "https://images.unsplash.com/photo-1434030216411-0b793f4b4173?w=640&q=70",
+};
+
+/** Image à afficher pour un document : couverture du cours, sinon visuel générique. */
+export function docCover(d: LibraryDoc): string {
+  return d.coverUrl || KIND_FALLBACK_IMG[d.kind];
 }
 
 export const KIND_LABEL: Record<LibraryKind, string> = {
@@ -69,6 +87,7 @@ export async function fetchLibrary(): Promise<LibraryDoc[]> {
       level: c.annee_niveau, semestre: c.semestre,
       academicYear: c.academic_year,
       teacherId: c.teacher_id,
+      coverUrl: c.cover_url ?? null,
     } : null;
   };
 
@@ -82,6 +101,7 @@ export async function fetchLibrary(): Promise<LibraryDoc[]> {
       parcoursSlug: m.parcoursSlug, parcoursTitle: m.parcoursTitle,
       level: m.level, semestre: m.semestre, academicYear: m.academicYear,
       authorId: author, authorName: authorName(author, users), date: ch.created_at,
+      coverUrl: m.coverUrl,
     };
     if (ch.pdf) docs.push({
       id: `chpdf:${ch.id}`, kind: "pdf",
@@ -112,6 +132,7 @@ export async function fetchLibrary(): Promise<LibraryDoc[]> {
       parcoursSlug: m.parcoursSlug, parcoursTitle: m.parcoursTitle,
       level: m.level, semestre: m.semestre, academicYear: m.academicYear,
       authorId: author, authorName: authorName(author, users), date: r.created_at,
+      coverUrl: m.coverUrl,
     });
   }
 
@@ -127,6 +148,7 @@ export async function fetchLibrary(): Promise<LibraryDoc[]> {
       parcoursSlug: m.parcoursSlug, parcoursTitle: m.parcoursTitle,
       level: m.level, semestre: m.semestre, academicYear: m.academicYear,
       authorId: author, authorName: authorName(author, users), date: e.created_at,
+      coverUrl: m.coverUrl,
     });
   }
 

@@ -70,6 +70,7 @@ export interface DBProgramCourse {
   difficulte: string | null;
   published: boolean;
   prof_ia: boolean;
+  cover_url: string | null;      // image de couverture (bibliothèque, vitrine)
   created_at: string;
 }
 

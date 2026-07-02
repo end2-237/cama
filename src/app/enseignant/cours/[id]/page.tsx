@@ -87,9 +87,14 @@ export default function CourseEditor() {
       </header>
 
       <main className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
-        <p className="text-sm text-muted mb-6">
+        <p className="text-sm text-muted mb-4">
           Composez librement chaque chapitre : un même chapitre peut proposer un PDF, une vidéo, un cours natif et un live.
         </p>
+
+        {/* Image de couverture — illustre le cours dans la Bibliothèque */}
+        <CoverEditor course={course} onSaved={reload} />
+
+
 
         <div className="space-y-4">
           {chapters.map((ch) => (
@@ -794,6 +799,65 @@ function SessionPlanner({ courseId, teacherId, courseTitle }: { courseId: string
             </div>
           );
         })}
+      </div>
+    </div>
+  );
+}
+
+/* ════ Image de couverture du cours (vitrine Bibliothèque) ════ */
+function CoverEditor({ course, onSaved }: { course: DBProgramCourse; onSaved: () => void }) {
+  const [uploading, setUploading] = useState(0);
+  const cover = (course as DBProgramCourse & { cover_url?: string | null }).cover_url ?? null;
+
+  const onPick = async (f: File | null) => {
+    if (!f) return;
+    if (!f.type.startsWith("image/")) { alert("Choisissez une image (JPG, PNG, WebP…)"); return; }
+    const res = await uploadMedia(course.id, f, setUploading);
+    setUploading(0);
+    if ("error" in res) { alert("Échec de l'envoi : " + res.error); return; }
+    await updateCourseContent(course.id, { cover_url: res.url } as Partial<DBProgramCourse>);
+    onSaved();
+  };
+
+  return (
+    <div className="bg-white rounded-2xl border border-border overflow-hidden mb-6">
+      <div className="grid sm:grid-cols-[220px_1fr] items-stretch">
+        <div className="relative h-32 sm:h-full min-h-[128px] bg-surface">
+          {cover ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={cover} alt="" className="absolute inset-0 w-full h-full object-cover" />
+          ) : (
+            <div className="absolute inset-0 flex flex-col items-center justify-center text-subtle">
+              <Upload className="w-6 h-6 mb-1" />
+              <p className="text-[10px] font-bold uppercase tracking-wider">Aucune image</p>
+            </div>
+          )}
+        </div>
+        <div className="p-4 flex flex-col justify-center">
+          <p className="text-[10px] font-black text-ink uppercase tracking-widest mb-1">Image de couverture</p>
+          <p className="text-xs text-muted leading-relaxed mb-3">
+            Cette image illustre votre cours et tous ses documents dans la <strong>Bibliothèque</strong>.
+            Sans image, un visuel générique est affiché.
+          </p>
+          <div className="flex items-center gap-2 flex-wrap">
+            <label className="inline-flex items-center gap-1.5 text-xs font-bold text-white bg-cama px-3 py-2 cursor-pointer hover:bg-cama-700 transition-colors">
+              <Upload className="w-3.5 h-3.5" />
+              {cover ? "Changer l'image" : "Ajouter une image"}
+              <input type="file" accept="image/*" className="hidden"
+                onChange={(e) => onPick(e.target.files?.[0] ?? null)} />
+            </label>
+            {cover && (
+              <button
+                onClick={async () => { await updateCourseContent(course.id, { cover_url: null } as Partial<DBProgramCourse>); onSaved(); }}
+                className="inline-flex items-center gap-1 text-xs font-bold text-muted border border-border px-3 py-2 hover:text-red-500 hover:border-red-300 transition-colors">
+                <Trash2 className="w-3.5 h-3.5" /> Retirer
+              </button>
+            )}
+            {uploading > 0 && uploading < 100 && (
+              <span className="text-[11px] text-cama font-bold">Envoi… {uploading}%</span>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );

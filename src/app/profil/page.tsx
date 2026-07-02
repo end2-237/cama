@@ -9,12 +9,12 @@ import {
   CalendarClock, HelpCircle, MessagesSquare, Bot, FileText,
   Pencil, Globe, Wifi, Bell, Lock, ChevronRight, Building2,
   Clock, Radio, LayoutDashboard, Star, Zap, UserCheck, AlarmClock,
-  BadgeCheck, BarChart2, Hash, Search, Library, Video, MonitorPlay,
+  BadgeCheck, BarChart2, Hash, Search, Library,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import QrSvg from "@/components/QrSvg";
 import PersonalCalendarDrawer from "@/components/PersonalCalendarDrawer";
-import { fetchLibrary, teacherLibrary, type LibraryDoc, KIND_LABEL } from "@/lib/library";
+import { fetchLibrary, teacherLibrary, docCover, type LibraryDoc, KIND_LABEL } from "@/lib/library";
 import { fetchStudentProgram, fetchChapters, fetchProgress, fetchTeacherCourses } from "@/lib/program";
 import { fetchAttemptsForStudent, fetchDeliberations, type DelibWithMeta } from "@/lib/exams";
 import type { DBProgramCourse, DBChapter, DBExamAttempt } from "@/lib/supabase";
@@ -504,13 +504,11 @@ export default function ProfilePage() {
                 <p className="bg-white text-xs text-muted p-3">Aucun document pour le moment.</p>
               )}
               {libDocs.map((d) => {
-                const Icon = d.kind === "video" ? Video : d.kind === "natif" ? MonitorPlay : FileText;
                 return (
                   <Link key={d.id} href="/bibliotheque"
                     className="bg-white flex items-center gap-2.5 p-2.5 hover:bg-cama-50/40 transition-colors group">
-                    <div className="w-7 h-7 bg-cama-50 flex items-center justify-center flex-shrink-0">
-                      <Icon className="w-3.5 h-3.5 text-cama" />
-                    </div>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={docCover(d)} alt="" loading="lazy" className="w-12 h-9 object-cover flex-shrink-0 bg-cama-50" />
                     <div className="flex-1 min-w-0">
                       <p className="text-[11px] font-bold text-ink truncate group-hover:text-cama transition-colors">{d.title}</p>
                       <p className="text-[9px] text-muted truncate">{KIND_LABEL[d.kind]} · {d.courseCode} · {d.authorName}</p>

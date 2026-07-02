@@ -9,7 +9,7 @@ import {
   RotateCcw, ChevronRight, User as UserIcon,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
-import { fetchLibrary, teacherLibrary, KIND_LABEL, type LibraryDoc, type LibraryKind } from "@/lib/library";
+import { fetchLibrary, teacherLibrary, KIND_LABEL, docCover, type LibraryDoc, type LibraryKind } from "@/lib/library";
 import { fetchTeacherCourses } from "@/lib/program";
 
 const ALL_KINDS = Object.keys(KIND_LABEL) as LibraryKind[];
@@ -167,9 +167,8 @@ export default function BibliothequePage() {
     const archived = isTeacher && user && d.authorId === user.id && !myCourseSet.has(d.courseId);
     return (
       <div className="px-4 py-3 flex items-center gap-3">
-        <div className="w-9 h-9 bg-cama-50 flex items-center justify-center flex-shrink-0 text-cama">
-          <KindIcon kind={d.kind} />
-        </div>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={docCover(d)} alt="" loading="lazy" className="w-24 h-16 object-cover flex-shrink-0 bg-cama-50" />
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <p className="text-[11px] font-bold text-ink truncate">{d.title}</p>
@@ -404,8 +403,39 @@ export default function BibliothequePage() {
                   </p>
                   <span className="text-[9px] font-bold text-white bg-cama px-2 py-0.5">{recommended.length}</span>
                 </div>
-                <div className="divide-y divide-cama/10 bg-white/60">
-                  {recommended.slice(0, 10).map((d) => <DocRow key={`rec-${d.id}`} d={d} />)}
+                <div className="p-3 grid grid-cols-2 md:grid-cols-3 gap-3">
+                  {recommended.slice(0, 9).map((d) => (
+                    <div key={`rec-${d.id}`} className="bg-white border border-border flex flex-col">
+                      <div className="relative">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={docCover(d)} alt="" loading="lazy" className="h-28 object-cover w-full" />
+                        <span className="absolute top-0 left-0 flex items-center gap-1 text-[8px] font-black uppercase tracking-widest text-white bg-cama px-1.5 py-0.5">
+                          <KindIcon kind={d.kind} className="w-2.5 h-2.5" /> {KIND_LABEL[d.kind]}
+                        </span>
+                      </div>
+                      <div className="p-2.5 flex-1 flex flex-col">
+                        <p className="text-[11px] font-bold text-ink line-clamp-2">{d.title}</p>
+                        <p className="text-[10px] font-bold text-cama mt-0.5">{d.courseCode}</p>
+                        <p className="text-[9px] text-subtle mt-auto pt-1 flex items-center gap-2 flex-wrap">
+                          <span className="flex items-center gap-1"><UserIcon className="w-2.5 h-2.5" /> {d.authorName}</span>
+                          <span className="flex items-center gap-1"><Clock className="w-2.5 h-2.5" /> {formatDate(d.date)}</span>
+                        </p>
+                        <div className="mt-2">
+                          {d.url ? (
+                            <a href={d.url} target="_blank" rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 text-[9px] font-black bg-cama text-white px-2 py-1 hover:bg-cama-700 transition-colors uppercase tracking-wider">
+                              <ExternalLink className="w-2.5 h-2.5" /> Ouvrir
+                            </a>
+                          ) : (
+                            <Link href={`/cours/${d.courseId}`}
+                              className="inline-flex items-center gap-1 text-[9px] font-bold text-gold-dark bg-gold/10 px-2 py-1 hover:underline">
+                              <BookMarked className="w-2.5 h-2.5" /> Dans le cours
+                            </Link>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </section>
             )}
@@ -457,7 +487,8 @@ export default function BibliothequePage() {
               <div className="space-y-1.5">
                 {recent.map((d) => (
                   <div key={`recent-${d.id}`} className="flex items-start gap-2 py-1">
-                    <div className="text-cama flex-shrink-0 mt-0.5"><KindIcon kind={d.kind} className="w-3 h-3" /></div>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={docCover(d)} alt="" loading="lazy" className="w-10 h-10 object-cover flex-shrink-0 bg-cama-50" />
                     <div className="min-w-0">
                       <p className="text-[10px] font-bold text-ink truncate">{d.title}</p>
                       <p className="text-[9px] text-muted">{d.courseCode} — {formatDate(d.date)}</p>
