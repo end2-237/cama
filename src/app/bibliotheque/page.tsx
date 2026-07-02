@@ -229,10 +229,43 @@ export default function BibliothequePage() {
             <ArrowLeft className="w-3.5 h-3.5" /> Dashboard
           </Link>
           <div className="w-px h-5 bg-border" />
+          <Link href="/" className="hidden sm:flex items-center gap-2 flex-shrink-0">
+            <div className="w-1 h-6 bg-gradient-to-b from-cama to-gold" />
+            <span className="text-sm font-bold text-ink tracking-tight">CA<span className="text-cama">MA</span></span>
+          </Link>
           <span className="text-[11px] font-black uppercase tracking-widest text-ink flex items-center gap-1.5">
             <Library className="w-3.5 h-3.5 text-cama" /> {pageTitle}
           </span>
-          <span className="ml-auto text-[9px] text-muted">{filtered.length} document{filtered.length > 1 ? "s" : ""}</span>
+
+          <div className="flex-1" />
+
+          {/* Navigation contextuelle */}
+          <nav className="hidden lg:flex items-center gap-0.5 text-xs font-semibold">
+            {(user?.role === "enseignant" ? [
+              { label: "Mes cours",   href: "/dashboard" },
+              { label: "Évaluations", href: "/dashboard?tab=%C3%89valuations" },
+              { label: "Présences",   href: "/presences" },
+              { label: "TP & VM",     href: "/tp" },
+            ] : [
+              { label: "Mes cours",   href: "/dashboard" },
+              { label: "Examens",     href: "/etudiant/examens" },
+              { label: "Journal",     href: "/journal" },
+              { label: "Calendrier",  href: "/calendrier" },
+            ]).map((l) => (
+              <Link key={l.href} href={l.href}
+                className="px-2.5 py-1.5 text-muted hover:text-cama hover:bg-cama-50/50 transition-colors">
+                {l.label}
+              </Link>
+            ))}
+            <Link href="/profil"
+              className="px-2.5 py-1.5 text-muted hover:text-cama hover:bg-cama-50/50 transition-colors">
+              Profil
+            </Link>
+          </nav>
+
+          <span className="text-[9px] text-muted border border-border px-2 py-1 bg-surface flex-shrink-0">
+            {filtered.length} document{filtered.length > 1 ? "s" : ""}
+          </span>
         </div>
       </header>
 

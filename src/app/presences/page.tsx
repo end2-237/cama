@@ -5,17 +5,50 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft, Loader2, ClipboardCheck, Check, X, Users, TrendingUp, Filter,
+  Radio, ChevronDown, BookOpen,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
-import { fetchProgram, fetchTeacherCourses } from "@/lib/program";
+import { fetchProgram, fetchTeacherCourses, fetchChapters } from "@/lib/program";
 import {
   fetchCourseStudents, fetchAttendance, markAttendance, attendanceRates,
   type CourseStudent, type AttendanceWithUser,
 } from "@/lib/attendance";
-import type { DBProgramCourse, CycleMode } from "@/lib/supabase";
+import {
+  fetchLivesForCourses, fetchAttendanceForLives, autoStatus,
+  type DBLive, type AutoStatus,
+} from "@/lib/lives";
+import { fetchCahierForCourses, computeProgress, type TeacherProgress } from "@/lib/cahier";
+import { fetchUsers } from "@/lib/admin";
+import type { DBProgramCourse, CycleMode, DBLiveAttendance, DBUser } from "@/lib/supabase";
 
 const MODE_LABEL: Record<CycleMode, string> = { online: "En ligne", hybride: "Hybride", presentiel: "Présentiel" };
 const MODE_COLOR: Record<CycleMode, string> = { online: "#4F46E5", hybride: "#D97706", presentiel: "#16a34a" };
+
+const AUTO_BADGE: Record<AutoStatus, { label: string; cls: string }> = {
+  present: { label: "Présent", cls: "bg-green-50 text-green-600 border-green-200" },
+  retard: { label: "Retard", cls: "bg-amber-50 text-amber-600 border-amber-200" },
+  absent: { label: "Absent", cls: "bg-red-50 text-red-600 border-red-200" },
+};
+
+function AutoBadge({ status, label }: { status: AutoStatus; label?: string }) {
+  const b = AUTO_BADGE[status];
+  return (
+    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${b.cls}`}>
+      {label ?? b.label}
+    </span>
+  );
+}
+
+function hhmm(iso: string | null | undefined) {
+  if (!iso) return "—";
+  return new Date(iso).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+}
+
+interface CourseProgressRow {
+  course: DBProgramCourse;
+  teacherName: string;
+  progress: TeacherProgress;
+}
 
 function todayISO() {
   const d = new Date();
@@ -37,6 +70,14 @@ export default function AttendancePage() {
   const [fetching, setFetching] = useState(true);
   const [savedMsg, setSavedMsg] = useState(false);
 
+  // Présences automatiques (lives)
+  const [lives, setLives] = useState<DBLive[]>([]);
+  const [liveRows, setLiveRows] = useState<DBLiveAttendance[]>([]);
+  const [usersById, setUsersById] = useState<Record<string, DBUser>>({});
+  const [openLiveId, setOpenLiveId] = useState<string | null>(null);
+  // Suivi pédagogique (admin)
+  const [progressRows, setProgressRows] = useState<CourseProgressRow[]>([]);
+
   const isAdmin = user?.role === "admin";
 
   useEffect(() => {
@@ -50,6 +91,34 @@ export default function AttendancePage() {
       setCourses(list);
       if (list.length) setCourseId((id) => id || list[0].id);
       setFetching(false);
+
+      // — Présences automatiques : lives tenus + journal de connexion —
+      const courseIds = list.map((c) => c.id);
+      const [allLives, allUsers] = await Promise.all([
+        fetchLivesForCourses(courseIds),
+        fetchUsers(),
+      ]);
+      const held = allLives.filter((l) => l.started_at);
+      setLives(held);
+      setUsersById(Object.fromEntries(allUsers.map((u) => [u.id, u])));
+      setLiveRows(await fetchAttendanceForLives(held.map((l) => l.id)));
+
+      // — Suivi pédagogique enseignants (admin) —
+      if (isAdmin) {
+        const withTeacher = list.filter((c) => c.teacher_id);
+        const entries = await fetchCahierForCourses(withTeacher.map((c) => c.id));
+        const rows = await Promise.all(withTeacher.map(async (c) => {
+          const chapters = await fetchChapters(c.id);
+          const teacher = allUsers.find((u) => u.id === c.teacher_id);
+          return {
+            course: c,
+            teacherName: teacher ? `${teacher.first_name} ${teacher.last_name}` : "—",
+            progress: computeProgress(c, entries.filter((e) => e.program_course_id === c.id), chapters),
+          };
+        }));
+        rows.sort((a, b) => a.progress.pctHours - b.progress.pctHours);
+        setProgressRows(rows);
+      }
     })();
   }, [user, isAdmin]);
 
@@ -95,6 +164,35 @@ export default function AttendancePage() {
   };
 
   const rates = useMemo(() => attendanceRates(history), [history]);
+
+  /** Lives tenus, triés du plus récent au plus ancien, avec roster calculé. */
+  const liveReports = useMemo(() => {
+    return [...lives]
+      .sort((a, b) => new Date(b.started_at ?? 0).getTime() - new Date(a.started_at ?? 0).getTime())
+      .map((live) => {
+        const liveCourse = courses.find((c) => c.id === live.program_course_id);
+        const rows = liveRows.filter((r) => r.live_id === live.id);
+        const teacherRow = rows.find((r) => r.role === "enseignant" || r.role === "admin");
+        const studentRows = rows.filter((r) => r.role === "etudiant");
+        const students = studentRows.map((r) => ({
+          row: r,
+          user: usersById[r.user_id],
+          status: liveCourse ? autoStatus(live, liveCourse, r) : ("absent" as AutoStatus),
+        }));
+        const teacherStatus: AutoStatus = liveCourse ? autoStatus(live, liveCourse, teacherRow) : "absent";
+        return { live, course: liveCourse, teacherRow, teacherStatus, students };
+      });
+  }, [lives, liveRows, courses, usersById]);
+
+  const liveKpis = useMemo(() => {
+    const totalHeld = liveReports.length;
+    let attended = 0, total = 0, autoAbsences = 0;
+    liveReports.forEach((r) => r.students.forEach((s) => {
+      total += 1;
+      if (s.status === "absent") autoAbsences += 1; else attended += 1;
+    }));
+    return { totalHeld, avgPct: total ? Math.round((attended / total) * 100) : 0, autoAbsences };
+  }, [liveReports]);
 
   if (loading || !user) return (
     <div className="min-h-screen flex items-center justify-center">
@@ -220,6 +318,132 @@ export default function AttendancePage() {
                 </div>
               )}
             </div>
+
+            {/* ═══ Présences automatiques (lives) ═══ */}
+            <div className="bg-white border border-border rounded-xl overflow-hidden mt-4">
+              <div className="px-4 py-3 border-b border-border flex items-center gap-2 flex-wrap">
+                <h3 className="text-[11px] font-black text-ink uppercase tracking-widest flex items-center gap-1.5">
+                  <Radio className="w-3.5 h-3.5 text-cama" /> Présences automatiques (lives)
+                </h3>
+                <span className="text-[10px] text-subtle">· gestion automatique des absences par délai de connexion</span>
+              </div>
+
+              {/* Mini KPI */}
+              <div className="grid grid-cols-3 divide-x divide-border border-b border-border">
+                <div className="px-4 py-3 text-center">
+                  <p className="text-lg font-black text-ink">{liveKpis.totalHeld}</p>
+                  <p className="text-[10px] font-bold text-muted uppercase tracking-wider">Lives tenus</p>
+                </div>
+                <div className="px-4 py-3 text-center">
+                  <p className="text-lg font-black text-ink">{liveKpis.avgPct}%</p>
+                  <p className="text-[10px] font-bold text-muted uppercase tracking-wider">Présence moyenne</p>
+                </div>
+                <div className="px-4 py-3 text-center">
+                  <p className="text-lg font-black text-red-600">{liveKpis.autoAbsences}</p>
+                  <p className="text-[10px] font-bold text-muted uppercase tracking-wider">Absences auto</p>
+                </div>
+              </div>
+
+              {liveReports.length === 0 ? (
+                <p className="px-4 py-8 text-center text-sm text-muted">Aucun live tenu pour vos matières.</p>
+              ) : (
+                <div className="divide-y divide-border">
+                  {liveReports.map(({ live, course: lc, teacherRow, teacherStatus, students: roster }) => {
+                    const open = openLiveId === live.id;
+                    const maxDelay = lc?.live_max_join_delay_min ?? 15;
+                    const minStay = lc?.live_min_stay_min ?? 30;
+                    return (
+                      <div key={live.id}>
+                        <button onClick={() => setOpenLiveId(open ? null : live.id)}
+                          className="w-full px-4 py-2.5 flex items-center gap-3 text-left hover:bg-surface transition-colors">
+                          <ChevronDown className={`w-4 h-4 text-subtle flex-shrink-0 transition-transform ${open ? "rotate-180" : ""}`} />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-semibold text-ink truncate">{live.title}</p>
+                            <p className="text-[10px] text-subtle">
+                              {lc?.code ?? "—"} · {live.started_at ? new Date(live.started_at).toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" }) : "—"}
+                            </p>
+                          </div>
+                          {!teacherRow ? (
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border bg-red-50 text-red-600 border-red-200">Absent enseignant</span>
+                          ) : (
+                            <AutoBadge status={teacherStatus} label={teacherStatus === "present" ? "Enseignant présent" : teacherStatus === "retard" ? "Enseignant en retard" : "Absent enseignant"} />
+                          )}
+                          <span className="text-[10px] text-muted font-semibold">{roster.length} étudiant{roster.length > 1 ? "s" : ""}</span>
+                        </button>
+                        {open && (
+                          <div className="px-4 pb-3 pt-1 bg-surface/50">
+                            {/* Enseignant */}
+                            <div className="flex items-center gap-2 py-1.5 text-xs">
+                              <span className="font-bold text-muted uppercase tracking-wider text-[10px] w-24">Enseignant</span>
+                              <span className="flex-1 font-semibold text-ink truncate">
+                                {teacherRow ? `${usersById[teacherRow.user_id]?.first_name ?? "?"} ${usersById[teacherRow.user_id]?.last_name ?? ""}` : "Aucune connexion enregistrée"}
+                              </span>
+                              {teacherRow && <span className="text-subtle">{hhmm(teacherRow.joined_at)} → {hhmm(teacherRow.left_at)}</span>}
+                              {teacherRow
+                                ? <AutoBadge status={teacherStatus} />
+                                : <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border bg-red-50 text-red-600 border-red-200">Absent enseignant</span>}
+                            </div>
+                            {/* Étudiants */}
+                            {roster.length === 0 ? (
+                              <p className="text-xs text-muted py-1.5">Aucun étudiant connecté à ce live.</p>
+                            ) : (
+                              <div className="divide-y divide-border/60">
+                                {roster.map(({ row, user: u, status }) => (
+                                  <div key={row.id} className="flex items-center gap-2 py-1.5 text-xs">
+                                    <span className="w-24" />
+                                    <span className="flex-1 font-semibold text-ink truncate">{u ? `${u.first_name} ${u.last_name}` : row.user_id}</span>
+                                    <span className="text-subtle">{hhmm(row.joined_at)} → {hhmm(row.left_at)}</span>
+                                    <AutoBadge status={status} />
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                            <p className="text-[10px] text-subtle mt-2 border-t border-border/60 pt-2">
+                              Absent = jamais connecté, connecté après le retard max ({maxDelay} min), ou parti avant la présence minimale ({minStay} min). Retard = connexion entre 5 et {maxDelay} min après le début.
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* ═══ Suivi pédagogique enseignants (admin) ═══ */}
+            {isAdmin && (
+              <div className="bg-white border border-border rounded-xl overflow-hidden mt-4">
+                <div className="px-4 py-3 border-b border-border flex items-center gap-2">
+                  <h3 className="text-[11px] font-black text-ink uppercase tracking-widest flex items-center gap-1.5">
+                    <BookOpen className="w-3.5 h-3.5 text-cama" /> Suivi pédagogique enseignants
+                  </h3>
+                  <span className="text-[10px] text-subtle">· les cours en retard d&apos;abord</span>
+                </div>
+                {progressRows.length === 0 ? (
+                  <p className="px-4 py-8 text-center text-sm text-muted">Aucun cours avec enseignant assigné.</p>
+                ) : (
+                  <div className="divide-y divide-border">
+                    {progressRows.map(({ course: pc, teacherName, progress: p }) => (
+                      <div key={pc.id} className="px-4 py-3">
+                        <div className="flex items-center justify-between gap-3 text-xs mb-1.5">
+                          <span className="font-semibold text-ink truncate">{pc.code} · {pc.title}</span>
+                          <span className="text-muted flex-shrink-0">{teacherName}</span>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <div className="flex-1 h-1.5 bg-surface rounded-full overflow-hidden">
+                            <div className={`h-full ${p.pctHours < 34 ? "bg-red-500" : p.pctHours < 67 ? "bg-amber-500" : "bg-green-500"}`} style={{ width: `${p.pctHours}%` }} />
+                          </div>
+                          <span className="text-xs font-bold text-ink flex-shrink-0">{p.hoursDone}h/{p.hoursPlanned}h ({p.pctHours}%)</span>
+                        </div>
+                        <p className="text-[10px] text-subtle mt-1">
+                          {p.entries} séance{p.entries > 1 ? "s" : ""} consignée{p.entries > 1 ? "s" : ""} · chapitres avec contenu {p.chaptersWithContent}/{p.chaptersTotal}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </>
         )}
       </main>

@@ -8,6 +8,7 @@ import {
   Trash2, Upload, Check, X, GripVertical, Eye, EyeOff,
   Sparkles, Calendar, Type, List as ListIcon, HelpCircle,
   Target, CalendarClock, Clock, Send, AlertTriangle,
+  Timer, NotebookPen, Save,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { BlocNatif } from "@/lib/db";
@@ -20,7 +21,8 @@ import {
 import { DAYS, CYCLE_MODES, SESSION_KINDS } from "@/lib/scheduling";
 import { createLive, deleteLive } from "@/lib/lives";
 import { uploadMedia, estimateVideoSizeMo, fetchResources, addResource, deleteResource } from "@/lib/resources";
-import type { DBCourseResource, ResourceKind } from "@/lib/supabase";
+import type { DBCourseResource, ResourceKind, DBCahierEntry } from "@/lib/supabase";
+import { fetchCahier, addCahierEntry, deleteCahierEntry, computeProgress } from "@/lib/cahier";
 
 export default function CourseEditor() {
   const { id } = useParams<{ id: string }>();
@@ -154,6 +156,16 @@ export default function CourseEditor() {
         </div>
         <ResourcesEditor courseId={id} />
 
+        {/* ── Paramètres des cours live ── */}
+        <div className="mt-10 flex items-center gap-3 mb-4">
+          <Timer className="w-6 h-6 text-cama" strokeWidth={1.5} />
+          <div>
+            <h2 className="text-xl font-bold text-ink">Paramètres des cours live</h2>
+            <p className="text-xs text-muted">Durée, retard toléré et présence minimale — utilisés pour la gestion automatique des absences.</p>
+          </div>
+        </div>
+        <LiveSettingsEditor course={course} reload={reload} />
+
         {/* ── Planification proposée ── */}
         <div className="mt-10 flex items-center gap-3 mb-4">
           <CalendarClock className="w-6 h-6 text-cama" strokeWidth={1.5} />
@@ -163,6 +175,17 @@ export default function CourseEditor() {
           </div>
         </div>
         <SessionPlanner courseId={id} teacherId={user.id} courseTitle={course.title} />
+
+        {/* ── Cahier de texte ── */}
+        <div className="mt-10 flex items-center gap-3 mb-4">
+          <NotebookPen className="w-6 h-6 text-cama" strokeWidth={1.5} />
+          <div>
+            <h2 className="text-xl font-bold text-ink">Cahier de texte</h2>
+            <p className="text-xs text-muted">Consignez chaque séance réalisée — votre progression est suivie par l&apos;administration.</p>
+          </div>
+        </div>
+        <CahierTexteEditor courseId={id} teacherId={user.id} courseHours={course.hours} chapters={chapters}
+          defaultDuration={course.live_duration_min ?? 60} />
       </main>
     </div>
   );
@@ -859,6 +882,170 @@ function CoverEditor({ course, onSaved }: { course: DBProgramCourse; onSaved: ()
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+/* ════ Paramètres des cours live (durée, retard, présence minimale) ════ */
+function LiveSettingsEditor({ course, reload }: { course: DBProgramCourse; reload: () => void }) {
+  const [duration, setDuration] = useState(String(course.live_duration_min ?? 60));
+  const [maxDelay, setMaxDelay] = useState(String(course.live_max_join_delay_min ?? 15));
+  const [minStay, setMinStay]   = useState(String(course.live_min_stay_min ?? 30));
+  const [saved, setSaved] = useState(false);
+
+  const save = async () => {
+    await updateCourseContent(course.id, {
+      live_duration_min: Math.max(1, parseInt(duration) || 60),
+      live_max_join_delay_min: Math.max(0, parseInt(maxDelay) || 15),
+      live_min_stay_min: Math.max(0, parseInt(minStay) || 30),
+    } as Partial<DBProgramCourse>);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2500);
+    reload();
+  };
+
+  return (
+    <div className="bg-white rounded-2xl border border-border p-5">
+      <div className="grid sm:grid-cols-3 gap-4">
+        <div>
+          <label className="text-xs font-bold text-ink flex items-center gap-1.5 mb-1.5">
+            <Clock className="w-3.5 h-3.5 text-cama" /> Durée d&apos;un live (min)
+          </label>
+          <input type="number" min="1" value={duration} onChange={(e) => setDuration(e.target.value)}
+            className="w-full text-sm border border-border rounded-lg px-3 py-2 outline-none focus:border-cama" />
+          <p className="text-[10px] text-subtle mt-1">Durée préconfigurée de chaque cours live.</p>
+        </div>
+        <div>
+          <label className="text-xs font-bold text-ink flex items-center gap-1.5 mb-1.5">
+            <AlertTriangle className="w-3.5 h-3.5 text-gold-dark" /> Retard max de connexion (min)
+          </label>
+          <input type="number" min="0" value={maxDelay} onChange={(e) => setMaxDelay(e.target.value)}
+            className="w-full text-sm border border-border rounded-lg px-3 py-2 outline-none focus:border-cama" />
+          <p className="text-[10px] text-subtle mt-1">Au-delà, l&apos;étudiant est refusé et compté absent.</p>
+        </div>
+        <div>
+          <label className="text-xs font-bold text-ink flex items-center gap-1.5 mb-1.5">
+            <Timer className="w-3.5 h-3.5 text-cama" /> Présence minimale (min)
+          </label>
+          <input type="number" min="0" value={minStay} onChange={(e) => setMinStay(e.target.value)}
+            className="w-full text-sm border border-border rounded-lg px-3 py-2 outline-none focus:border-cama" />
+          <p className="text-[10px] text-subtle mt-1">Sortir avant cette durée = compté absent.</p>
+        </div>
+      </div>
+      <div className="mt-4 flex items-center justify-between flex-wrap gap-3">
+        <p className="text-[10px] text-subtle">
+          Ces règles pilotent la gestion automatique des absences : la présence de chaque étudiant est enregistrée à la connexion et à la sortie du live.
+        </p>
+        <button onClick={save} className="btn-primary py-2 px-5 text-xs gap-1.5">
+          {saved ? <><Check className="w-3.5 h-3.5" /> Enregistré</> : <><Save className="w-3.5 h-3.5" /> Enregistrer</>}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ════ Cahier de texte — journal des séances + progression ════ */
+function CahierTexteEditor({ courseId, teacherId, courseHours, chapters, defaultDuration }: {
+  courseId: string; teacherId: string; courseHours: number; chapters: DBChapter[]; defaultDuration: number;
+}) {
+  const [entries, setEntries] = useState<DBCahierEntry[]>([]);
+  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [content, setContent] = useState("");
+  const [homework, setHomework] = useState("");
+  const [duration, setDuration] = useState(String(defaultDuration || 60));
+  const [saving, setSaving] = useState(false);
+
+  const load = useCallback(async () => { setEntries(await fetchCahier(courseId)); }, [courseId]);
+  useEffect(() => { load(); }, [load]);
+
+  const prog = computeProgress({ hours: courseHours }, entries, chapters);
+
+  const add = async () => {
+    if (!content.trim() || !date) return;
+    setSaving(true);
+    await addCahierEntry({
+      program_course_id: courseId,
+      entry_date: date,
+      content: content.trim(),
+      homework: homework.trim() || null,
+      duration_min: Math.max(1, parseInt(duration) || 60),
+      created_by: teacherId,
+    });
+    setContent(""); setHomework("");
+    setSaving(false);
+    load();
+  };
+
+  return (
+    <div className="bg-white rounded-2xl border border-border p-5">
+      {/* Progression */}
+      <div className="mb-5">
+        <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
+          <p className="text-xs font-bold text-ink">
+            {prog.hoursDone} h consignées / {prog.hoursPlanned} h prévues
+          </p>
+          <p className="text-[10px] text-muted">
+            {prog.entries} séance{prog.entries > 1 ? "s" : ""} · chapitres avec contenu {prog.chaptersWithContent}/{prog.chaptersTotal} ({prog.pctContent}%)
+          </p>
+        </div>
+        <div className="h-2 bg-surface rounded-full overflow-hidden">
+          <div className="h-full bg-cama transition-all" style={{ width: `${prog.pctHours}%` }} />
+        </div>
+      </div>
+
+      {/* Formulaire d'ajout */}
+      <div className="border border-border rounded-xl p-4 mb-5 space-y-2">
+        <div className="flex flex-wrap gap-2">
+          <input type="date" value={date} onChange={(e) => setDate(e.target.value)}
+            className="text-xs border border-border rounded-lg px-3 py-2 outline-none focus:border-cama" />
+          <div className="flex items-center gap-1.5">
+            <input type="number" min="1" value={duration} onChange={(e) => setDuration(e.target.value)}
+              className="w-24 text-xs border border-border rounded-lg px-3 py-2 outline-none focus:border-cama" />
+            <span className="text-[10px] text-subtle">Durée (min)</span>
+          </div>
+        </div>
+        <textarea value={content} onChange={(e) => setContent(e.target.value)} rows={2}
+          placeholder="Contenu de la séance…"
+          className="w-full text-xs border border-border rounded-lg px-3 py-2 outline-none focus:border-cama resize-y" />
+        <input value={homework} onChange={(e) => setHomework(e.target.value)}
+          placeholder="Travail à faire (optionnel)"
+          className="w-full text-xs border border-border rounded-lg px-3 py-2 outline-none focus:border-cama" />
+        <button onClick={add} disabled={saving || !content.trim()}
+          className="btn-primary py-2 px-5 text-xs gap-1.5 disabled:opacity-50">
+          <NotebookPen className="w-3.5 h-3.5" /> Consigner la séance
+        </button>
+      </div>
+
+      {/* Liste des séances */}
+      {entries.length === 0 ? (
+        <p className="text-xs text-subtle text-center py-4">Aucune séance consignée pour le moment.</p>
+      ) : (
+        <div className="space-y-2">
+          {entries.map((e) => (
+            <div key={e.id} className="flex items-start gap-3 bg-surface rounded-xl px-4 py-3">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap mb-1">
+                  <p className="text-xs font-bold text-ink">
+                    {new Date(e.entry_date + "T00:00:00").toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
+                  </p>
+                  <span className="badge bg-cama-50 text-cama text-[10px]"><Clock className="w-3 h-3" /> {e.duration_min} min</span>
+                </div>
+                <p className="text-xs text-muted whitespace-pre-wrap">{e.content}</p>
+                {e.homework && <p className="text-[11px] text-gold-dark italic mt-1">Travail à faire : {e.homework}</p>}
+              </div>
+              <button
+                onClick={async () => {
+                  if (!confirm("Supprimer cette entrée du cahier de texte ?")) return;
+                  await deleteCahierEntry(e.id);
+                  load();
+                }}
+                className="p-1.5 text-subtle hover:text-red-500 transition-colors flex-shrink-0">
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

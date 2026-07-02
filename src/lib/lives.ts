@@ -65,3 +65,56 @@ export function subscribeLives(onChange: (live: DBLive) => void): () => void {
     .subscribe();
   return () => { supabase.removeChannel(channel); };
 }
+
+/* ════════════════════════════════════════════════════════════
+   PRÉSENCE AUTOMATIQUE — journal de connexion aux lives
+════════════════════════════════════════════════════════════ */
+import type { DBLiveAttendance, DBProgramCourse } from "@/lib/supabase";
+
+/** Enregistre l'entrée d'un participant (1 ligne par live+user, upsert). */
+export async function logLiveJoin(liveId: string, userId: string, role: string) {
+  return supabase.from("live_attendance")
+    .upsert({ live_id: liveId, user_id: userId, role }, { onConflict: "live_id,user_id", ignoreDuplicates: true });
+}
+
+/** Horodate la sortie du participant. */
+export async function logLiveLeave(liveId: string, userId: string) {
+  return supabase.from("live_attendance")
+    .update({ left_at: new Date().toISOString() })
+    .eq("live_id", liveId).eq("user_id", userId);
+}
+
+export async function fetchLiveAttendance(liveId: string): Promise<DBLiveAttendance[]> {
+  const { data } = await supabase.from("live_attendance").select("*").eq("live_id", liveId);
+  return (data as DBLiveAttendance[]) ?? [];
+}
+
+export async function fetchAttendanceForLives(liveIds: string[]): Promise<DBLiveAttendance[]> {
+  if (!liveIds.length) return [];
+  const { data } = await supabase.from("live_attendance").select("*").in("live_id", liveIds);
+  return (data as DBLiveAttendance[]) ?? [];
+}
+
+export type AutoStatus = "present" | "retard" | "absent";
+
+/** Statut automatique d'un participant selon les délais configurés sur le cours.
+    - jamais connecté            → absent
+    - connecté après le retard max → absent (retard disqualifiant)
+    - resté moins que le minimum   → absent (sortie prématurée)
+    - connecté dans les temps mais après 5 min → retard (présent signalé)   */
+export function autoStatus(
+  live: DBLive,
+  course: Pick<DBProgramCourse, "live_max_join_delay_min" | "live_min_stay_min" | "live_duration_min">,
+  row: DBLiveAttendance | undefined,
+): AutoStatus {
+  if (!row || !live.started_at) return "absent";
+  const start = new Date(live.started_at).getTime();
+  const joined = new Date(row.joined_at).getTime();
+  const delayMin = (joined - start) / 60000;
+  if (delayMin > (course.live_max_join_delay_min ?? 15)) return "absent";
+  const end = row.left_at ? new Date(row.left_at).getTime()
+    : live.ended_at ? new Date(live.ended_at).getTime() : Date.now();
+  const stayMin = (end - joined) / 60000;
+  if (stayMin < (course.live_min_stay_min ?? 30)) return "absent";
+  return delayMin > 5 ? "retard" : "present";
+}

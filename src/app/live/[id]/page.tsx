@@ -3,9 +3,11 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { ChevronLeft, Radio, Circle, Users, CheckCircle2 } from "lucide-react";
+import { ChevronLeft, Radio, Circle, Users, CheckCircle2, Lock } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
-import { fetchLive, setLiveStatus } from "@/lib/lives";
+import { fetchLive, setLiveStatus, logLiveJoin, logLiveLeave } from "@/lib/lives";
+import { supabase } from "@/lib/supabase";
+import type { DBProgramCourse } from "@/lib/supabase";
 import JitsiRoom from "@/components/JitsiRoom";
 
 export default function LiveRoom() {
@@ -13,6 +15,7 @@ export default function LiveRoom() {
   const router = useRouter();
   const { user, loading } = useAuth();
   const [elapsed, setElapsed] = useState(0);
+  const [lateBlocked, setLateBlocked] = useState<number | null>(null); // minutes de retard si refusé
 
   const isTeacher = user?.role === "enseignant" || user?.role === "admin";
   const room = `CAMA-${id}`;
@@ -20,6 +23,42 @@ export default function LiveRoom() {
   useEffect(() => {
     if (!loading && !user) router.replace("/auth/login");
   }, [loading, user, router]);
+
+  /* Présence automatique : journalise entrée/sortie de TOUT participant.
+     Étudiant en retard au-delà du délai max du cours → accès refusé. */
+  useEffect(() => {
+    if (loading || !user || id === "demo") return;
+    let active = true;
+    let joined = false;
+    const leave = () => { if (joined) logLiveLeave(id, user.id).catch(() => {}); };
+
+    (async () => {
+      const live = await fetchLive(id);
+      if (!live || !active) return;
+      if (user.role === "etudiant" && live.started_at) {
+        const { data } = await supabase.from("program_courses").select("*")
+          .eq("id", live.program_course_id ?? "").maybeSingle();
+        const course = data as DBProgramCourse | null;
+        const maxDelay = course?.live_max_join_delay_min ?? 15;
+        const delayMin = (Date.now() - new Date(live.started_at).getTime()) / 60000;
+        if (delayMin > maxDelay) {
+          if (active) setLateBlocked(Math.round(delayMin));
+          await logLiveJoin(id, user.id, user.role);      // trace le retard (comptera absent)
+          await logLiveLeave(id, user.id);
+          return;
+        }
+      }
+      await logLiveJoin(id, user.id, user.role);
+      joined = true;
+      window.addEventListener("beforeunload", leave);
+    })();
+
+    return () => {
+      active = false;
+      window.removeEventListener("beforeunload", leave);
+      leave();
+    };
+  }, [id, user, loading]);
 
   useEffect(() => {
     const t = setInterval(() => setElapsed((e) => e + 1), 1000);
@@ -58,6 +97,21 @@ export default function LiveRoom() {
   if (loading || !user) return (
     <div className="min-h-screen flex items-center justify-center bg-ink">
       <div className="w-8 h-8 rounded-full border-4 border-white/30 border-t-white animate-spin" />
+    </div>
+  );
+
+  /* Étudiant refusé pour retard : au-delà du délai max configuré par le prof */
+  if (lateBlocked !== null) return (
+    <div className="min-h-screen flex items-center justify-center bg-ink p-4">
+      <div className="bg-white border border-border p-8 text-center max-w-sm">
+        <Lock className="w-10 h-10 text-red-500 mx-auto mb-3" />
+        <p className="text-sm font-bold text-ink mb-1">Accès refusé — retard de {lateBlocked} min</p>
+        <p className="text-xs text-muted mb-4">
+          Le délai maximum de connexion fixé par l&apos;enseignant est dépassé.
+          Votre tentative est enregistrée : vous êtes compté <strong>absent</strong> à cette séance.
+        </p>
+        <Link href="/dashboard" className="inline-block text-xs font-bold bg-cama text-white px-4 py-2 hover:bg-cama-700">← Retour au dashboard</Link>
+      </div>
     </div>
   );
 

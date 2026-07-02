@@ -71,6 +71,32 @@ export interface DBProgramCourse {
   published: boolean;
   prof_ia: boolean;
   cover_url: string | null;      // image de couverture (bibliothèque, vitrine)
+  // Paramètres des cours live (préconfigurés par l'enseignant)
+  live_duration_min: number;         // durée d'un live
+  live_max_join_delay_min: number;   // retard max de connexion étudiant
+  live_min_stay_min: number;         // présence minimale avant sortie
+  created_at: string;
+}
+
+// Journal de connexion aux lives (présence automatique)
+export interface DBLiveAttendance {
+  id: string;
+  live_id: string;
+  user_id: string;
+  role: string;
+  joined_at: string;
+  left_at: string | null;
+}
+
+// Cahier de texte : journal pédagogique tenu par l'enseignant
+export interface DBCahierEntry {
+  id: string;
+  program_course_id: string;
+  entry_date: string;       // YYYY-MM-DD
+  content: string;
+  homework: string | null;
+  duration_min: number;
+  created_by: string | null;
   created_at: string;
 }
 
