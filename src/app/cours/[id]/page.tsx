@@ -17,7 +17,10 @@ import { useAuth } from "@/context/AuthContext";
 import { BlocNatif, DBChapter } from "@/lib/db";
 import { supabase } from "@/lib/supabase";
 import { fetchChapters, fetchProgress, markChapter } from "@/lib/program";
-import { fetchLivesForCourses, subscribeLives } from "@/lib/lives";
+import { fetchLive, fetchLivesForCourses, subscribeLives } from "@/lib/lives";
+import type { DBLive } from "@/lib/lives";
+import { saveNativeProgress, fetchMyFeedback, submitFeedback, liveAccess } from "@/lib/tracking";
+import type { CycleMode } from "@/lib/tracking";
 import { fetchResources } from "@/lib/resources";
 import { fetchForum, postForum } from "@/lib/chat";
 import type { DBCourseResource } from "@/lib/supabase";
@@ -61,7 +64,7 @@ export default function CoursePlayer() {
   const [chapters, setChapters] = useState<DBChapter[]>([]);
   const [doneIds, setDoneIds] = useState<Set<string>>(new Set());
   const [, setLoaded] = useState(false);
-  const [liveNow, setLiveNow] = useState<string | null>(null);
+  const [liveNow, setLiveNow] = useState<DBLive | null>(null);
   const [resources, setResources] = useState<DBCourseResource[]>([]);
 
   useEffect(() => {
@@ -76,12 +79,12 @@ export default function CoursePlayer() {
       const list = await fetchLivesForCourses([courseId]);
       if (cancelled) return;
       const active = list.find((l) => l.status === "encours");
-      setLiveNow(active?.id ?? null);
+      setLiveNow(active ?? null);
     })();
     const unsub = subscribeLives((live) => {
       if (live.program_course_id !== courseId) return;
-      if (live.status === "encours") setLiveNow(live.id);
-      else setLiveNow((prev) => (prev === live.id ? null : prev));
+      if (live.status === "encours") setLiveNow(live);
+      else setLiveNow((prev) => (prev?.id === live.id ? null : prev));
     });
     return () => { cancelled = true; unsub(); };
   }, [course?.id]);
@@ -147,6 +150,9 @@ export default function CoursePlayer() {
   if (course.prof_ia)  availModes.push("ia");
   const activeMode: Mode = availModes.includes(mode) ? mode : availModes[0] || "natif";
 
+  const isStudent = user.role === "etudiant";
+  const cycleMode: CycleMode | null = isStudent ? (user.dossier?.mode ?? "online") : null;
+
   const validateChapter = async () => {
     if (doneIds.has(chapter.id)) return;
     await markChapter(user.id, chapter.id, true);
@@ -190,22 +196,49 @@ export default function CoursePlayer() {
       </header>
 
       {/* Live en cours */}
-      {liveNow && (
-        <Link href={`/live/${liveNow}`}
-          className="flex items-center gap-3 p-3 text-white hover:opacity-95 transition-opacity"
-          style={{ background: "linear-gradient(90deg, #1E1B4B, #4F46E5)" }}>
-          <div className="w-9 h-9 bg-red-500/20 flex items-center justify-center flex-shrink-0">
-            <Radio className="w-4 h-4 text-red-300 animate-pulse" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-[10px] text-red-300 font-bold flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse" /> EN DIRECT MAINTENANT
-            </p>
-            <p className="font-bold text-sm truncate">{course.title}</p>
-          </div>
-          <span className="text-xs font-bold bg-gold text-white px-3 py-1.5 flex-shrink-0">Rejoindre</span>
-        </Link>
-      )}
+      {liveNow && (() => {
+        const access = cycleMode ? liveAccess(cycleMode, liveNow) : null;
+        const inner = (
+          <>
+            <div className="w-9 h-9 bg-red-500/20 flex items-center justify-center flex-shrink-0">
+              <Radio className="w-4 h-4 text-red-300 animate-pulse" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-[10px] text-red-300 font-bold flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse" /> EN DIRECT MAINTENANT
+                {cycleMode === "hybride" && (
+                  <span className="text-[9px] font-bold bg-white/15 text-white px-1.5 py-0.5 rounded-sm normal-case">Programme live — cycle hybride</span>
+                )}
+              </p>
+              <p className="font-bold text-sm truncate">{course.title}</p>
+            </div>
+          </>
+        );
+        if (access && !access.canJoin) {
+          return (
+            <div className="flex items-center gap-3 p-3 text-white"
+              style={{ background: "linear-gradient(90deg, #1E1B4B, #4F46E5)" }}>
+              {inner}
+              {access.showReplay && liveNow.recording_url ? (
+                <a href={liveNow.recording_url} target="_blank" rel="noopener noreferrer"
+                  className="text-xs font-bold bg-white/15 text-white px-3 py-1.5 flex-shrink-0 hover:bg-white/25 transition-colors">
+                  ▶ Regarder le replay
+                </a>
+              ) : (
+                <span className="text-[10px] text-white/70 flex-shrink-0 max-w-[220px]">{access.reason}</span>
+              )}
+            </div>
+          );
+        }
+        return (
+          <Link href={`/live/${liveNow.id}`}
+            className="flex items-center gap-3 p-3 text-white hover:opacity-95 transition-opacity"
+            style={{ background: "linear-gradient(90deg, #1E1B4B, #4F46E5)" }}>
+            {inner}
+            <span className="text-xs font-bold bg-gold text-white px-3 py-1.5 flex-shrink-0">Rejoindre</span>
+          </Link>
+        );
+      })()}
 
       {/* ── HERO ── */}
       <section className="relative overflow-hidden text-white"
@@ -411,8 +444,10 @@ export default function CoursePlayer() {
 
             {activeMode === "pdf"   && chapter?.pdf   && <PdfMode pdf={chapter.pdf} />}
             {activeMode === "video" && chapter?.video && <VideoMode video={chapter.video} />}
-            {activeMode === "natif" && chapter?.natif && <NatifMode blocks={chapter.natif.blocks} />}
-            {activeMode === "live"  && chapter?.liveId && <LiveMode liveId={chapter.liveId} />}
+            {activeMode === "natif" && chapter?.natif && (
+              <NatifMode blocks={chapter.natif.blocks} chapterId={chapter.id} studentId={isStudent ? user.id : null} />
+            )}
+            {activeMode === "live"  && chapter?.liveId && <LiveMode liveId={chapter.liveId} cycleMode={cycleMode} />}
             {activeMode === "ia"    && <ProfIA chapter={chapter} courseTitle={course.title} />}
 
             {/* Objectifs du chapitre */}
@@ -516,6 +551,9 @@ export default function CoursePlayer() {
               ))}
             </div>
           </div>
+
+          {/* Retour étudiant sur le cours */}
+          {isStudent && <CourseFeedbackWidget courseId={course.id} studentId={user.id} />}
 
           {/* Chat prof — prend le reste */}
           <ProfChat courseTitle={course.title} />
@@ -967,10 +1005,77 @@ function VideoMode({ video }: { video: NonNullable<DBChapter["video"]> }) {
   );
 }
 
-/* ════ MODE COURS NATIF — blocs interactifs ════ */
-function NatifMode({ blocks }: { blocks: BlocNatif[] }) {
+/* ════ MODE COURS NATIF — blocs interactifs + ancrage de lecture ════ */
+function NatifMode({ blocks, chapterId, studentId }: { blocks: BlocNatif[]; chapterId: string; studentId: string | null }) {
+  const [anchor, setAnchor] = useState(0);
+  const [fastScrolls, setFastScrolls] = useState(0);
+  const track = useRef({ maxAnchor: 0, readMs: 0, fastScrolls: 0, lastY: 0, lastT: 0 });
+
+  useEffect(() => {
+    if (!studentId) return;
+    const s = track.current;
+    s.maxAnchor = 0; s.readMs = 0; s.fastScrolls = 0;
+    s.lastY = window.scrollY; s.lastT = Date.now();
+    setAnchor(0); setFastScrolls(0);
+
+    const onScroll = () => {
+      const now = Date.now();
+      const y = window.scrollY;
+      const dt = now - s.lastT;
+      const speed = dt > 0 ? (Math.abs(y - s.lastY) / dt) * 1000 : 0; // px/s
+      /* Temps de lecture valide : onglet visible, pas de longue pause */
+      if (document.visibilityState === "visible" && dt > 0 && dt < 30000) s.readMs += dt;
+      const total = document.documentElement.scrollHeight;
+      const pct = total > 0 ? Math.min(100, ((y + window.innerHeight) / total) * 100) : 0;
+      if (speed > 3000) {
+        /* Scroll rapide (survol) : l'ancrage ne progresse pas */
+        s.fastScrolls += 1;
+        setFastScrolls(s.fastScrolls);
+      } else if (pct > s.maxAnchor) {
+        s.maxAnchor = pct;
+        setAnchor(Math.round(pct));
+      }
+      s.lastY = y; s.lastT = now;
+    };
+
+    const flush = () => {
+      if (s.maxAnchor <= 0 && s.readMs <= 0 && s.fastScrolls <= 0) return;
+      void saveNativeProgress(studentId, chapterId, {
+        pct: Math.round(s.maxAnchor),
+        read_ms: Math.round(s.readMs),
+        fast_scrolls: s.fastScrolls,
+      });
+    };
+
+    const iv = setInterval(flush, 15000);
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      clearInterval(iv);
+      window.removeEventListener("scroll", onScroll);
+      flush();
+    };
+  }, [studentId, chapterId]);
+
   return (
     <div className="space-y-5 max-w-2xl">
+      {studentId && (
+        <div className="border border-border bg-surface px-3 py-2">
+          <div className="flex items-center justify-between mb-1">
+            <p className="text-[9px] font-black text-subtle uppercase tracking-widest flex items-center gap-1">
+              <BookOpen className="w-3 h-3 text-cama" /> Ancrage : {anchor}%
+            </p>
+            {fastScrolls > 0 && <span className="text-[9px] text-subtle">{fastScrolls} scroll(s) rapide(s)</span>}
+          </div>
+          <div className="w-full h-1 bg-border overflow-hidden">
+            <div className="h-full bg-gradient-to-r from-cama to-gold transition-all duration-500" style={{ width: `${anchor}%` }} />
+          </div>
+          {fastScrolls > 3 && (
+            <p className="text-[10px] text-amber-600 mt-1.5">
+              Lecture rapide détectée — l&apos;ancrage ne progresse pas pendant les scrolls rapides.
+            </p>
+          )}
+        </div>
+      )}
       {blocks.map((b, i) => <Bloc key={i} b={b} />)}
       <p className="text-[10px] text-subtle flex items-center gap-1 pt-2">
         <Wifi className="w-3 h-3" /> Contenu 100% texte/HTML — idéal en zone à débit critique (~0,05 Mo)
@@ -1031,18 +1136,106 @@ function Bloc({ b }: { b: BlocNatif }) {
   );
 }
 
-/* ════ MODE LIVE — accès à la classe virtuelle ════ */
-function LiveMode({ liveId }: { liveId: string }) {
+/* ════ MODE LIVE — accès à la classe virtuelle selon le cycle ════ */
+function LiveMode({ liveId, cycleMode }: { liveId: string; cycleMode: CycleMode | null }) {
+  const [live, setLive] = useState<DBLive | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchLive(liveId).then((l) => { if (!cancelled) setLive(l); });
+    return () => { cancelled = true; };
+  }, [liveId]);
+
+  const access = cycleMode && live ? liveAccess(cycleMode, live) : null;
+
   return (
     <div className="border-2 border-border rounded-2xl p-6 text-center max-w-md mx-auto">
       <div className="w-14 h-14 rounded-full mx-auto mb-4 flex items-center justify-center bg-cama-50">
         <Radio className="w-7 h-7 text-cama" />
       </div>
       <h3 className="font-bold text-ink mb-1">Classe virtuelle</h3>
-      <Link href={`/live/${liveId}`} className="btn-primary w-full justify-center gap-2 mt-2">
-        <Radio className="w-4 h-4" /> Rejoindre le live
-      </Link>
+      {cycleMode === "hybride" && (
+        <span className="inline-block text-[9px] font-bold bg-cama-50 text-cama px-2 py-0.5 mb-1">
+          Programme live — cycle hybride
+        </span>
+      )}
+      {access && !access.canJoin ? (
+        access.showReplay && live?.recording_url ? (
+          <>
+            <a href={live.recording_url} target="_blank" rel="noopener noreferrer"
+              className="btn-primary w-full justify-center gap-2 mt-2 inline-flex">
+              <Play className="w-4 h-4" /> Regarder le replay
+            </a>
+            <p className="text-[10px] text-subtle mt-2">{access.reason}</p>
+          </>
+        ) : (
+          <p className="text-xs text-muted mt-3 bg-surface border border-border px-3 py-2">{access.reason}</p>
+        )
+      ) : (
+        <Link href={`/live/${liveId}`} className="btn-primary w-full justify-center gap-2 mt-2">
+          <Radio className="w-4 h-4" /> Rejoindre le live
+        </Link>
+      )}
       <p className="text-[10px] text-subtle mt-4">Mode audio seul disponible · enregistré pour replay — personne n&apos;est exclu.</p>
+    </div>
+  );
+}
+
+/* ════ RETOUR ÉTUDIANT — évaluer ce cours ════ */
+function CourseFeedbackWidget({ courseId, studentId }: { courseId: string; studentId: string }) {
+  const [rating, setRating] = useState(0);
+  const [comment, setComment] = useState("");
+  const [saved, setSaved] = useState(false);
+  const [sending, setSending] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchMyFeedback(studentId, courseId).then((f) => {
+      if (cancelled || !f) return;
+      setRating(f.rating);
+      setComment(f.comment ?? "");
+      setSaved(true);
+    });
+    return () => { cancelled = true; };
+  }, [courseId, studentId]);
+
+  const send = async () => {
+    if (!rating || sending) return;
+    setSending(true);
+    await submitFeedback(courseId, studentId, rating, comment);
+    setSending(false);
+    setSaved(true);
+  };
+
+  return (
+    <div className="bg-white border-b border-border px-4 py-3 flex-shrink-0">
+      <p className="text-[9px] font-black text-subtle uppercase tracking-widest mb-2 flex items-center gap-1">
+        <MessageSquare className="w-3 h-3 text-cama" /> Évaluer ce cours
+      </p>
+      <div className="flex items-center gap-1.5 mb-2">
+        {[1, 2, 3, 4, 5].map((s) => (
+          <button key={s} onClick={() => { setRating(s); setSaved(false); }}
+            className={`transition-colors ${s <= rating ? "text-gold" : "text-border hover:text-gold"}`}>
+            <Star className={`w-5 h-5 ${s <= rating ? "fill-current" : ""}`} />
+          </button>
+        ))}
+      </div>
+      <input
+        value={comment}
+        onChange={(e) => { setComment(e.target.value); setSaved(false); }}
+        placeholder="Commentaire (facultatif)…"
+        className="w-full text-[11px] border border-border px-2 py-1.5 mb-2 focus:outline-none focus:border-cama/50"
+      />
+      {saved ? (
+        <p className="text-[10px] font-bold text-green-600 flex items-center gap-1">
+          <CheckCircle2 className="w-3 h-3" /> Merci pour votre retour ✓
+        </p>
+      ) : (
+        <button onClick={send} disabled={!rating || sending}
+          className="flex items-center gap-1.5 text-[10px] font-bold text-white bg-cama px-3 py-1.5 hover:bg-cama-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+          <Send className="w-3 h-3" /> {sending ? "Envoi…" : "Envoyer"}
+        </button>
+      )}
     </div>
   );
 }
