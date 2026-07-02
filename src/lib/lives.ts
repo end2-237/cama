@@ -11,6 +11,7 @@ export interface DBLive {
   started_at: string | null;
   ended_at: string | null;
   created_by: string | null;
+  recording_url?: string | null;   // replay pour les étudiants online
   created_at: string;
 }
 

@@ -7,7 +7,7 @@ import {
   Grid3x3, Search, ChevronDown, Globe, HelpCircle,
   Bell, LogOut, User, Settings, Megaphone, X, FileText, Radio, AlertCircle,
   CalendarDays, CalendarClock, Sparkles, Award, ClipboardList, BookOpen, ShieldCheck, Newspaper,
-  Library,
+  Library, BarChart2,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import PersonalCalendarDrawer from "@/components/PersonalCalendarDrawer";
@@ -113,6 +113,7 @@ export default function DashNav({ activeTab, onTab, tabs }: DashNavProps) {
                   {moreOpen && (
                     <div className="absolute left-0 top-full mt-0 w-56 bg-white rounded-xl border border-border shadow-xl overflow-hidden z-50 animate-scale-in">
                       {[
+                        { href: "/admin/suivi",          icon: BarChart2,     label: "Suivi & Qualité" },
                         { href: "/admin/journal",        icon: Newspaper,     label: "Journal JFN" },
                         { href: "/admin/hors-cursus",    icon: Sparkles,      label: "Hors-cursus" },
                         { href: "/admin/certifications", icon: Award,         label: "Certifications" },

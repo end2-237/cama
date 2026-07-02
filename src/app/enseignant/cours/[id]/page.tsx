@@ -19,7 +19,9 @@ import {
   updateCourseContent, fetchSessions, upsertSession, deleteSession,
 } from "@/lib/program";
 import { DAYS, CYCLE_MODES, SESSION_KINDS } from "@/lib/scheduling";
-import { createLive, deleteLive } from "@/lib/lives";
+import { createLive, deleteLive, fetchLive } from "@/lib/lives";
+import type { DBLive } from "@/lib/lives";
+import { setLiveRecording } from "@/lib/tracking";
 import { uploadMedia, estimateVideoSizeMo, fetchResources, addResource, deleteResource } from "@/lib/resources";
 import type { DBCourseResource, ResourceKind, DBCahierEntry } from "@/lib/supabase";
 import { fetchCahier, addCahierEntry, deleteCahierEntry, computeProgress } from "@/lib/cahier";
@@ -362,19 +364,55 @@ function ChapterModes({ chapter, reload }: { chapter: DBChapter; reload: () => v
 }
 
 function LiveStatus({ chapter, reload }: { chapter: DBChapter; reload: () => void }) {
-  if (!chapter.live_id) return null;
+  const liveId = chapter.live_id;
+  const [live, setLive] = useState<DBLive | null>(null);
+  const [replayUrl, setReplayUrl] = useState("");
+  const [replaySaved, setReplaySaved] = useState(false);
+
+  useEffect(() => {
+    if (!liveId) return;
+    fetchLive(liveId).then((l) => {
+      setLive(l);
+      setReplayUrl(l?.recording_url ?? "");
+    });
+  }, [liveId]);
+
+  if (!liveId) return null;
   return (
-    <div className="flex items-center justify-between bg-red-50/60 border border-red-100 rounded-lg px-3 py-2.5 flex-wrap gap-2">
-      <div className="min-w-0">
-        <p className="text-xs font-semibold text-ink">Classe virtuelle programmée</p>
-        <p className="text-[10px] text-muted">Salle de classe virtuelle prête</p>
+    <div className="space-y-2">
+      <div className="flex items-center justify-between bg-red-50/60 border border-red-100 rounded-lg px-3 py-2.5 flex-wrap gap-2">
+        <div className="min-w-0">
+          <p className="text-xs font-semibold text-ink">Classe virtuelle programmée</p>
+          <p className="text-[10px] text-muted">Salle de classe virtuelle prête{live ? ` · statut : ${live.status}` : ""}</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Link href={`/live/${liveId}`} className="text-xs font-bold bg-cama text-white px-3 py-1.5 rounded-full hover:bg-cama-700 transition-colors">
+            Entrer dans la salle
+          </Link>
+          <button onClick={async () => { await deleteLive(liveId); await updateChapter(chapter.id, { live_id: null }); reload(); }}
+            className="text-subtle hover:text-red-500"><X className="w-4 h-4" /></button>
+        </div>
       </div>
-      <div className="flex items-center gap-2">
-        <Link href={`/live/${chapter.live_id}`} className="text-xs font-bold bg-cama text-white px-3 py-1.5 rounded-full hover:bg-cama-700 transition-colors">
-          Entrer dans la salle
-        </Link>
-        <button onClick={async () => { await deleteLive(chapter.live_id!); await updateChapter(chapter.id, { live_id: null }); reload(); }}
-          className="text-subtle hover:text-red-500"><X className="w-4 h-4" /></button>
+
+      {/* ── Replay du live ── */}
+      <div className="bg-white border border-border rounded-lg px-3 py-2.5">
+        <p className="text-xs font-bold text-ink flex items-center gap-1.5 mb-2"><MonitorPlay className="w-3.5 h-3.5 text-cama" /> Replay du live</p>
+        <div className="flex flex-wrap gap-2">
+          <input value={replayUrl} onChange={(e) => { setReplayUrl(e.target.value); setReplaySaved(false); }}
+            placeholder="URL de l'enregistrement (replay pour les étudiants online)…"
+            className="flex-1 min-w-[180px] text-xs border border-border rounded-lg px-3 py-2 outline-none focus:border-cama" />
+          <button
+            onClick={async () => {
+              const url = replayUrl.trim() || null;
+              await setLiveRecording(liveId, url);
+              setLive((l) => (l ? { ...l, recording_url: url } : l));
+              setReplaySaved(true);
+            }}
+            className="btn-primary py-2 px-4 text-xs gap-1.5">
+            {replaySaved ? <><Check className="w-3.5 h-3.5" /> Enregistré</> : "Enregistrer"}
+          </button>
+        </div>
+        <p className="text-[10px] text-subtle mt-1.5">Les étudiants 100% online qui ont manqué le direct regarderont ce replay.</p>
       </div>
     </div>
   );

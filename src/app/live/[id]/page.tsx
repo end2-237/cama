@@ -16,6 +16,7 @@ export default function LiveRoom() {
   const { user, loading } = useAuth();
   const [elapsed, setElapsed] = useState(0);
   const [lateBlocked, setLateBlocked] = useState<number | null>(null); // minutes de retard si refusé
+  const [modeBlocked, setModeBlocked] = useState<{ reason: string; replay: string | null } | null>(null);
 
   const isTeacher = user?.role === "enseignant" || user?.role === "admin";
   const room = `CAMA-${id}`;
@@ -35,6 +36,20 @@ export default function LiveRoom() {
     (async () => {
       const live = await fetchLive(id);
       if (!live || !active) return;
+      /* Accès par cycle : online → live à l'heure sinon replay ;
+         présentiel → consultation du direct uniquement ; hybride → accès direct. */
+      if (user.role === "etudiant") {
+        const mode = user.dossier?.mode ?? "presentiel";
+        if (mode !== "hybride" && live.status !== "encours") {
+          if (active) setModeBlocked({
+            reason: mode === "online"
+              ? "Hors horaire : ce live n'est pas en cours. Regardez l'enregistrement ci-dessous."
+              : "Cycle présentiel : la salle n'est ouverte que pendant le direct.",
+            replay: mode === "online" ? (live.recording_url ?? null) : null,
+          });
+          return;
+        }
+      }
       if (user.role === "etudiant" && live.started_at) {
         const { data } = await supabase.from("program_courses").select("*")
           .eq("id", live.program_course_id ?? "").maybeSingle();
@@ -97,6 +112,28 @@ export default function LiveRoom() {
   if (loading || !user) return (
     <div className="min-h-screen flex items-center justify-center bg-ink">
       <div className="w-8 h-8 rounded-full border-4 border-white/30 border-t-white animate-spin" />
+    </div>
+  );
+
+  /* Accès refusé par cycle : online hors horaire (→ replay) ou présentiel hors direct */
+  if (modeBlocked) return (
+    <div className="min-h-screen flex items-center justify-center bg-ink p-4">
+      <div className="bg-white border border-border p-8 text-center max-w-sm">
+        <Radio className="w-10 h-10 text-cama mx-auto mb-3" />
+        <p className="text-sm font-bold text-ink mb-1">Salle live fermée</p>
+        <p className="text-xs text-muted mb-4">{modeBlocked.reason}</p>
+        {modeBlocked.replay ? (
+          <a href={modeBlocked.replay} target="_blank" rel="noreferrer"
+            className="inline-block text-xs font-bold bg-cama text-white px-4 py-2 hover:bg-cama-700 mb-2">
+            ▶ Regarder le replay
+          </a>
+        ) : (
+          <p className="text-[11px] text-subtle mb-2">Aucun enregistrement disponible pour le moment.</p>
+        )}
+        <div>
+          <Link href="/dashboard" className="text-xs font-bold text-cama hover:underline">← Retour au dashboard</Link>
+        </div>
+      </div>
     </div>
   );
 
