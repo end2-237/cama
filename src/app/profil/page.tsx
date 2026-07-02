@@ -9,12 +9,13 @@ import {
   CalendarClock, HelpCircle, MessagesSquare, Bot, FileText,
   Pencil, Globe, Wifi, Bell, Lock, ChevronRight, Building2,
   Clock, Radio, LayoutDashboard, Star, Zap, UserCheck, AlarmClock,
-  BadgeCheck, BarChart2, Hash, Search,
+  BadgeCheck, BarChart2, Hash, Search, Library, Video, MonitorPlay,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import QrSvg from "@/components/QrSvg";
 import PersonalCalendarDrawer from "@/components/PersonalCalendarDrawer";
-import { fetchStudentProgram, fetchChapters, fetchProgress } from "@/lib/program";
+import { fetchLibrary, teacherLibrary, type LibraryDoc, KIND_LABEL } from "@/lib/library";
+import { fetchStudentProgram, fetchChapters, fetchProgress, fetchTeacherCourses } from "@/lib/program";
 import { fetchAttemptsForStudent, fetchDeliberations, type DelibWithMeta } from "@/lib/exams";
 import type { DBProgramCourse, DBChapter, DBExamAttempt } from "@/lib/supabase";
 
@@ -30,6 +31,7 @@ export default function ProfilePage() {
   const [doneIds, setDoneIds] = useState<Set<string>>(new Set());
   const [attempts, setAttempts] = useState<DBExamAttempt[]>([]);
   const [results, setResults] = useState<DelibWithMeta[]>([]);
+  const [libDocs, setLibDocs] = useState<LibraryDoc[]>([]);
 
   useEffect(() => {
     if (!loading && !user) router.replace("/auth/login");
@@ -59,6 +61,30 @@ export default function ProfilePage() {
       const map: Record<string, DBChapter[]> = {};
       progCourses.forEach((c, i) => { map[c.id] = chapterLists[i]; });
       setChaptersByCourse(map);
+    })();
+    return () => { cancelled = true; };
+  }, [user]);
+
+  /* Miniature bibliothèque : docs pertinents selon le rôle */
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    (async () => {
+      const all = await fetchLibrary();
+      if (cancelled) return;
+      if (user.role === "enseignant") {
+        const my = await fetchTeacherCourses(user.id);
+        if (cancelled) return;
+        setLibDocs(teacherLibrary(all, user.id, my.map((c) => c.id)).slice(0, 4));
+      } else if (user.role === "etudiant") {
+        const slug = user.dossier?.parcoursSlug;
+        const lvl = user.dossier?.level;
+        const mine = all.filter((d) =>
+          (!slug || d.parcoursSlug === slug) && (!lvl || d.level === lvl));
+        setLibDocs((mine.length ? mine : all).slice(0, 4));
+      } else {
+        setLibDocs(all.slice(0, 4));
+      }
     })();
     return () => { cancelled = true; };
   }, [user]);
@@ -463,6 +489,42 @@ export default function ProfilePage() {
 
         {/* ══ COLONNE DROITE ══ */}
         <div className="bg-white min-h-full">
+
+          {/* Bibliothèque (miniature) */}
+          <section className="px-4 py-4 border-b border-border">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-[10px] font-black text-ink uppercase tracking-widest flex items-center gap-1.5">
+                <Library className="w-3.5 h-3.5 text-cama" />
+                {user.role === "enseignant" ? "Ma bibliothèque" : "Bibliothèque"}
+              </h2>
+              <Link href="/bibliotheque" className="text-[10px] font-bold text-cama hover:underline">Tout voir →</Link>
+            </div>
+            <div className="space-y-px bg-border border border-border">
+              {libDocs.length === 0 && (
+                <p className="bg-white text-xs text-muted p-3">Aucun document pour le moment.</p>
+              )}
+              {libDocs.map((d) => {
+                const Icon = d.kind === "video" ? Video : d.kind === "natif" ? MonitorPlay : FileText;
+                return (
+                  <Link key={d.id} href="/bibliotheque"
+                    className="bg-white flex items-center gap-2.5 p-2.5 hover:bg-cama-50/40 transition-colors group">
+                    <div className="w-7 h-7 bg-cama-50 flex items-center justify-center flex-shrink-0">
+                      <Icon className="w-3.5 h-3.5 text-cama" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[11px] font-bold text-ink truncate group-hover:text-cama transition-colors">{d.title}</p>
+                      <p className="text-[9px] text-muted truncate">{KIND_LABEL[d.kind]} · {d.courseCode} · {d.authorName}</p>
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+            <p className="text-[10px] text-subtle mt-2 leading-relaxed">
+              {user.role === "enseignant"
+                ? "Tous vos supports, y compris ceux des cours qui vous ont été retirés."
+                : "Documents mis en avant pour votre cycle et votre niveau."}
+            </p>
+          </section>
 
           {/* Accès rapides aux composants existants */}
           <section className="px-4 py-4 border-b border-border">

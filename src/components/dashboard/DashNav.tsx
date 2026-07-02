@@ -7,6 +7,7 @@ import {
   Grid3x3, Search, ChevronDown, Globe, HelpCircle,
   Bell, LogOut, User, Settings, Megaphone, X, FileText, Radio, AlertCircle,
   CalendarDays, CalendarClock, Sparkles, Award, ClipboardList, BookOpen, ShieldCheck, Newspaper,
+  Library,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import PersonalCalendarDrawer from "@/components/PersonalCalendarDrawer";
@@ -144,6 +145,7 @@ export default function DashNav({ activeTab, onTab, tabs }: DashNavProps) {
                     <div className="absolute left-0 top-full mt-0 w-52 bg-white rounded-xl border border-border shadow-xl overflow-hidden z-50 animate-scale-in">
                       {[
                         { href: "/dashboard?tab=%C3%89valuations", icon: BookOpen,      label: "Évaluations" },
+                        { href: "/bibliotheque",       icon: Library,       label: "Ma bibliothèque" },
                         { href: "/presences",          icon: ClipboardList, label: "Présences" },
                       ].map((l) => (
                         <Link key={l.href} href={l.href} onClick={() => setMoreOpen(false)}
@@ -172,6 +174,7 @@ export default function DashNav({ activeTab, onTab, tabs }: DashNavProps) {
                     <div className="absolute left-0 top-full mt-0 w-52 bg-white rounded-xl border border-border shadow-xl overflow-hidden z-50 animate-scale-in">
                       {[
                         { href: "/etudiant/examens",       icon: BookOpen,      label: "Examens" },
+                        { href: "/bibliotheque",           icon: Library,       label: "Bibliothèque" },
                         { href: "/etudiant/parascolaire",  icon: Sparkles,      label: "Parascolaire" },
                       ].map((l) => (
                         <Link key={l.href} href={l.href} onClick={() => setMoreOpen(false)}
