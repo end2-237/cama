@@ -46,7 +46,7 @@ function authorName(id: string | null, users: Map<string, DBUser>): string {
 export async function fetchLibrary(): Promise<LibraryDoc[]> {
   const [coursesQ, chaptersQ, resourcesQ, examsQ, usersQ] = await Promise.all([
     supabase.from("program_courses").select("*"),
-    supabase.from("chapters").select("*"),
+    supabase.from("course_chapters").select("*"),
     supabase.from("course_resources").select("*"),
     supabase.from("exams").select("*"),
     supabase.from("users").select("*"),
