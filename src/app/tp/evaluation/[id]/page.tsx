@@ -42,6 +42,7 @@ export default function TpEvaluationPage() {
   const [ready, setReady] = useState(false);
 
   const [selected, setSelected] = useState<string[]>([]);
+  const [preview, setPreview] = useState<Set<string>>(new Set()); // panneaux avec aperçu machine embarqué
   const [gradingId, setGradingId] = useState<string | null>(null);
   const [note, setNote] = useState("");
   const [appreciation, setAppreciation] = useState("");
@@ -279,6 +280,31 @@ export default function TpEvaluationPage() {
                       </button>
                     </div>
 
+                    {/* Aperçu embarqué de la machine (le prof voit la machine sans nouvel onglet) */}
+                    {machine?.web_url && preview.has(sid) && (
+                      <div className="relative bg-black border-b border-border">
+                        <iframe
+                          src={machine.web_url}
+                          title={`Machine — ${nameOf(sid)}`}
+                          className="w-full h-64 border-0"
+                          sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
+                        />
+                        <div className="absolute top-1 right-1 flex gap-1">
+                          <a href={machine.web_url} target="_blank" rel="noopener noreferrer"
+                            className="bg-ink/80 text-white p-1 hover:bg-ink" title="Ouvrir en plein écran">
+                            <ExternalLink className="w-3 h-3" />
+                          </a>
+                          <button onClick={() => setPreview((s) => { const n = new Set(s); n.delete(sid); return n; })}
+                            className="bg-ink/80 text-white p-1 hover:bg-ink" title="Masquer l'aperçu">
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                        <p className="absolute bottom-1 left-2 text-[9px] text-white/60 bg-ink/60 px-1.5 py-0.5">
+                          Aperçu live · saisissez {machine.name} pour tester
+                        </p>
+                      </div>
+                    )}
+
                     <div className="p-4 space-y-4 flex-1">
                       {/* Activités */}
                       <div>
@@ -336,14 +362,13 @@ export default function TpEvaluationPage() {
                     {/* Actions */}
                     <div className="px-4 py-3 border-t border-border flex items-center gap-2">
                       {machine?.web_url && (
-                        <a
-                          href={machine.web_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold border border-border text-ink hover:bg-surface transition-colors"
+                        <button
+                          onClick={() => setPreview((s) => { const n = new Set(s); if (n.has(sid)) n.delete(sid); else n.add(sid); return n; })}
+                          className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold border transition-colors ${
+                            preview.has(sid) ? "border-cama bg-cama-50 text-cama" : "border-border text-ink hover:bg-surface"}`}
                         >
-                          <ExternalLink className="w-3.5 h-3.5" /> Visiter la machine
-                        </a>
+                          <Monitor className="w-3.5 h-3.5" /> {preview.has(sid) ? "Masquer l'aperçu" : "Voir la machine"}
+                        </button>
                       )}
                       <div className="flex-1" />
                       <button
