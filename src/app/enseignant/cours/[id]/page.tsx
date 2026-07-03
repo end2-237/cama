@@ -1265,6 +1265,9 @@ function TpManager({ courseId, teacherId }: { courseId: string; teacherId: strin
                   <Trash2 className="w-4 h-4" />
                 </button>
               </div>
+              {/* Liste d'activités : éditeur ajouter/retirer sur TP existant */}
+              <TpActivitiesEditor tp={tp} onSaved={load} />
+
               <p className="text-[11px] text-muted mt-3">
                 {st ? `${st.started} étudiant${st.started > 1 ? "s ont" : " a"} commencé · ${st.sessions} session${st.sessions > 1 ? "s" : ""} · ${st.graded} noté${st.graded > 1 ? "s" : ""}` : "Chargement des statistiques…"}
               </p>
@@ -1275,6 +1278,72 @@ function TpManager({ courseId, teacherId }: { courseId: string; teacherId: strin
             </div>
           );
         })
+      )}
+    </div>
+  );
+}
+
+/* Éditeur d'activités d'un TP existant : ajouter / retirer, sauvegarde en base. */
+function TpActivitiesEditor({ tp, onSaved }: { tp: DBCourseTp; onSaved: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [list, setList] = useState<string[]>(tp.activities);
+  const [newAct, setNewAct] = useState("");
+  const [saving, setSaving] = useState(false);
+  const dirty = JSON.stringify(list) !== JSON.stringify(tp.activities);
+
+  const add = () => {
+    const v = newAct.trim();
+    if (!v) return;
+    setList((prev) => [...prev, v]);
+    setNewAct("");
+  };
+
+  const save = async () => {
+    setSaving(true);
+    await updateTp(tp.id, { activities: list });
+    setSaving(false);
+    onSaved();
+  };
+
+  return (
+    <div className="mt-3 border border-border rounded-xl overflow-hidden">
+      <button onClick={() => setOpen((v) => !v)}
+        className="w-full flex items-center justify-between px-4 py-2.5 text-xs font-bold text-ink hover:bg-surface transition-colors">
+        <span className="flex items-center gap-1.5">
+          <ListIcon className="w-3.5 h-3.5 text-cama" /> Liste d&apos;activités ({list.length})
+        </span>
+        <ChevronDown className={`w-3.5 h-3.5 text-subtle transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+      {open && (
+        <div className="border-t border-border p-3 space-y-2 animate-fade-up">
+          {list.length === 0 && <p className="text-[11px] text-muted italic">Aucune activité. Ajoutez-en ci-dessous.</p>}
+          {list.map((a, i) => (
+            <div key={i} className="flex items-center gap-2 bg-surface rounded-lg px-3 py-2">
+              <span className="w-5 h-5 rounded-full bg-cama text-white flex items-center justify-center text-[10px] font-bold flex-shrink-0">{i + 1}</span>
+              <p className="text-xs text-ink flex-1 min-w-0">{a}</p>
+              <button onClick={() => setList((prev) => prev.filter((_, j) => j !== i))}
+                className="p-1 text-subtle hover:text-red-500 transition-colors flex-shrink-0">
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          ))}
+          <div className="flex gap-2">
+            <input value={newAct} onChange={(e) => setNewAct(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && add()}
+              placeholder="Nouvelle activité…"
+              className="flex-1 text-xs border border-border rounded-lg px-3 py-2 outline-none focus:border-cama text-ink placeholder-subtle min-w-0" />
+            <button onClick={add}
+              className="text-xs font-bold px-3 py-2 rounded-lg border-2 border-border text-muted hover:border-cama/40 hover:text-cama transition-all">
+              Ajouter
+            </button>
+          </div>
+          {dirty && (
+            <button onClick={save} disabled={saving}
+              className="btn-primary gap-1.5 py-2 px-4 text-xs disabled:opacity-50">
+              <Check className="w-3.5 h-3.5" /> {saving ? "Enregistrement…" : "Enregistrer les modifications"}
+            </button>
+          )}
+        </div>
       )}
     </div>
   );
