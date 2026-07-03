@@ -95,12 +95,13 @@ function RemoteMode({ user }: { user: AppUser | null }) {
     const courseIds = new Set(myCourses.map((c) => c.id));
 
     // Filtrage selon le rôle :
-    //  • étudiant : machines de SES cours ET marquées « disponibles »
+    //  • étudiant : AUCUNE machine brute — il passe par le TP de son cours
+    //    (le panneau TP ouvre la machine attribuée par l'enseignant)
     //  • enseignant : machines de SES cours (toutes, dispo ou non)
     //  • admin : toutes les machines
     let visible = allMachines;
     if (user?.role === "etudiant")
-      visible = allMachines.filter((m) => m.available && m.program_course_id && courseIds.has(m.program_course_id));
+      visible = [];
     else if (user?.role === "enseignant")
       visible = allMachines.filter((m) => m.program_course_id && courseIds.has(m.program_course_id));
 
@@ -196,7 +197,9 @@ function RemoteMode({ user }: { user: AppUser | null }) {
         ) : machines.length === 0 ? (
           <div className="p-4 text-xs text-white/50 leading-relaxed">
             {user?.role === "etudiant"
-              ? "Aucune machine de TP disponible pour vos cours en ce moment. Votre enseignant l'ouvrira au moment de la séance."
+              ? (openTps.length > 0
+                ? "Cliquez sur un TP ci-dessus : la machine s'ouvre depuis le TP, avec la liste d'activités et votre compte-rendu."
+                : "Aucun TP ouvert pour vos cours en ce moment. Votre enseignant en ouvrira un au moment de la séance.")
               : canManage
                 ? <>Aucune machine pour vos cours. Cliquez sur <strong className="text-white">+</strong> pour en rattacher une.</>
                 : "Aucune machine enregistrée."}
@@ -243,8 +246,10 @@ function RemoteMode({ user }: { user: AppUser | null }) {
       {/* Terminal embarqué */}
       <div className="flex flex-col min-h-0 bg-black">
         {!selected ? (
-          <div className="flex-1 flex items-center justify-center text-white/50 text-sm">
-            Sélectionnez une machine pour vous y connecter.
+          <div className="flex-1 flex items-center justify-center text-white/50 text-sm text-center px-6">
+            {user?.role === "etudiant"
+              ? "Ouvrez un TP dans la liste à gauche : la machine, les activités et le compte-rendu sont dans le TP."
+              : "Sélectionnez une machine pour vous y connecter."}
           </div>
         ) : (
           <>
