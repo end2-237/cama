@@ -175,6 +175,7 @@ export default function DashNav({ activeTab, onTab, tabs }: DashNavProps) {
                     <div className="absolute left-0 top-full mt-0 w-52 bg-white rounded-xl border border-border shadow-xl overflow-hidden z-50 animate-scale-in">
                       {[
                         { href: "/etudiant/examens",       icon: BookOpen,      label: "Examens" },
+                        { href: "/tp",                     icon: ClipboardList, label: "TP & Machines" },
                         { href: "/bibliotheque",           icon: Library,       label: "Bibliothèque" },
                         { href: "/etudiant/parascolaire",  icon: Sparkles,      label: "Parascolaire" },
                       ].map((l) => (

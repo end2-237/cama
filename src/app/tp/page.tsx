@@ -6,11 +6,11 @@ import dynamic from "next/dynamic";
 import {
   ArrowLeft, Play, Loader2, Terminal, RotateCcw, FileCode2, Server,
   CheckCircle2, AlertCircle, ChevronDown, Cpu, Plus, Trash2, X,
-  ExternalLink, Maximize2, Wifi, Code2, BookOpen, Copy, Check,
+  ExternalLink, Maximize2, Wifi, Code2, BookOpen, Copy, Check, FlaskConical,
 } from "lucide-react";
 import { useAuth, type AppUser } from "@/context/AuthContext";
 import { fetchRuntimes, executeCode, versionFor, LANGS, type Runtime } from "@/lib/piston";
-import { fetchMachines, addMachine, deleteMachine, setMachineAvailable } from "@/lib/tp";
+import { fetchMachines, addMachine, deleteMachine, setMachineAvailable, fetchTpsForCourses, type DBCourseTp } from "@/lib/tp";
 import { fetchTeacherCourses, fetchProgram, fetchStudentProgram } from "@/lib/program";
 import type { DBRemoteMachine, DBProgramCourse } from "@/lib/supabase";
 
@@ -77,6 +77,7 @@ function RemoteMode({ user }: { user: AppUser | null }) {
   const [saving, setSaving]     = useState(false);
   const [err, setErr]           = useState<string | null>(null);
   const [guideOpen, setGuideOpen] = useState(false);
+  const [openTps, setOpenTps]     = useState<DBCourseTp[]>([]);
 
   // Cours pertinents pour cet utilisateur (sert au filtrage + au menu déroulant).
   const loadCourses = async (): Promise<CourseLite[]> => {
@@ -102,6 +103,10 @@ function RemoteMode({ user }: { user: AppUser | null }) {
       visible = allMachines.filter((m) => m.available && m.program_course_id && courseIds.has(m.program_course_id));
     else if (user?.role === "enseignant")
       visible = allMachines.filter((m) => m.program_course_id && courseIds.has(m.program_course_id));
+
+    // TP ouverts des cours de l'utilisateur (raccourci étudiant, visible même sans machine)
+    const tps = await fetchTpsForCourses(myCourses.map((c) => c.id));
+    setOpenTps(tps.filter((t) => t.status === "ouvert"));
 
     setCourses(myCourses);
     setMachines(visible);
@@ -160,6 +165,31 @@ function RemoteMode({ user }: { user: AppUser | null }) {
             )}
           </div>
         </div>
+
+        {/* Raccourci : TP ouverts (même sans machine disponible) */}
+        {!loading && openTps.length > 0 && (
+          <div className="border-b border-black/30">
+            <p className="px-4 pt-3 pb-1.5 text-[10px] font-black text-gold uppercase tracking-widest flex items-center gap-1.5">
+              <FlaskConical className="w-3 h-3" /> TP ouverts ({openTps.length})
+            </p>
+            <div className="pb-2">
+              {openTps.map((tp) => {
+                const c = courses.find((x) => x.id === tp.program_course_id);
+                return (
+                  <Link key={tp.id}
+                    href={user?.role === "etudiant" ? `/cours/${tp.program_course_id}` : `/tp/evaluation/${tp.id}`}
+                    className="block px-4 py-2 hover:bg-white/5 transition-colors group">
+                    <p className="text-xs font-bold text-white truncate group-hover:text-gold transition-colors">{tp.title}</p>
+                    <p className="text-[10px] text-white/50 truncate">
+                      {c ? c.code : ""} · {tp.activities.length} activité{tp.activities.length > 1 ? "s" : ""}
+                      {user?.role === "etudiant" ? " · Participer →" : " · Évaluer →"}
+                    </p>
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {loading ? (
           <div className="py-10 text-center"><Loader2 className="w-5 h-5 animate-spin text-cama mx-auto" /></div>
