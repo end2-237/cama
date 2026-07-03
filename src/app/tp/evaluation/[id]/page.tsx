@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import {
-  fetchTp, fetchTpSessions, fetchTpProgress, fetchTpGrades, saveTpGrade, fetchMachines,
+  fetchTp, fetchTpSessions, fetchTpProgress, fetchTpGrades, saveTpGrade, fetchMachines, machineUrlFor,
   type DBCourseTp, type DBTpSession, type DBTpProgress, type DBTpGrade,
 } from "@/lib/tp";
 import { fetchUsers } from "@/lib/admin";
@@ -284,13 +284,13 @@ export default function TpEvaluationPage() {
                     {machine?.web_url && preview.has(sid) && (
                       <div className="relative bg-black border-b border-border">
                         <iframe
-                          src={machine.web_url}
+                          src={machineUrlFor(machine.web_url, sid)}
                           title={`Machine — ${nameOf(sid)}`}
                           className="w-full h-64 border-0"
                           sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
                         />
                         <div className="absolute top-1 right-1 flex gap-1">
-                          <a href={machine.web_url} target="_blank" rel="noopener noreferrer"
+                          <a href={machineUrlFor(machine.web_url, sid)} target="_blank" rel="noopener noreferrer"
                             className="bg-ink/80 text-white p-1 hover:bg-ink" title="Ouvrir en plein écran">
                             <ExternalLink className="w-3 h-3" />
                           </a>

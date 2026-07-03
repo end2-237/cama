@@ -163,3 +163,12 @@ export async function fetchTpGrades(tpId: string): Promise<DBTpGrade[]> {
   const { data } = await supabase.from("tp_grades").select("*").eq("tp_id", tpId);
   return (data as DBTpGrade[]) ?? [];
 }
+
+/** Ajoute l'identité de l'étudiant à l'URL d'une machine (?arg=<id>) pour
+    router vers SON conteneur (script cama-tp-setup-persistent.sh). Sans effet
+    sur les machines mono-shell / multi-jetables (l'argument est ignoré). */
+export function machineUrlFor(webUrl: string, studentId: string): string {
+  if (!webUrl) return webUrl;
+  const sep = webUrl.includes("?") ? "&" : "?";
+  return `${webUrl}${sep}arg=${encodeURIComponent(studentId)}`;
+}

@@ -27,7 +27,7 @@ import { fetchForum, postForum } from "@/lib/chat";
 import type { DBCourseResource, DBRemoteMachine } from "@/lib/supabase";
 import {
   fetchTpsForCourses, fetchMachines, fetchMyTpProgress, saveTpProgress,
-  startTpSession, endTpSession, saveTpReport, fetchMyTpSessions,
+  startTpSession, endTpSession, saveTpReport, fetchMyTpSessions, machineUrlFor,
 } from "@/lib/tp";
 import type { DBCourseTp, DBTpSession } from "@/lib/tp";
 import type { AppUser } from "@/context/AuthContext";
@@ -1727,7 +1727,7 @@ function StudentTpPanel({ tp, user, machine }: { tp: DBCourseTp; user: AppUser; 
     setBusy(false);
     if (!id) return;
     setSessionId(id);
-    window.open(machine!.web_url, "_blank", "noopener,noreferrer");
+    window.open(machineUrlFor(machine!.web_url, user.id), "_blank", "noopener,noreferrer");
   };
 
   const endSession = async () => {
@@ -1810,7 +1810,7 @@ function StudentTpPanel({ tp, user, machine }: { tp: DBCourseTp; user: AppUser; 
                 <span className="flex items-center gap-1.5 text-[10px] font-bold text-green-600">
                   <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" /> Session en cours
                 </span>
-                <a href={machine!.web_url} target="_blank" rel="noopener noreferrer"
+                <a href={machineUrlFor(machine!.web_url, user.id)} target="_blank" rel="noopener noreferrer"
                   className="flex items-center gap-1 text-[10px] font-bold text-cama hover:underline">
                   <ExternalLink className="w-3 h-3" /> Rouvrir la machine
                 </a>
