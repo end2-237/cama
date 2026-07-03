@@ -12,6 +12,7 @@ import {
   Bookmark, Award, Zap, BarChart2, Target, Users,
   Pencil, ThumbsUp, RotateCcw, ExternalLink, Hash, StickyNote,
   Search, Filter, ChevronUp, BookOpen, X as XIcon,
+  FlaskConical, Server, Square, History,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { BlocNatif, DBChapter } from "@/lib/db";
@@ -23,7 +24,13 @@ import { saveNativeProgress, fetchMyFeedback, submitFeedback, liveAccess } from 
 import type { CycleMode } from "@/lib/tracking";
 import { fetchResources } from "@/lib/resources";
 import { fetchForum, postForum } from "@/lib/chat";
-import type { DBCourseResource } from "@/lib/supabase";
+import type { DBCourseResource, DBRemoteMachine } from "@/lib/supabase";
+import {
+  fetchTpsForCourses, fetchMachines, fetchMyTpProgress, saveTpProgress,
+  startTpSession, endTpSession, saveTpReport, fetchMyTpSessions,
+} from "@/lib/tp";
+import type { DBCourseTp, DBTpSession } from "@/lib/tp";
+import type { AppUser } from "@/context/AuthContext";
 
 const RES_ICON = { syllabus: FileText, support: Download, biblio: ExternalLink, lien: ExternalLink } as const;
 
@@ -66,6 +73,8 @@ export default function CoursePlayer() {
   const [, setLoaded] = useState(false);
   const [liveNow, setLiveNow] = useState<DBLive | null>(null);
   const [resources, setResources] = useState<DBCourseResource[]>([]);
+  const [openTps, setOpenTps] = useState<DBCourseTp[]>([]);
+  const [machines, setMachines] = useState<DBRemoteMachine[]>([]);
 
   useEffect(() => {
     if (!loading && !user) router.replace("/auth/login");
@@ -130,6 +139,20 @@ export default function CoursePlayer() {
     })();
     return () => { cancelled = true; };
   }, [id, user]);
+
+  /* TP du cours — visibles par l'étudiant uniquement quand le prof les a ouverts */
+  useEffect(() => {
+    if (!course?.id || !user || user.role !== "etudiant") return;
+    const courseId = course.id;
+    let cancelled = false;
+    (async () => {
+      const [tps, machs] = await Promise.all([fetchTpsForCourses([courseId]), fetchMachines()]);
+      if (cancelled) return;
+      setOpenTps(tps.filter((t) => t.status === "ouvert"));
+      setMachines(machs);
+    })();
+    return () => { cancelled = true; };
+  }, [course?.id, user]);
 
   if (loading || !user || !course) {
     return <div className="min-h-screen flex items-center justify-center">
@@ -521,6 +544,11 @@ export default function CoursePlayer() {
               </button>
             </div>
           </div>
+
+          {/* ── TP du cours (étudiant) ── */}
+          {isStudent && openTps.length > 0 && (
+            <TpSection tps={openTps} machines={machines} user={user} />
+          )}
         </div>
 
         {/* ── Sidebar droite ── */}
@@ -1637,6 +1665,229 @@ function VoiceLive({ chapterTitle, onClose }: { chapterTitle: string; onClose: (
       </div>
 
       <p className="absolute bottom-3 text-[10px] text-white/25">Prototype — synthèse et reconnaissance vocales simulées · ~0,2 Mo/min en production</p>
+    </div>
+  );
+}
+
+/* ════ TP DU COURS (étudiant) — section repliable sous le lecteur ════ */
+function TpSection({ tps, machines, user }: { tps: DBCourseTp[]; machines: DBRemoteMachine[]; user: AppUser }) {
+  const [open, setOpen] = useState(true);
+  return (
+    <div className="bg-white border-r border-border border-t border-border">
+      <button onClick={() => setOpen(!open)} className="w-full flex items-center justify-between px-6 py-3 hover:bg-surface transition-colors">
+        <span className="flex items-center gap-2 text-xs font-bold text-ink">
+          <FlaskConical className="w-4 h-4 text-cama" /> TP du cours
+          <span className="text-[10px] bg-cama-50 text-cama px-1.5 py-0.5 rounded-full">{tps.length} ouvert{tps.length > 1 ? "s" : ""}</span>
+        </span>
+        <ChevronDown className={`w-3.5 h-3.5 text-subtle transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+      {open && (
+        <div className="px-6 pb-5 space-y-4 animate-fade-up">
+          {tps.map((tp) => (
+            <StudentTpPanel key={tp.id} tp={tp} user={user}
+              machine={machines.find((m) => m.id === tp.machine_id) ?? null} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function StudentTpPanel({ tp, user, machine }: { tp: DBCourseTp; user: AppUser; machine: DBRemoteMachine | null }) {
+  const [done, setDone] = useState<Set<number>>(new Set());
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [report, setReport] = useState("");
+  const [sessions, setSessions] = useState<DBTpSession[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [reportSaved, setReportSaved] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchMyTpProgress(tp.id, user.id).then((p) => { if (!cancelled && p) setDone(new Set(p.done)); });
+    fetchMyTpSessions(tp.id, user.id).then((s) => { if (!cancelled) setSessions(s); });
+    return () => { cancelled = true; };
+  }, [tp.id, user.id]);
+
+  const toggleActivity = (i: number) => {
+    const next = new Set(done);
+    if (next.has(i)) next.delete(i); else next.add(i);
+    setDone(next);
+    void saveTpProgress(tp.id, user.id, Array.from(next).sort((a, b) => a - b));
+  };
+
+  const machineOpen = !!machine && machine.available;
+  const total = tp.activities.length;
+  const doneCount = tp.activities.filter((_, i) => done.has(i)).length;
+  const pct = total ? Math.round((doneCount / total) * 100) : 0;
+
+  const startSession = async () => {
+    if (!machineOpen || busy || sessionId) return;
+    setBusy(true);
+    const id = await startTpSession(tp.id, user.id);
+    setBusy(false);
+    if (!id) return;
+    setSessionId(id);
+    window.open(machine!.web_url, "_blank", "noopener,noreferrer");
+  };
+
+  const endSession = async () => {
+    if (!sessionId || busy) return;
+    setBusy(true);
+    await endTpSession(sessionId, report.trim() || undefined);
+    const s = await fetchMyTpSessions(tp.id, user.id);
+    setBusy(false);
+    setSessionId(null);
+    setReport("");
+    setReportSaved(false);
+    setSessions(s);
+  };
+
+  const saveReport = async () => {
+    if (!sessionId || busy) return;
+    setBusy(true);
+    await saveTpReport(sessionId, report.trim());
+    setBusy(false);
+    setReportSaved(true);
+    setTimeout(() => setReportSaved(false), 1500);
+  };
+
+  const fmtDate = (iso: string) =>
+    new Date(iso).toLocaleString("fr-FR", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+  const fmtDur = (start: string, end: string) => {
+    const min = Math.max(1, Math.round((new Date(end).getTime() - new Date(start).getTime()) / 60000));
+    return min >= 60 ? `${Math.floor(min / 60)} h ${String(min % 60).padStart(2, "0")} min` : `${min} min`;
+  };
+
+  return (
+    <div className="border border-border">
+      {/* En-tête */}
+      <div className="px-4 py-3 bg-surface border-b border-border">
+        <div className="flex items-center gap-2 flex-wrap">
+          <p className="text-sm font-bold text-ink flex-1 min-w-0">{tp.title}</p>
+          {machine && machine.available && (
+            <span className="flex items-center gap-1 text-[9px] font-bold bg-cama-50 text-cama px-1.5 py-0.5">
+              <Server className="w-3 h-3" /> {machine.name}
+            </span>
+          )}
+          <span className="text-[9px] font-bold bg-green-50 text-green-600 px-1.5 py-0.5 uppercase tracking-wider">Ouvert</span>
+        </div>
+        {tp.description && <p className="text-xs text-muted mt-1 leading-relaxed">{tp.description}</p>}
+      </div>
+
+      <div className="p-4 space-y-4">
+        {/* Liste d'activités */}
+        {total > 0 && (
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <p className="text-[9px] font-black text-subtle uppercase tracking-widest flex items-center gap-1">
+                <Check className="w-3 h-3 text-cama" /> Liste d&apos;activités
+              </p>
+              <span className="text-[10px] font-bold text-cama">{doneCount}/{total} activités</span>
+            </div>
+            <div className="w-full h-1 bg-border overflow-hidden mb-2">
+              <div className="h-full bg-gradient-to-r from-cama to-gold transition-all duration-500" style={{ width: `${pct}%` }} />
+            </div>
+            <div className="space-y-1">
+              {tp.activities.map((a, i) => (
+                <label key={i} className="flex items-start gap-2 px-1 py-1 hover:bg-surface transition-colors cursor-pointer">
+                  <input type="checkbox" checked={done.has(i)} onChange={() => toggleActivity(i)}
+                    className="mt-0.5 accent-[#4F46E5] flex-shrink-0" />
+                  <span className={`text-xs leading-relaxed ${done.has(i) ? "text-subtle line-through" : "text-ink"}`}>{a}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Machine & session */}
+        <div>
+          <p className="text-[9px] font-black text-subtle uppercase tracking-widest mb-2 flex items-center gap-1">
+            <MonitorPlay className="w-3 h-3 text-cama" /> Machine &amp; session
+          </p>
+          {machineOpen ? (
+            sessionId ? (
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="flex items-center gap-1.5 text-[10px] font-bold text-green-600">
+                  <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" /> Session en cours
+                </span>
+                <a href={machine!.web_url} target="_blank" rel="noopener noreferrer"
+                  className="flex items-center gap-1 text-[10px] font-bold text-cama hover:underline">
+                  <ExternalLink className="w-3 h-3" /> Rouvrir la machine
+                </a>
+                <button onClick={endSession} disabled={busy}
+                  className="inline-flex items-center gap-1.5 text-[10px] font-bold text-white bg-red-500 px-3 py-1.5 hover:bg-red-600 transition-colors disabled:opacity-40 ml-auto">
+                  <Square className="w-3 h-3" /> {busy ? "…" : "Terminer la session"}
+                </button>
+              </div>
+            ) : (
+              <button onClick={startSession} disabled={busy}
+                className="inline-flex items-center gap-2 text-xs font-bold text-white bg-cama px-4 py-2 hover:bg-cama-700 transition-colors disabled:opacity-40">
+                <ExternalLink className="w-3.5 h-3.5" /> {busy ? "Démarrage…" : "Ouvrir la machine & démarrer une session"}
+              </button>
+            )
+          ) : (
+            <p className="text-[11px] text-subtle italic bg-surface border border-border px-3 py-2">
+              Machine fermée — attendez l&apos;ouverture par l&apos;enseignant.
+            </p>
+          )}
+        </div>
+
+        {/* Compte-rendu */}
+        {sessionId && (
+          <div>
+            <p className="text-[9px] font-black text-subtle uppercase tracking-widest mb-2 flex items-center gap-1">
+              <Pencil className="w-3 h-3 text-gold-dark" /> Compte-rendu
+            </p>
+            <textarea
+              value={report}
+              onChange={(e) => { setReport(e.target.value); setReportSaved(false); }}
+              placeholder="Décrivez ce que vous avez fait (commandes, résultats, difficultés)…"
+              rows={4}
+              className="w-full text-xs text-ink placeholder-subtle bg-surface border border-border p-2.5 outline-none focus:border-cama transition-colors resize-none leading-relaxed"
+            />
+            <div className="flex items-center justify-between mt-1.5">
+              <p className="text-[9px] text-subtle">Envoyé avec la fin de session — ou enregistrez-le dès maintenant.</p>
+              <button onClick={saveReport} disabled={busy || !report.trim()}
+                className={`flex items-center gap-1 text-[10px] font-bold px-3 py-1 transition-colors disabled:opacity-40 ${
+                  reportSaved ? "bg-green-50 text-green-600" : "bg-cama text-white hover:bg-cama-700"
+                }`}>
+                {reportSaved ? <><Check className="w-3 h-3" /> Enregistré</> : <>Enregistrer le compte-rendu</>}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Mes sessions */}
+        <div>
+          <p className="text-[9px] font-black text-subtle uppercase tracking-widest mb-2 flex items-center gap-1">
+            <History className="w-3 h-3 text-cama" /> Mes sessions
+          </p>
+          {sessions.length === 0 ? (
+            <p className="text-[10px] text-subtle italic">Aucune session pour l&apos;instant.</p>
+          ) : (
+            <div className="space-y-1.5">
+              {sessions.map((s) => (
+                <div key={s.id} className="flex items-start gap-2 text-[11px] bg-surface border border-border px-2.5 py-1.5">
+                  <Clock className="w-3 h-3 text-subtle flex-shrink-0 mt-0.5" />
+                  <div className="min-w-0 flex-1">
+                    <p className="font-semibold text-ink">
+                      {fmtDate(s.started_at)}
+                      {s.ended_at
+                        ? <span className="text-subtle font-normal"> · durée {fmtDur(s.started_at, s.ended_at)}</span>
+                        : <span className="text-green-600 font-bold"> · en cours</span>}
+                    </p>
+                    {s.report && (
+                      <p className="text-[10px] text-muted mt-0.5 line-clamp-2">
+                        {s.report.length > 160 ? `${s.report.slice(0, 160)}…` : s.report}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
