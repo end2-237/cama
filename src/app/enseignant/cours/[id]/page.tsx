@@ -8,7 +8,7 @@ import {
   Trash2, Upload, Check, X, GripVertical, Eye, EyeOff,
   Sparkles, Calendar, Type, List as ListIcon, HelpCircle,
   Target, CalendarClock, Clock, Send, AlertTriangle,
-  Timer, NotebookPen, Save,
+  Timer, NotebookPen, Save, FlaskConical, ExternalLink, ChevronDown,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { BlocNatif } from "@/lib/db";
@@ -25,6 +25,12 @@ import { setLiveRecording } from "@/lib/tracking";
 import { uploadMedia, estimateVideoSizeMo, fetchResources, addResource, deleteResource } from "@/lib/resources";
 import type { DBCourseResource, ResourceKind, DBCahierEntry } from "@/lib/supabase";
 import { fetchCahier, addCahierEntry, deleteCahierEntry, computeProgress } from "@/lib/cahier";
+import {
+  fetchMachines, fetchTpsForCourses, createTp, updateTp, deleteTp,
+  fetchTpProgress, fetchTpSessions, fetchTpGrades,
+} from "@/lib/tp";
+import type { DBCourseTp, TpStatus } from "@/lib/tp";
+import type { DBRemoteMachine } from "@/lib/supabase";
 
 export default function CourseEditor() {
   const { id } = useParams<{ id: string }>();
@@ -188,6 +194,16 @@ export default function CourseEditor() {
         </div>
         <CahierTexteEditor courseId={id} teacherId={user.id} courseHours={course.hours} chapters={chapters}
           defaultDuration={course.live_duration_min ?? 60} />
+
+        {/* ── Travaux pratiques (TP) ── */}
+        <div className="mt-10 flex items-center gap-3 mb-4">
+          <FlaskConical className="w-6 h-6 text-cama" strokeWidth={1.5} />
+          <div>
+            <h2 className="text-xl font-bold text-ink">Travaux pratiques</h2>
+            <p className="text-xs text-muted">Programmez un TP : machine attribuée + liste d&apos;activités. Les étudiants suivent la liste, vous évaluez leur travail.</p>
+          </div>
+        </div>
+        <TpManager courseId={id} teacherId={user.id} />
       </main>
     </div>
   );
@@ -1083,6 +1099,182 @@ function CahierTexteEditor({ courseId, teacherId, courseHours, chapters, default
             </div>
           ))}
         </div>
+      )}
+    </div>
+  );
+}
+
+/* ════ Travaux pratiques (TP) ════ */
+const TP_STATUS_LABELS: Record<TpStatus, string> = { ferme: "Fermé", ouvert: "Ouvert", termine: "Terminé" };
+
+function TpManager({ courseId, teacherId }: { courseId: string; teacherId: string }) {
+  const [tps, setTps] = useState<DBCourseTp[]>([]);
+  const [machines, setMachines] = useState<DBRemoteMachine[]>([]);
+  const [stats, setStats] = useState<Record<string, { started: number; sessions: number; graded: number }>>({});
+  const [showForm, setShowForm] = useState(false);
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [machineId, setMachineId] = useState("");
+  const [activities, setActivities] = useState<string[]>([]);
+  const [newActivity, setNewActivity] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const load = useCallback(async () => {
+    const [tpList, machineList] = await Promise.all([fetchTpsForCourses([courseId]), fetchMachines()]);
+    setTps(tpList);
+    setMachines(machineList.filter((m) => m.program_course_id === courseId));
+    const entries = await Promise.all(tpList.map(async (tp) => {
+      const [progress, sessions, grades] = await Promise.all([
+        fetchTpProgress(tp.id), fetchTpSessions(tp.id), fetchTpGrades(tp.id),
+      ]);
+      return [tp.id, { started: progress.length, sessions: sessions.length, graded: grades.length }] as const;
+    }));
+    setStats(Object.fromEntries(entries));
+  }, [courseId]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const addActivity = () => {
+    if (!newActivity.trim()) return;
+    setActivities((prev) => [...prev, newActivity.trim()]);
+    setNewActivity("");
+  };
+
+  const create = async () => {
+    if (!title.trim() || saving) return;
+    setSaving(true);
+    await createTp({
+      program_course_id: courseId,
+      machine_id: machineId || null,
+      title: title.trim(),
+      description: description.trim() || null,
+      activities,
+      status: "ferme",
+      created_by: teacherId,
+    });
+    setTitle(""); setDescription(""); setMachineId(""); setActivities([]); setShowForm(false);
+    setSaving(false);
+    load();
+  };
+
+  const machineName = (id: string | null) =>
+    id ? (machines.find((m) => m.id === id)?.name ?? "machine inconnue") : "sans machine";
+
+  return (
+    <div className="space-y-4">
+      {/* Formulaire de création */}
+      <div className="bg-white rounded-2xl border border-border overflow-hidden">
+        <button onClick={() => setShowForm((v) => !v)}
+          className="w-full flex items-center justify-between px-5 py-4 text-sm font-bold text-ink hover:bg-surface transition-colors">
+          <span className="flex items-center gap-2"><Plus className="w-4 h-4 text-cama" /> Programmer un TP</span>
+          <ChevronDown className={`w-4 h-4 text-subtle transition-transform ${showForm ? "rotate-180" : ""}`} />
+        </button>
+        {showForm && (
+          <div className="border-t border-border p-5 space-y-4 animate-fade-up">
+            <div>
+              <label className="text-[11px] font-bold text-muted block mb-1">Titre du TP</label>
+              <input value={title} onChange={(e) => setTitle(e.target.value)}
+                placeholder="Ex. : TP 1 — Commandes de base Linux"
+                className="w-full text-sm border border-border rounded-lg px-3 py-2 outline-none focus:border-cama text-ink placeholder-subtle" />
+            </div>
+            <div>
+              <label className="text-[11px] font-bold text-muted block mb-1">Description (optionnelle)</label>
+              <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2}
+                placeholder="Objectifs, consignes générales…"
+                className="w-full text-sm border border-border rounded-lg px-3 py-2 outline-none focus:border-cama text-ink placeholder-subtle resize-y" />
+            </div>
+            <div>
+              <label className="text-[11px] font-bold text-muted block mb-1">Machine attribuée</label>
+              <select value={machineId} onChange={(e) => setMachineId(e.target.value)}
+                className="w-full text-sm border border-border rounded-lg px-3 py-2 outline-none focus:border-cama text-ink bg-white">
+                <option value="">— Sans machine —</option>
+                {machines.map((m) => (
+                  <option key={m.id} value={m.id}>{m.name} · {m.available ? "OUVERT" : "FERMÉ"}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="text-[11px] font-bold text-muted block mb-1">Liste d&apos;activités</label>
+              {activities.length > 0 && (
+                <div className="space-y-1.5 mb-2">
+                  {activities.map((a, i) => (
+                    <div key={i} className="flex items-center gap-2 bg-surface rounded-lg px-3 py-2">
+                      <span className="w-5 h-5 rounded-full bg-cama text-white flex items-center justify-center text-[10px] font-bold flex-shrink-0">{i + 1}</span>
+                      <p className="text-xs text-ink flex-1 min-w-0">{a}</p>
+                      <button onClick={() => setActivities((prev) => prev.filter((_, j) => j !== i))}
+                        className="p-1 text-subtle hover:text-red-500 transition-colors flex-shrink-0">
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div className="flex gap-2">
+                <input value={newActivity} onChange={(e) => setNewActivity(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && addActivity()}
+                  placeholder="Ex. : Créer un utilisateur avec adduser…"
+                  className="flex-1 text-sm border border-border rounded-lg px-3 py-2 outline-none focus:border-cama text-ink placeholder-subtle min-w-0" />
+                <button onClick={addActivity}
+                  className="text-xs font-bold px-4 py-2 rounded-lg border-2 border-border text-muted hover:border-cama/40 hover:text-cama transition-all">
+                  Ajouter
+                </button>
+              </div>
+            </div>
+            <button onClick={create} disabled={!title.trim() || saving}
+              className="btn-primary gap-2 py-2 px-5 text-sm disabled:opacity-50">
+              <FlaskConical className="w-4 h-4" /> {saving ? "Création…" : "Créer le TP"}
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Liste des TP */}
+      {tps.length === 0 ? (
+        <div className="bg-white rounded-2xl border border-border p-6 text-center text-xs text-muted">
+          Aucun TP programmé pour ce cours.
+        </div>
+      ) : (
+        tps.map((tp) => {
+          const st = stats[tp.id];
+          return (
+            <div key={tp.id} className="bg-white rounded-2xl border border-border p-5">
+              <div className="flex items-start gap-3 flex-wrap">
+                <div className="flex-1 min-w-0">
+                  <p className="font-bold text-ink truncate">{tp.title}</p>
+                  <p className="text-[11px] text-muted mt-0.5">
+                    Machine : {machineName(tp.machine_id)} · {tp.activities.length} activité{tp.activities.length > 1 ? "s" : ""}
+                  </p>
+                  {tp.description && <p className="text-xs text-muted mt-1 whitespace-pre-wrap">{tp.description}</p>}
+                </div>
+                <select value={tp.status}
+                  onChange={async (e) => { await updateTp(tp.id, { status: e.target.value as TpStatus }); load(); }}
+                  className={`text-xs font-bold border-2 rounded-full px-3 py-1.5 outline-none bg-white ${
+                    tp.status === "ouvert" ? "border-green-500 text-green-600"
+                      : tp.status === "termine" ? "border-border text-muted" : "border-gold/40 text-gold-dark"}`}>
+                  {(Object.keys(TP_STATUS_LABELS) as TpStatus[]).map((s) => (
+                    <option key={s} value={s}>{TP_STATUS_LABELS[s]}</option>
+                  ))}
+                </select>
+                <button
+                  onClick={async () => {
+                    if (!confirm(`Supprimer le TP « ${tp.title} » ? Les progressions et notes associées seront perdues.`)) return;
+                    await deleteTp(tp.id);
+                    load();
+                  }}
+                  className="p-1.5 text-subtle hover:text-red-500 transition-colors">
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
+              <p className="text-[11px] text-muted mt-3">
+                {st ? `${st.started} étudiant${st.started > 1 ? "s ont" : " a"} commencé · ${st.sessions} session${st.sessions > 1 ? "s" : ""} · ${st.graded} noté${st.graded > 1 ? "s" : ""}` : "Chargement des statistiques…"}
+              </p>
+              <Link href={`/tp/evaluation/${tp.id}`}
+                className="mt-3 inline-flex items-center gap-2 bg-cama text-white text-xs font-bold px-4 py-2.5 rounded-full hover:opacity-90 transition-opacity">
+                <ExternalLink className="w-4 h-4" /> Fenêtre d&apos;évaluation multi-écran →
+              </Link>
+            </div>
+          );
+        })
       )}
     </div>
   );

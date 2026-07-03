@@ -1,16 +1,26 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft, Loader2, Library, Search, Filter, FileText, Video, MonitorPlay,
   BookMarked, ExternalLink, ShieldCheck, Sparkles, Clock, BarChart3, Info,
-  RotateCcw, ChevronRight, User as UserIcon,
+  RotateCcw, ChevronRight, ChevronLeft, User as UserIcon,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { fetchLibrary, teacherLibrary, KIND_LABEL, docCover, type LibraryDoc, type LibraryKind } from "@/lib/library";
 import { fetchTeacherCourses } from "@/lib/program";
+import { fetchExtraCourses, MODE_LABEL } from "@/lib/extra";
+import type { DBExtraCourse } from "@/lib/supabase";
+
+const EXTRA_IMG: Record<string, string> = {
+  "Soft skills":      "https://images.unsplash.com/photo-1475721027785-f74eccf877e2?w=480&q=70",
+  "Langues":          "https://images.unsplash.com/photo-1543109740-4bdb38fda756?w=480&q=70",
+  "Entrepreneuriat":  "https://images.unsplash.com/photo-1556761175-5973dc0f32e7?w=480&q=70",
+  "Tech":             "https://images.unsplash.com/photo-1517694712202-14dd9538aa97?w=480&q=70",
+  "Autre":            "https://images.unsplash.com/photo-1626785774573-4b799315345d?w=480&q=70",
+};
 
 const ALL_KINDS = Object.keys(KIND_LABEL) as LibraryKind[];
 const LEVELS = ["L1", "L2", "L3", "M1", "M2"];
@@ -35,7 +45,9 @@ export default function BibliothequePage() {
 
   const [allDocs, setAllDocs] = useState<LibraryDoc[]>([]);
   const [myCourseIds, setMyCourseIds] = useState<string[]>([]);
+  const [extras, setExtras] = useState<DBExtraCourse[]>([]);
   const [fetching, setFetching] = useState(true);
+  const extraRowRef = useRef<HTMLDivElement>(null);
 
   // ── Filters ──
   const [search, setSearch] = useState("");
@@ -55,12 +67,14 @@ export default function BibliothequePage() {
   useEffect(() => {
     if (!user) return;
     (async () => {
-      const [docs, courses] = await Promise.all([
+      const [docs, courses, extraList] = await Promise.all([
         fetchLibrary(),
         user.role === "enseignant" ? fetchTeacherCourses(user.id) : Promise.resolve([]),
+        fetchExtraCourses(true),
       ]);
       setAllDocs(docs);
       setMyCourseIds(courses.map((c) => c.id));
+      setExtras(extraList.filter((c) => c.published));
       setFetching(false);
     })();
   }, [user]);
@@ -268,6 +282,67 @@ export default function BibliothequePage() {
           </span>
         </div>
       </header>
+
+      {/* ═══════════════ HORS-CURSUS STRIP ═══════════════ */}
+      {!fetching && extras.length > 0 && (
+        <section className="max-w-[1400px] mx-auto px-4 pt-4">
+          <div className="border-t-2 border-gold text-white flex items-stretch overflow-hidden"
+            style={{ background: "linear-gradient(135deg, #1E1B4B 0%, #4F46E5 100%)" }}>
+            {/* Left cap label */}
+            <div className="flex-shrink-0 px-4 py-3 flex flex-col justify-center gap-1.5 max-w-[210px] border-r border-white/10">
+              <p className="text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-gold flex-shrink-0" /> Hors-cursus
+              </p>
+              <div className="w-8 h-0.5 bg-gold" />
+              <p className="text-[9px] font-black uppercase tracking-widest text-white/70 leading-snug">
+                Explorez au-delà du programme
+              </p>
+              <div className="flex items-center gap-1.5 mt-1">
+                <span className="text-[8px] font-black uppercase tracking-widest text-gold bg-white/10 border border-white/10 px-1.5 py-0.5">
+                  {extras.length} parcours
+                </span>
+                <button aria-label="Défiler vers la gauche"
+                  onClick={() => extraRowRef.current?.scrollBy({ left: -480, behavior: "smooth" })}
+                  className="w-5 h-5 flex items-center justify-center border border-white/20 text-white/80 hover:text-gold hover:border-gold transition-colors">
+                  <ChevronLeft className="w-3 h-3" />
+                </button>
+                <button aria-label="Défiler vers la droite"
+                  onClick={() => extraRowRef.current?.scrollBy({ left: 480, behavior: "smooth" })}
+                  className="w-5 h-5 flex items-center justify-center border border-white/20 text-white/80 hover:text-gold hover:border-gold transition-colors">
+                  <ChevronRight className="w-3 h-3" />
+                </button>
+              </div>
+            </div>
+
+            {/* Scrolling row */}
+            <div ref={extraRowRef}
+              className="flex-1 min-w-0 overflow-x-auto flex gap-3 snap-x snap-mandatory p-3 [&::-webkit-scrollbar]:hidden"
+              style={{ scrollbarWidth: "none" }}>
+              {extras.map((c) => (
+                <Link key={c.id} href="/etudiant/parascolaire"
+                  className="w-[230px] flex-shrink-0 snap-start bg-white/5 border border-white/10 hover:border-gold/60 transition-colors group">
+                  <div className="relative">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={EXTRA_IMG[c.category] ?? EXTRA_IMG["Autre"]} alt="" loading="lazy"
+                      className="w-full h-20 object-cover" />
+                    <span className="absolute top-1 right-1 text-[8px] font-black uppercase tracking-widest text-white px-1.5 py-0.5"
+                      style={{ background: c.color }}>
+                      {c.category}
+                    </span>
+                  </div>
+                  <div className="p-2">
+                    <p className="text-[11px] font-bold text-white line-clamp-1">{c.title}</p>
+                    <p className="text-[9px] text-white/70 truncate">
+                      {c.instructor_name ?? "Intervenant CAMA"} · {MODE_LABEL[c.mode]}
+                    </p>
+                    <p className="text-[9px] font-bold text-gold mt-1 group-hover:underline">Découvrir →</p>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
 
       {fetching ? (
         <div className="py-32 text-center"><Loader2 className="w-6 h-6 animate-spin text-cama mx-auto" /></div>
