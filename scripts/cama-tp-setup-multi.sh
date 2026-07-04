@@ -84,6 +84,7 @@ cat >/usr/local/bin/cama-tp-shell <<EOF
 exec docker run --rm -it \\
   --cpus="${TP_CPU}" --memory="${TP_MEM}" --pids-limit="${TP_PIDS}" \\
   --network bridge \\
+  --label cama.tp=1 \\
   --hostname tp-cama \\
   -e DEBIAN_FRONTEND=noninteractive \\
   "${TP_IMAGE}" bash -c 'echo "══════════════════════════════════════════════"; echo " CAMA TP — votre machine personnelle jetable"; echo " Vous êtes root. Tout est détruit à la sortie."; echo "══════════════════════════════════════════════"; exec bash'
@@ -179,6 +180,7 @@ fi
 echo "════════════════════════════════════════════════════════════════"
 echo
 c_info "Gérer     : systemctl status cama-ttyd-multi cama-tunnel-multi"
-c_info "Conteneurs actifs : docker ps"
-c_info "Arrêter   : systemctl stop cama-ttyd-multi cama-tunnel-multi && docker ps -q | xargs -r docker kill"
+c_info "Conteneurs CAMA : docker ps --filter label=cama.tp=1"
+c_info "Arrêter   : systemctl stop cama-ttyd-multi cama-tunnel-multi (les conteneurs --rm s'auto-suppriment)"
+c_info "Forcer    : docker ps -aq --filter label=cama.tp=1 | xargs -r docker rm -f   (NE TOUCHE QUE CAMA)"
 c_info "NB: l'ancien service mono-shell (cama-ttyd, port 7681) n'est pas touché."
