@@ -48,16 +48,25 @@ export interface DBCourseFeedback {
   id: string;
   program_course_id: string;
   student_id: string;
-  rating: number;         // 1..5
+  rating: number;               // note du COURS 1..5
   comment: string | null;
+  teacher_rating: number | null;// note de l'ENSEIGNANT 1..5
+  teacher_comment: string | null;
   created_at: string;
 }
 
-export async function submitFeedback(courseId: string, studentId: string, rating: number, comment: string) {
-  return supabase.from("course_feedback").upsert({
+export async function submitFeedback(
+  courseId: string, studentId: string,
+  rating: number, comment: string,
+  teacherRating?: number, teacherComment?: string,
+) {
+  const row: Record<string, unknown> = {
     program_course_id: courseId, student_id: studentId,
     rating, comment: comment.trim() || null,
-  }, { onConflict: "program_course_id,student_id" });
+  };
+  if (teacherRating !== undefined) row.teacher_rating = teacherRating;
+  if (teacherComment !== undefined) row.teacher_comment = teacherComment.trim() || null;
+  return supabase.from("course_feedback").upsert(row, { onConflict: "program_course_id,student_id" });
 }
 
 export async function fetchFeedback(courseId: string): Promise<DBCourseFeedback[]> {

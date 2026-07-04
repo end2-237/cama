@@ -24,8 +24,14 @@ export interface DBUser {
   phone: string | null;
   phone_prefix: string | null;
   student_card: string | null;
+  admin_level: AdminLevel | null;   // coordinateur | admin | super_admin
+  admin_scope: string[];            // filières gérées (parcours_slug) pour un coordinateur
+  is_media_manager: boolean;
   created_at: string;
 }
+
+// Niveaux d'administration (hiérarchie académique)
+export type AdminLevel = "coordinateur" | "admin" | "super_admin";
 
 export interface DBInscription {
   id: string;
@@ -150,6 +156,7 @@ export interface DBExam {
   status: ExamStatus;
   scheduled_at: string | null;
   shuffle: boolean;
+  require_camera: boolean;      // caméra imposée pour composer
   created_by: string | null;
   created_at: string;
 }
@@ -177,6 +184,9 @@ export interface DBExamAttempt {
   score_max: number | null;
   feedback: string | null;
   alerts: { time: string; type: string; detail: string }[];
+  physical: boolean;            // composition physique (caméra HS)
+  camera_ok: boolean;           // caméra activée & consentie
+  proctoring: { time: string; type: string }[];  // horodatages de surveillance
 }
 
 export interface DBDeliberation {
