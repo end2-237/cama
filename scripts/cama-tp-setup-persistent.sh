@@ -79,7 +79,7 @@ cat >/usr/local/bin/cama-tp-shell <<EOF
 # ttyd passe l'identité de l'étudiant en 1er argument (?arg=<id>).
 set -e
 RAW="\${1:-invite}"
-SID="\$(printf '%s' "\$RAW" | tr -dc 'A-Za-z0-9' | head -c 24)"
+SID="\$(printf '%s' "\$RAW" | tr -dc 'A-Za-z0-9' | head -c 32)"
 [ -n "\$SID" ] || SID="invite"
 CTN="tp-\$SID"
 IMG="${TP_IMAGE}"
