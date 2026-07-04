@@ -6,9 +6,10 @@ import { useParams, useRouter } from "next/navigation";
 import {
   ShieldCheck, Clock, AlertTriangle, Lock, Save, CheckCircle2,
   Maximize, Award, Loader2, ChevronLeft, ChevronRight, FileText, Hourglass,
-  BookOpen, Layers, ListChecks, Eye,
+  BookOpen, Layers, ListChecks, Eye, Camera, CameraOff,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { supabase } from "@/lib/supabase";
 import type { DBExam, DBExamQuestion, DBExamAttempt } from "@/lib/supabase";
 import {
   fetchExam, fetchQuestions, fetchAttempt, startAttempt, pushAlert, submitAttempt,
@@ -44,6 +45,49 @@ export default function ExamPage() {
     alertCount: number; durationMin: number;
   } | null>(null);
   const submitting = useRef(false);
+
+  // ── Caméra / proctoring ──
+  const [cameraOk, setCameraOk] = useState(false);
+  const [cameraError, setCameraError] = useState<string | null>(null);
+  const [requestingCam, setRequestingCam] = useState(false);
+  const [physical, setPhysical] = useState(false);
+  const [locked, setLocked] = useState(false); // overlay bloquant (onglet quitté)
+  const streamRef = useRef<MediaStream | null>(null);
+  const readyVideoRef = useRef<HTMLVideoElement | null>(null);
+  const pipVideoRef = useRef<HTMLVideoElement | null>(null);
+  const proctoringRef = useRef<{ time: string; type: string }[]>([]);
+
+  const stopCamera = useCallback(() => {
+    streamRef.current?.getTracks().forEach((t) => t.stop());
+    streamRef.current = null;
+  }, []);
+
+  const requestCamera = useCallback(async () => {
+    if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) {
+      setCameraError("Caméra non disponible sur cet appareil.");
+      return;
+    }
+    setRequestingCam(true);
+    setCameraError(null);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      streamRef.current = stream;
+      setCameraOk(true);
+      setPhysical(false);
+      if (readyVideoRef.current) {
+        readyVideoRef.current.srcObject = stream;
+        readyVideoRef.current.play().catch(() => {});
+      }
+    } catch {
+      setCameraOk(false);
+      setCameraError("Accès à la caméra refusé ou indisponible. Autorisez la caméra puis réessayez.");
+    } finally {
+      setRequestingCam(false);
+    }
+  }, []);
+
+  // Nettoyage de la caméra au démontage
+  useEffect(() => () => stopCamera(), [stopCamera]);
 
   useEffect(() => { if (!loading && !user) router.replace("/auth/login"); }, [loading, user, router]);
 
@@ -113,36 +157,82 @@ export default function ExamPage() {
 
   useEffect(() => {
     if (phase !== "running") return;
-    const onVis = () => { if (document.hidden) logAlert("onglet", "Changement d'onglet / fenêtre détecté"); };
+    const onVis = () => {
+      if (document.hidden) { logAlert("onglet", "Changement d'onglet / fenêtre détecté"); setLocked(true); }
+    };
+    const onBlur = () => { logAlert("focus", "Perte de focus de la fenêtre"); setLocked(true); };
+    const onFsChange = () => { if (!document.fullscreenElement) { logAlert("pleinecran", "Sortie du plein écran"); setLocked(true); } };
     const onCopy = () => logAlert("copier", "Tentative de copie");
     const onPaste = () => logAlert("coller", "Tentative de collage");
     const onCtx = (e: Event) => { e.preventDefault(); logAlert("saisie", "Clic droit / menu contextuel"); };
+    const onBeforeUnload = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ""; };
     document.addEventListener("visibilitychange", onVis);
+    window.addEventListener("blur", onBlur);
+    document.addEventListener("fullscreenchange", onFsChange);
     document.addEventListener("copy", onCopy);
     document.addEventListener("paste", onPaste);
     document.addEventListener("contextmenu", onCtx);
+    window.addEventListener("beforeunload", onBeforeUnload);
     return () => {
       document.removeEventListener("visibilitychange", onVis);
+      window.removeEventListener("blur", onBlur);
+      document.removeEventListener("fullscreenchange", onFsChange);
       document.removeEventListener("copy", onCopy);
       document.removeEventListener("paste", onPaste);
       document.removeEventListener("contextmenu", onCtx);
+      window.removeEventListener("beforeunload", onBeforeUnload);
     };
   }, [phase, logAlert]);
 
-  const begin = async () => {
+  // Rebranche le flux caméra sur le PiP en cours d'examen + horodatages toutes les 30s
+  useEffect(() => {
+    if (phase !== "running" || physical || !cameraOk) return;
+    if (pipVideoRef.current && streamRef.current) {
+      pipVideoRef.current.srcObject = streamRef.current;
+      pipVideoRef.current.play().catch(() => {});
+    }
+    proctoringRef.current.push({ time: new Date().toISOString(), type: "start" });
+    const t = setInterval(() => {
+      proctoringRef.current.push({ time: new Date().toISOString(), type: "tick" });
+    }, 30000);
+    return () => clearInterval(t);
+  }, [phase, physical, cameraOk]);
+
+  // Revenir en plein écran depuis l'overlay bloquant
+  const resumeExam = () => {
+    document.documentElement.requestFullscreen?.().then(() => setLocked(false)).catch(() => setLocked(false));
+  };
+
+  const begin = async (asPhysical = false) => {
     if (!user) return;
     const att = await startAttempt(id, user.id);
     if (!att) return;
+    // Persiste le mode de composition sur la tentative
+    await supabase.from("exam_attempts")
+      .update({ physical: asPhysical, camera_ok: !asPhysical && cameraOk })
+      .eq("id", att.id);
+    setPhysical(asPhysical);
+    if (asPhysical) stopCamera();
     setAttempt(att);
     setAnswers(att.answers ?? {});
     setPhase("running");
     document.documentElement.requestFullscreen?.().catch(() => {});
   };
 
+  // Composer en présentiel (caméra endommagée)
+  const beginPhysical = () => { setCameraError(null); begin(true); };
+
   const doSubmit = async () => {
     if (submitting.current || !attempt) return;
     submitting.current = true;
     await submitAttempt(attempt.id, answers, questions);
+    // Sauvegarde des horodatages de surveillance + coupe la caméra
+    if (proctoringRef.current.length > 0) {
+      await supabase.from("exam_attempts")
+        .update({ proctoring: proctoringRef.current })
+        .eq("id", attempt.id);
+    }
+    stopCamera();
     if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
     let score = 0, max = 0, qcmScore = 0, qcmMax = 0;
     const hasOpen = questions.some((q) => q.type === "ouverte");
@@ -310,10 +400,54 @@ export default function ExamPage() {
           <li className="flex items-center gap-2"><Clock className="w-4 h-4 text-cama" /> Durée : <strong>{exam?.duration_min} minutes</strong> (chrono non interruptible)</li>
           <li className="flex items-center gap-2"><Maximize className="w-4 h-4 text-cama" /> Plein écran activé automatiquement</li>
           <li className="flex items-center gap-2"><AlertTriangle className="w-4 h-4 text-gold-dark" /> Changements d&apos;onglet, copier/coller : <strong>signalés au jury</strong></li>
+          {exam?.require_camera && (
+            <li className="flex items-center gap-2"><Camera className="w-4 h-4 text-cama" /> Caméra <strong>obligatoire</strong> pendant toute l&apos;épreuve</li>
+          )}
         </ul>
-        <button onClick={begin} className="w-full bg-cama text-white rounded-xl py-3 text-sm font-bold hover:bg-cama-700 transition-colors">
+
+        {/* Vérification caméra (si imposée) */}
+        {exam?.require_camera && (
+          <div className="mb-5">
+            <div className="relative bg-black rounded-xl overflow-hidden aspect-video mb-2">
+              <video ref={readyVideoRef} muted playsInline className="w-full h-full object-cover" />
+              {!cameraOk && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center text-white/70 gap-2">
+                  <CameraOff className="w-8 h-8" />
+                  <p className="text-xs">{requestingCam ? "Activation de la caméra…" : "Caméra non activée"}</p>
+                </div>
+              )}
+              {cameraOk && (
+                <span className="absolute top-2 left-2 flex items-center gap-1 text-[10px] font-bold bg-green-600 text-white px-2 py-0.5 rounded-full">
+                  <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" /> Caméra active
+                </span>
+              )}
+            </div>
+            {!cameraOk && (
+              <button onClick={requestCamera} disabled={requestingCam}
+                className="w-full border-2 border-cama text-cama rounded-xl py-2.5 text-sm font-bold hover:bg-cama-50 transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
+                <Camera className="w-4 h-4" /> Activer ma caméra
+              </button>
+            )}
+            {cameraError && (
+              <div className="mt-2 bg-red-50 border border-red-200 rounded-lg p-2.5">
+                <p className="text-[11px] text-red-600 mb-2">{cameraError}</p>
+                <button onClick={beginPhysical}
+                  className="w-full text-[11px] font-bold text-gold-dark border border-gold/40 rounded-lg py-2 hover:bg-gold/10 transition-colors">
+                  Ma caméra est endommagée — composer en présentiel (physique)
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        <button onClick={() => begin(false)}
+          disabled={!!exam?.require_camera && !cameraOk}
+          className="w-full bg-cama text-white rounded-xl py-3 text-sm font-bold hover:bg-cama-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
           Commencer l&apos;examen
         </button>
+        {exam?.require_camera && !cameraOk && !cameraError && (
+          <p className="text-[10px] text-subtle text-center mt-2">Activez la caméra pour pouvoir composer.</p>
+        )}
       </div>
     </div>
   );
@@ -329,6 +463,30 @@ export default function ExamPage() {
 
   return (
     <div className="min-h-screen bg-surface select-none">
+      {/* Caméra de surveillance (PiP) */}
+      {!physical && cameraOk && (
+        <div className="fixed bottom-3 right-3 z-50 w-32 rounded-lg overflow-hidden border-2 border-ink shadow-lg bg-black">
+          <video ref={pipVideoRef} muted playsInline className="w-full h-24 object-cover" />
+          <div className="absolute top-1 left-1 flex items-center gap-1 text-[8px] font-bold bg-red-600 text-white px-1 rounded">
+            <span className="w-1 h-1 rounded-full bg-white animate-pulse" /> REC
+          </div>
+        </div>
+      )}
+
+      {/* Overlay bloquant : l'étudiant a quitté l'onglet / le plein écran */}
+      {locked && (
+        <div className="fixed inset-0 z-[60] bg-red-950/95 flex items-center justify-center p-4">
+          <div className="text-center max-w-sm">
+            <AlertTriangle className="w-12 h-12 text-red-300 mx-auto mb-3" />
+            <p className="text-lg font-black text-white mb-1">Revenez à l&apos;épreuve</p>
+            <p className="text-sm text-red-200 mb-5">Quitter l&apos;onglet ou le plein écran est enregistré et signalé au jury. Reprenez pour continuer à composer.</p>
+            <button onClick={resumeExam} className="bg-white text-red-700 font-bold px-5 py-2.5 rounded-xl hover:bg-red-50 transition-colors">
+              Reprendre en plein écran
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Barre surveillée */}
       <header className="bg-ink text-white sticky top-0 z-40 border-b border-white/10">
         <div className="px-4 sm:px-6 flex items-center gap-3 h-12">
@@ -336,6 +494,11 @@ export default function ExamPage() {
           <span className="text-[10px] font-black uppercase tracking-widest text-green-400">Safe-CAMA</span>
           <span className="hidden sm:inline text-white/20">|</span>
           <span className="hidden sm:inline text-xs font-bold truncate">{exam?.title}</span>
+          {physical ? (
+            <span className="flex items-center gap-1 text-[10px] font-bold text-gold-dark bg-gold/20 px-2 py-0.5 rounded-full"><CameraOff className="w-3 h-3" /> Mode physique</span>
+          ) : cameraOk ? (
+            <span className="hidden sm:flex items-center gap-1 text-[10px] font-bold text-green-300"><Camera className="w-3 h-3" /> Caméra</span>
+          ) : null}
           <div className="flex-1" />
           {alerts > 0 ? (
             <span className="flex items-center gap-1 text-[11px] font-bold text-red-300 bg-red-500/15 px-2 py-1 rounded-lg">

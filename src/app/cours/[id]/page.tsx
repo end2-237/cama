@@ -1213,6 +1213,8 @@ function LiveMode({ liveId, cycleMode }: { liveId: string; cycleMode: CycleMode 
 function CourseFeedbackWidget({ courseId, studentId }: { courseId: string; studentId: string }) {
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState("");
+  const [teacherRating, setTeacherRating] = useState(0);
+  const [teacherComment, setTeacherComment] = useState("");
   const [saved, setSaved] = useState(false);
   const [sending, setSending] = useState(false);
 
@@ -1222,6 +1224,8 @@ function CourseFeedbackWidget({ courseId, studentId }: { courseId: string; stude
       if (cancelled || !f) return;
       setRating(f.rating);
       setComment(f.comment ?? "");
+      setTeacherRating(f.teacher_rating ?? 0);
+      setTeacherComment(f.teacher_comment ?? "");
       setSaved(true);
     });
     return () => { cancelled = true; };
@@ -1230,7 +1234,7 @@ function CourseFeedbackWidget({ courseId, studentId }: { courseId: string; stude
   const send = async () => {
     if (!rating || sending) return;
     setSending(true);
-    await submitFeedback(courseId, studentId, rating, comment);
+    await submitFeedback(courseId, studentId, rating, comment, teacherRating || undefined, teacherComment || undefined);
     setSending(false);
     setSaved(true);
   };
@@ -1254,15 +1258,40 @@ function CourseFeedbackWidget({ courseId, studentId }: { courseId: string; stude
         placeholder="Commentaire (facultatif)…"
         className="w-full text-[11px] border border-border px-2 py-1.5 mb-2 focus:outline-none focus:border-cama/50"
       />
+
+      <p className="text-[9px] font-black text-subtle uppercase tracking-widest mb-2 flex items-center gap-1">
+        <MessageSquare className="w-3 h-3 text-cama" /> Évaluer l&apos;enseignant
+      </p>
+      <div className="flex items-center gap-1.5 mb-2">
+        {[1, 2, 3, 4, 5].map((s) => (
+          <button key={s} onClick={() => { setTeacherRating(s); setSaved(false); }}
+            className={`transition-colors ${s <= teacherRating ? "text-gold" : "text-border hover:text-gold"}`}>
+            <Star className={`w-5 h-5 ${s <= teacherRating ? "fill-current" : ""}`} />
+          </button>
+        ))}
+      </div>
+      <input
+        value={teacherComment}
+        onChange={(e) => { setTeacherComment(e.target.value); setSaved(false); }}
+        placeholder="Votre retour sur l'enseignant…"
+        className="w-full text-[11px] border border-border px-2 py-1.5 mb-2 focus:outline-none focus:border-cama/50"
+      />
+
       {saved ? (
-        <p className="text-[10px] font-bold text-green-600 flex items-center gap-1">
-          <CheckCircle2 className="w-3 h-3" /> Merci pour votre retour ✓
-        </p>
+        <div>
+          <p className="text-[10px] font-bold text-green-600 flex items-center gap-1">
+            <CheckCircle2 className="w-3 h-3" /> Merci — votre évaluation du cours et de l&apos;enseignant a été transmise ✓
+          </p>
+          <p className="text-[9px] text-subtle mt-1">Vos retours sont visibles par l&apos;enseignant et l&apos;administration pour le suivi qualité.</p>
+        </div>
       ) : (
-        <button onClick={send} disabled={!rating || sending}
-          className="flex items-center gap-1.5 text-[10px] font-bold text-white bg-cama px-3 py-1.5 hover:bg-cama-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
-          <Send className="w-3 h-3" /> {sending ? "Envoi…" : "Envoyer"}
-        </button>
+        <>
+          <button onClick={send} disabled={!rating || sending}
+            className="flex items-center gap-1.5 text-[10px] font-bold text-white bg-cama px-3 py-1.5 hover:bg-cama-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+            <Send className="w-3 h-3" /> {sending ? "Envoi…" : "Envoyer"}
+          </button>
+          <p className="text-[9px] text-subtle mt-1.5">Vos retours sont visibles par l&apos;enseignant et l&apos;administration pour le suivi qualité.</p>
+        </>
       )}
     </div>
   );

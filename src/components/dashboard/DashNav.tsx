@@ -113,7 +113,11 @@ export default function DashNav({ activeTab, onTab, tabs }: DashNavProps) {
                   {moreOpen && (
                     <div className="absolute left-0 top-full mt-0 w-56 bg-white rounded-xl border border-border shadow-xl overflow-hidden z-50 animate-scale-in">
                       {[
+                        { href: "/admin/statistiques",   icon: BarChart2,     label: "Statistiques" },
                         { href: "/admin/suivi",          icon: BarChart2,     label: "Suivi & Qualité" },
+                        { href: "/admin/audit",          icon: ShieldCheck,   label: "Rapports & Audit" },
+                        { href: "/messagerie",           icon: Megaphone,     label: "Messagerie" },
+                        { href: "/admin/media",          icon: FileText,      label: "Ressources média" },
                         { href: "/admin/journal",        icon: Newspaper,     label: "Journal JFN" },
                         { href: "/admin/hors-cursus",    icon: Sparkles,      label: "Hors-cursus" },
                         { href: "/admin/certifications", icon: Award,         label: "Certifications" },

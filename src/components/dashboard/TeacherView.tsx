@@ -7,7 +7,7 @@ import {
   Radio, Bot, FileText, Video, MonitorPlay, ShieldCheck,
   AlertTriangle, Check, Eye, EyeOff, TrendingUp, Terminal,
   Newspaper, BookMarked, ExternalLink, Play, Sparkles, Inbox, Target,
-  Trash2, X, CalendarClock, Edit3 as EditIcon,
+  Trash2, X, CalendarClock, Edit3 as EditIcon, Printer, FileCheck,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { fetchTeacherCourses, fetchChapters } from "@/lib/program";
@@ -856,7 +856,7 @@ function EvalTab() {
                 ) : (
                   <div className="space-y-3">
                     {(attemptsByExam[selExam.id] ?? []).map((a) => (
-                      <AttemptCard key={a.id} attempt={a} questions={questionsByExam[selExam.id] ?? []} users={users} onGraded={reload} isTP={isTP(selExam)} />
+                      <AttemptCard key={a.id} attempt={a} questions={questionsByExam[selExam.id] ?? []} users={users} onGraded={reload} isTP={isTP(selExam)} examTitle={selExam.title} />
                     ))}
                   </div>
                 )}
@@ -918,16 +918,18 @@ function EvalTab() {
 }
 
 function AttemptCard({
-  attempt: a, questions, users, onGraded, isTP,
+  attempt: a, questions, users, onGraded, isTP, examTitle,
 }: {
   attempt: DBExamAttempt;
   questions: DBExamQuestion[];
   users: Map<string, DBUser>;
   onGraded: () => void | Promise<void>;
   isTP?: boolean;
+  examTitle?: string;
 }) {
   const [note, setNote] = useState("");
   const [fb, setFb] = useState("");
+  const [copieOpen, setCopieOpen] = useState(false);
   const name = studentName(a.student_id, users);
   const openQs = questions.filter((q) => q.type === "ouverte");
   const qcmQs = questions.filter((q) => q.type === "qcm");
@@ -939,6 +941,15 @@ function AttemptCard({
     qcmMax += q.points;
     if (a.answers[q.id] !== undefined && Number(a.answers[q.id]) === q.correct_index) qcmScore += q.points;
   });
+
+  const totalMax = questions.reduce((s, q) => s + q.points, 0);
+  const orderedQs = [...questions].sort((x, y) => x.ordre - y.ordre);
+  const submittedDate = a.submitted_at
+    ? new Date(a.submitted_at).toLocaleString("fr-FR", { dateStyle: "long", timeStyle: "short" })
+    : "Non soumise";
+  const scoreLabel = a.status === "corrige" && a.score !== null
+    ? `${a.score}/20`
+    : hasOpen ? `QCM auto : ${qcmScore}/${qcmMax} pts (ouvertes à corriger)` : `${qcmScore}/${qcmMax} pts`;
 
   const grade = async () => {
     const n = parseFloat(note);
@@ -962,6 +973,10 @@ function AttemptCard({
         <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold ${a.status === "corrige" ? "bg-green-50 text-green-600" : "bg-cama-50 text-cama"}`}>
           {a.status === "corrige" ? `Corrigé · ${a.score}/20` : hasOpen ? "QCM auto + ouvertes à corriger" : `QCM auto : ${qcmScore}/${qcmMax} pts`}
         </span>
+        <button onClick={() => setCopieOpen(true)}
+          className="inline-flex items-center gap-1 px-2.5 py-1 border border-cama/40 text-cama text-[10px] font-bold hover:bg-cama-50 transition-colors">
+          <FileCheck className="w-3 h-3" /> Voir la copie entière
+        </button>
       </div>
 
       {/* Détail par type de question */}
@@ -1017,6 +1032,93 @@ function AttemptCard({
           <input value={fb} onChange={(e) => setFb(e.target.value)} placeholder="Feedback formatif..."
             className="flex-1 min-w-[180px] text-xs border border-border px-3 py-2 outline-none focus:border-cama" />
           <button onClick={grade} className="bg-cama text-white text-xs font-bold px-4 py-2 hover:bg-cama-700 transition-colors flex items-center gap-1"><Check className="w-3.5 h-3.5" /> Corriger</button>
+        </div>
+      )}
+
+      {/* Modal : copie entière format A4 */}
+      {copieOpen && (
+        <div className="fixed inset-0 bg-black/60 z-50 overflow-y-auto p-4 sm:p-8"
+          onClick={(ev) => { if (ev.target === ev.currentTarget) setCopieOpen(false); }}>
+          {/* Barre d'actions (non imprimée) */}
+          <div className="print:hidden max-w-[210mm] mx-auto flex items-center justify-end gap-2 mb-3">
+            <button onClick={() => window.print()}
+              className="inline-flex items-center gap-1.5 bg-white text-ink text-xs font-bold px-3 py-2 hover:bg-surface transition-colors">
+              <Printer className="w-4 h-4" /> Imprimer
+            </button>
+            <button onClick={() => setCopieOpen(false)} title="Fermer"
+              className="inline-flex items-center justify-center bg-white text-ink w-9 h-9 hover:bg-surface transition-colors">
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          {/* Feuille A4 */}
+          <div className="bg-white text-black max-w-[210mm] mx-auto p-[15mm] shadow-2xl max-h-[90vh] overflow-y-auto print:shadow-none print:max-h-none">
+            {/* En-tête de la copie */}
+            <div className="border-b-2 border-black pb-4 mb-6">
+              <h1 className="text-xl font-black uppercase tracking-wide">{examTitle || "Copie d'examen"}</h1>
+              <div className="mt-3 grid grid-cols-2 gap-x-6 gap-y-1 text-sm">
+                <p><span className="font-bold">Étudiant :</span> {name}</p>
+                <p><span className="font-bold">Barème total :</span> {totalMax} pts</p>
+                <p><span className="font-bold">Soumise le :</span> {submittedDate}</p>
+                <p><span className="font-bold">Note :</span> {scoreLabel}</p>
+              </div>
+            </div>
+
+            {/* Questions */}
+            <ol className="space-y-6">
+              {orderedQs.map((qq, idx) => {
+                const studentAns = a.answers[qq.id];
+                return (
+                  <li key={qq.id}>
+                    <div className="flex items-start justify-between gap-4">
+                      <p className="text-sm font-bold leading-snug">
+                        <span className="mr-1.5">{idx + 1}.</span>{qq.text}
+                      </p>
+                      <span className="text-xs font-bold text-gray-600 whitespace-nowrap flex-shrink-0">/{qq.points} pts</span>
+                    </div>
+
+                    {qq.type === "qcm" ? (
+                      <ul className="mt-2 space-y-1 pl-5">
+                        {qq.options.map((o, oi) => {
+                          const isCorrect = oi === qq.correct_index;
+                          const isChosen = studentAns !== undefined && Number(studentAns) === oi;
+                          const chosenWrong = isChosen && !isCorrect;
+                          return (
+                            <li key={oi}
+                              className={`text-sm flex items-center gap-2 ${isCorrect ? "text-green-700 font-bold" : chosenWrong ? "text-red-600 font-bold" : "text-gray-700"}`}>
+                              <span className="w-4 inline-block text-center">
+                                {isCorrect ? "✓" : chosenWrong ? "✗" : "○"}
+                              </span>
+                              <span>{o}</span>
+                              {isChosen && <span className="text-[10px] italic text-gray-500">(Réponse de l&apos;étudiant)</span>}
+                            </li>
+                          );
+                        })}
+                        {studentAns === undefined && (
+                          <li className="text-xs italic text-gray-500 pl-6">Réponse de l&apos;étudiant : aucune</li>
+                        )}
+                      </ul>
+                    ) : (
+                      <div className="mt-2 pl-5">
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-1">Réponse de l&apos;étudiant</p>
+                        {(studentAns as string) ? (
+                          <p className="text-sm border border-gray-400 p-3 leading-relaxed whitespace-pre-wrap">{studentAns as string}</p>
+                        ) : (
+                          <p className="text-sm border border-gray-300 p-3 italic text-gray-400">Pas de réponse</p>
+                        )}
+                      </div>
+                    )}
+                  </li>
+                );
+              })}
+            </ol>
+
+            {/* Pied de copie */}
+            <div className="border-t-2 border-black mt-8 pt-3 flex items-center justify-between text-xs font-bold">
+              <span>Note finale : {scoreLabel}</span>
+              <span>{a.alerts.length} signalement(s)</span>
+            </div>
+          </div>
         </div>
       )}
     </div>
