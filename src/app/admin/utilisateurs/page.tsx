@@ -188,6 +188,12 @@ export default function AdminUsersPage() {
                     <p className="text-sm font-bold text-ink">{u.first_name} {u.last_name}</p>
                     <p className="text-[11px] text-muted">{u.email}{u.level && ` · ${u.level}`}{u.school && ` · ${u.school}`}</p>
                   </div>
+                  {u.role === "etudiant" && (
+                    <Link href={`/admin/etudiant/${u.id}`}
+                      className="text-[11px] font-bold text-cama border border-cama/30 rounded-lg px-2.5 py-1.5 hover:bg-cama-50 transition-colors">
+                      Fiche →
+                    </Link>
+                  )}
                   <select value={u.role} onChange={(e) => onRole(u.id, e.target.value as UserRole)}
                     className="border border-border rounded-lg px-2 py-1.5 text-xs bg-white outline-none focus:border-cama">
                     {ROLES.map((r) => <option key={r} value={r}>{ROLE_LABEL[r]}</option>)}

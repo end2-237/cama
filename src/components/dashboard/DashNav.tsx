@@ -116,6 +116,7 @@ export default function DashNav({ activeTab, onTab, tabs }: DashNavProps) {
                         { href: "/admin/statistiques",   icon: BarChart2,     label: "Statistiques" },
                         { href: "/admin/suivi",          icon: BarChart2,     label: "Suivi & Qualité" },
                         { href: "/admin/audit",          icon: ShieldCheck,   label: "Rapports & Audit" },
+                        { href: "/admin/roles",          icon: ShieldCheck,   label: "Niveaux d'admin" },
                         { href: "/messagerie",           icon: Megaphone,     label: "Messagerie" },
                         { href: "/admin/media",          icon: FileText,      label: "Ressources média" },
                         { href: "/admin/journal",        icon: Newspaper,     label: "Journal JFN" },
