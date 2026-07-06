@@ -3,6 +3,7 @@ import type {
   DBExam, DBExamQuestion, DBExamAttempt, DBDeliberation,
   ExamStatus, AttemptStatus, DelibStatus,
 } from "@/lib/supabase";
+import { notify } from "@/lib/notifications";
 
 // ════════════════════════════════════════════════════════════
 // ENSEIGNANT / ADMIN — création & gestion des examens
@@ -28,6 +29,18 @@ export async function setExamStatus(id: string, status: ExamStatus) {
 
 export async function deleteExam(id: string) {
   return supabase.from("exams").delete().eq("id", id);
+}
+
+// ── Rattrapage (session 2) ──
+export async function openResit(examId: string, scheduledAt?: string) {
+  return supabase.from("exams").update({
+    resit_open: true,
+    resit_scheduled_at: scheduledAt ?? null,
+  }).eq("id", examId);
+}
+
+export async function closeResit(examId: string) {
+  return supabase.from("exams").update({ resit_open: false }).eq("id", examId);
 }
 
 // ── Questions ──
@@ -66,10 +79,18 @@ export async function fetchOpenExams(courseIds: string[]): Promise<DBExam[]> {
   return (data as DBExam[]) ?? [];
 }
 
-export async function fetchAttempt(examId: string, studentId: string): Promise<DBExamAttempt | null> {
+export async function fetchAttempt(examId: string, studentId: string, session = 1): Promise<DBExamAttempt | null> {
   const { data } = await supabase.from("exam_attempts").select("*")
-    .eq("exam_id", examId).eq("student_id", studentId).maybeSingle();
+    .eq("exam_id", examId).eq("student_id", studentId).eq("session", session).maybeSingle();
   return (data as DBExamAttempt) ?? null;
+}
+
+/** Toutes les tentatives (sessions 1 et 2) d'un étudiant sur un examen. */
+export async function fetchMyAttempts(examId: string, studentId: string): Promise<DBExamAttempt[]> {
+  const { data } = await supabase.from("exam_attempts").select("*")
+    .eq("exam_id", examId).eq("student_id", studentId)
+    .order("session", { ascending: true });
+  return (data as DBExamAttempt[]) ?? [];
 }
 
 export async function fetchAttemptsForStudent(studentId: string): Promise<DBExamAttempt[]> {
@@ -77,12 +98,12 @@ export async function fetchAttemptsForStudent(studentId: string): Promise<DBExam
   return (data as DBExamAttempt[]) ?? [];
 }
 
-/** Démarre (ou reprend) une tentative — une seule par (exam, étudiant). */
-export async function startAttempt(examId: string, studentId: string): Promise<DBExamAttempt | null> {
-  const existing = await fetchAttempt(examId, studentId);
+/** Démarre (ou reprend) une tentative — une seule par (exam, étudiant, session). */
+export async function startAttempt(examId: string, studentId: string, session = 1): Promise<DBExamAttempt | null> {
+  const existing = await fetchAttempt(examId, studentId, session);
   if (existing) return existing;
   const { data } = await supabase.from("exam_attempts")
-    .insert({ exam_id: examId, student_id: studentId, status: "encours" })
+    .insert({ exam_id: examId, student_id: studentId, status: "encours", session, is_resit: session > 1 })
     .select().single();
   return (data as DBExamAttempt) ?? null;
 }
@@ -122,6 +143,27 @@ export async function submitAttempt(
   }).eq("id", attemptId);
 }
 
+/** Note /20 d'une tentative (null si non notée). */
+export function attemptNote20(a: DBExamAttempt): number | null {
+  if (a.score === null || a.score === undefined) return null;
+  if (a.score_max) return Math.round((Number(a.score) / Number(a.score_max)) * 20 * 10) / 10;
+  return Math.round(Number(a.score) * 10) / 10;
+}
+
+/**
+ * Note retenue (/20) entre les sessions selon la règle de l'examen :
+ *   'best' → meilleure note, 'last' → note de la dernière session notée.
+ */
+export function effectiveScore(attempts: DBExamAttempt[], rule: "best" | "last" = "best"): number | null {
+  const noted = attempts
+    .filter((a) => a.status === "corrige" || a.status === "soumis")
+    .map((a) => ({ session: a.session ?? 1, note: attemptNote20(a) }))
+    .filter((x): x is { session: number; note: number } => x.note !== null);
+  if (noted.length === 0) return null;
+  if (rule === "last") return [...noted].sort((a, b) => b.session - a.session)[0].note;
+  return Math.max(...noted.map((x) => x.note));
+}
+
 // ── Correction enseignant (questions ouvertes) ──
 export async function fetchAttemptsForExam(examId: string): Promise<DBExamAttempt[]> {
   const { data } = await supabase.from("exam_attempts").select("*").eq("exam_id", examId);
@@ -154,9 +196,20 @@ export async function upsertDeliberation(d: Partial<DBDeliberation>) {
 }
 
 export async function setDelibStatus(id: string, status: DelibStatus, validatedBy: string, credits: number) {
-  return supabase.from("deliberations").update({
+  const res = await supabase.from("deliberations").update({
     status, validated_by: validatedBy,
     validated_at: new Date().toISOString(),
     credits: status === "valide" ? credits : 0,
-  }).eq("id", id);
+  }).eq("id", id).select("student_id").maybeSingle();
+  const row = res.data as Pick<DBDeliberation, "student_id"> | null;
+  if (row?.student_id) {
+    await notify(
+      row.student_id,
+      "resultat",
+      "Résultat disponible",
+      "Une délibération vous concernant a été rendue. Consultez vos résultats.",
+      "/etudiant/examens",
+    );
+  }
+  return res;
 }

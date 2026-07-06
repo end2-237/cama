@@ -5,7 +5,8 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import {
   ArrowLeft, Loader2, Printer, UserX, GraduationCap, BookOpen,
-  Award, ClipboardCheck, Activity, ShieldAlert,
+  Award, ClipboardCheck, Activity, ShieldAlert, FolderOpen,
+  CheckCircle2, XCircle, ExternalLink,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import type {
@@ -16,6 +17,8 @@ import { fetchUsers, fetchInscriptions } from "@/lib/admin";
 import { fetchStudentProgram, fetchProgress, fetchChapters } from "@/lib/program";
 import { fetchAttemptsForStudent, fetchDeliberations, fetchExamsForCourses, type DelibWithMeta } from "@/lib/exams";
 import { fetchNativeProgress, type DBNativeProgress } from "@/lib/tracking";
+import { fetchDocuments, reviewDocument, docKindLabel, type DBStudentDocument } from "@/lib/documents";
+import { logAudit } from "@/lib/governance";
 
 // ── Libellés & badges ──────────────────────────────────────────
 const INSCR_BADGE: Record<DBInscription["status"], { label: string; cls: string }> = {
@@ -30,6 +33,11 @@ const DELIB_BADGE: Record<string, { label: string; cls: string }> = {
   en_delib: { label: "En délibération", cls: "bg-gold-light text-gold-dark" },
   valide:   { label: "Validée",         cls: "bg-green-50 text-green-700" },
   rejete:   { label: "Rejetée",         cls: "bg-red-50 text-red-600" },
+};
+const DOC_BADGE: Record<string, { label: string; cls: string }> = {
+  depose: { label: "Déposé", cls: "bg-gold-light text-gold-dark border-gold/40" },
+  valide: { label: "Validé", cls: "bg-green-50 text-green-700 border-green-200" },
+  refuse: { label: "Refusé", cls: "bg-red-50 text-red-600 border-red-200" },
 };
 const ATTEMPT_BADGE: Record<string, { label: string; cls: string }> = {
   encours: { label: "En cours", cls: "bg-cama-50 text-cama-700" },
@@ -89,6 +97,8 @@ export default function FicheEtudiantPage() {
   const [exams, setExams]       = useState<DBExam[]>([]);
   const [native, setNative]     = useState<DBNativeProgress[]>([]);
   const [progress, setProgress] = useState<DBChapterProgress[]>([]);
+  const [documents, setDocuments] = useState<DBStudentDocument[]>([]);
+  const [reviewing, setReviewing] = useState<string | null>(null);
 
   // Garde admin
   useEffect(() => {
@@ -109,14 +119,16 @@ export default function FicheEtudiantPage() {
       const ins = inscriptions.find((i) => i.user_id === studentId) ?? null;
       setInscr(ins);
 
-      const [prog, delibsAll, atts, nat] = await Promise.all([
+      const [prog, delibsAll, atts, nat, docs] = await Promise.all([
         fetchProgress(studentId),
         fetchDeliberations(),
         fetchAttemptsForStudent(studentId),
         fetchNativeProgress(studentId),
+        fetchDocuments(studentId),
       ]);
       if (!alive) return;
       setProgress(prog);
+      setDocuments(docs);
       setDelibs(delibsAll.filter((d) => d.student_id === studentId));
       setAttempts(atts);
       setNative(nat);
@@ -141,6 +153,30 @@ export default function FicheEtudiantPage() {
     })();
     return () => { alive = false; };
   }, [loading, user, studentId]);
+
+  const handleReview = async (docId: string, status: "valide" | "refuse") => {
+    if (!user || reviewing) return;
+    let note: string | null = null;
+    if (status === "refuse") {
+      note = window.prompt("Motif du refus (note transmise à l'étudiant) :");
+      if (note === null) return; // annulé
+    }
+    setReviewing(docId);
+    await reviewDocument(docId, status, note, user.id);
+    const doc = documents.find((d) => d.id === docId);
+    await logAudit({
+      actorId: user.id,
+      actorName: user.name,
+      action: "document.review",
+      entity: `document:${docId}`,
+      detail: `Pièce « ${doc ? docKindLabel(doc.kind) : docId} » de ${student?.first_name ?? ""} ${student?.last_name ?? ""} : ${status === "valide" ? "validée" : "refusée"}${note ? ` — ${note}` : ""}`,
+      severity: status === "refuse" ? "warn" : "info",
+    });
+    setDocuments((ds) => ds.map((d) => d.id === docId
+      ? { ...d, status, note_admin: note, reviewed_by: user.id, reviewed_at: new Date().toISOString() }
+      : d));
+    setReviewing(null);
+  };
 
   const examTitle = useMemo(() => {
     const m = new Map(exams.map((e) => [e.id, e.title]));
@@ -380,7 +416,62 @@ export default function FicheEtudiantPage() {
             )}
           </Section>
 
-          {/* 5 — Assiduité & engagement */}
+          {/* 5 — Dossier administratif */}
+          <Section icon={FolderOpen} title="Dossier administratif">
+            {documents.length ? (
+              <ul className="divide-y divide-border/60">
+                {documents.map((d) => {
+                  const db = DOC_BADGE[d.status] ?? DOC_BADGE.depose;
+                  return (
+                    <li key={d.id} className="py-2.5">
+                      <div className="flex items-center gap-3">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm text-ink truncate">{docKindLabel(d.kind)}</p>
+                          <p className="text-xs text-muted truncate">
+                            {d.title ?? "Document"}{d.size_mo != null ? ` · ${d.size_mo} Mo` : ""} · déposé le {fmtDate(d.uploaded_at)}
+                          </p>
+                        </div>
+                        <span className={`inline-block rounded-full border px-2.5 py-0.5 text-xs font-semibold ${db.cls}`}>
+                          {db.label}
+                        </span>
+                        <a href={d.url} target="_blank" rel="noreferrer"
+                          className="inline-flex items-center gap-1 text-xs font-medium text-cama hover:underline print:hidden">
+                          <ExternalLink className="w-3.5 h-3.5" /> Ouvrir
+                        </a>
+                        {d.status === "depose" && (
+                          <div className="flex items-center gap-1.5 print:hidden">
+                            <button
+                              onClick={() => handleReview(d.id, "valide")}
+                              disabled={reviewing === d.id}
+                              className="inline-flex items-center gap-1 rounded-full bg-green-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-green-700 transition-colors disabled:opacity-50"
+                            >
+                              <CheckCircle2 className="w-3.5 h-3.5" /> Valider
+                            </button>
+                            <button
+                              onClick={() => handleReview(d.id, "refuse")}
+                              disabled={reviewing === d.id}
+                              className="inline-flex items-center gap-1 rounded-full bg-red-50 border border-red-200 px-2.5 py-1 text-xs font-semibold text-red-600 hover:bg-red-100 transition-colors disabled:opacity-50"
+                            >
+                              <XCircle className="w-3.5 h-3.5" /> Refuser
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                      {d.note_admin && (
+                        <p className="mt-1.5 text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-2.5 py-1.5 inline-block">
+                          Note : {d.note_admin}
+                        </p>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : (
+              <p className="text-sm text-muted italic">Aucune pièce justificative déposée.</p>
+            )}
+          </Section>
+
+          {/* 6 — Assiduité & engagement */}
           <Section icon={Activity} title="Assiduité & engagement">
             <div className="grid grid-cols-3 gap-4">
               <div className="rounded-xl border border-border bg-surface/60 p-4 text-center">

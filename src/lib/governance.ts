@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/supabase";
 import type { DBUser, AdminLevel } from "@/lib/supabase";
+import { notify } from "@/lib/notifications";
 
 /* ════════════════════════════════════════════════════════════
    GOUVERNANCE ADMINISTRATIVE — hiérarchie académique CAMA
@@ -83,9 +84,14 @@ export interface DBMessage {
 }
 
 export async function sendMessage(fromId: string, toId: string, body: string, subject?: string) {
-  return supabase.from("internal_messages").insert({
+  const res = await supabase.from("internal_messages").insert({
     from_user_id: fromId, to_user_id: toId, body: body.trim(), subject: subject?.trim() || null,
   });
+  if (!res.error) {
+    await notify(toId, "message", "Nouveau message",
+      subject?.trim() || body.trim().slice(0, 120), "/messagerie");
+  }
+  return res;
 }
 export async function fetchInbox(userId: string): Promise<DBMessage[]> {
   const { data } = await supabase.from("internal_messages").select("*")

@@ -1,16 +1,20 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   Grid3x3, Search, ChevronDown, Globe, HelpCircle,
-  Bell, LogOut, User, Settings, Megaphone, X, FileText, Radio, AlertCircle,
+  Bell, LogOut, User, Settings, Megaphone, X, FileText,
   CalendarDays, CalendarClock, Sparkles, Award, ClipboardList, BookOpen, ShieldCheck, Newspaper,
   Library, BarChart2,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import PersonalCalendarDrawer from "@/components/PersonalCalendarDrawer";
+import {
+  fetchNotifs, markRead, markAllRead, subscribeNotifs, timeAgo,
+  type DBNotification,
+} from "@/lib/notifications";
 
 interface DashNavProps {
   activeTab: string;
@@ -22,16 +26,50 @@ export default function DashNav({ activeTab, onTab, tabs }: DashNavProps) {
   const { user, logout } = useAuth();
   const router = useRouter();
   const [profileOpen, setProfileOpen] = useState(false);
-  const [commOpen, setCommOpen] = useState(false);
+  const [notifOpen, setNotifOpen] = useState(false);
   const [calOpen, setCalOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
 
-  const ADMIN_COMMS = [
-    { icon: Megaphone, type: "Circulaire", color: "text-cama bg-cama/10", title: "Fermeture administrative — 14 juillet", body: "Les services administratifs seront fermés le 14 juillet. Les demandes urgentes sont à envoyer avant le 12 juillet.", time: "Il y a 1 jour" },
-    { icon: AlertCircle, type: "Urgent", color: "text-red-500 bg-red-50", title: "Mise à jour des photos de carte étudiante", body: "Tous les étudiants doivent mettre à jour leur photo au secrétariat avant le 20 juin pour l'impression des nouvelles cartes.", time: "Il y a 2 jours" },
-    { icon: FileText, type: "Note de service", color: "text-amber-600 bg-amber-50", title: "Calendrier des délibérations S4", body: "Les résultats du semestre 4 seront délibérés le 25 juin à 9h en salle A12. Présence non obligatoire pour les étudiants.", time: "Il y a 3 jours" },
-    { icon: Radio, type: "Événement", color: "text-green-600 bg-green-50", title: "Cérémonie de remise des diplômes", body: "La cérémonie annuelle de remise des diplômes est programmée le 5 juillet à l'amphithéâtre principal. Invitation à venir chercher au secrétariat.", time: "Il y a 5 jours" },
-  ];
+  // ── Notifications réelles (cloche) ──
+  const [notifs, setNotifs] = useState<DBNotification[]>([]);
+  const notifRef = useRef<HTMLDivElement>(null);
+  const userId = user?.id;
+  const unread = notifs.filter((n) => !n.read_at).length;
+
+  useEffect(() => {
+    if (!userId) return;
+    let alive = true;
+    fetchNotifs(userId).then((rows) => { if (alive) setNotifs(rows); });
+    const unsub = subscribeNotifs(userId, (n) => {
+      if (alive) setNotifs((prev) => [n, ...prev.filter((p) => p.id !== n.id)]);
+    });
+    return () => { alive = false; unsub(); };
+  }, [userId]);
+
+  // Fermer le dropdown au clic extérieur
+  useEffect(() => {
+    if (!notifOpen) return;
+    const onDown = (e: MouseEvent) => {
+      if (notifRef.current && !notifRef.current.contains(e.target as Node)) setNotifOpen(false);
+    };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [notifOpen]);
+
+  const handleNotifClick = (n: DBNotification) => {
+    if (!n.read_at) {
+      markRead(n.id);
+      setNotifs((prev) => prev.map((p) => p.id === n.id ? { ...p, read_at: new Date().toISOString() } : p));
+    }
+    setNotifOpen(false);
+    if (n.link) router.push(n.link);
+  };
+
+  const handleMarkAll = () => {
+    if (!userId) return;
+    markAllRead(userId);
+    setNotifs((prev) => prev.map((p) => p.read_at ? p : { ...p, read_at: new Date().toISOString() }));
+  };
 
   const handleLogout = () => {
     logout();
@@ -117,6 +155,7 @@ export default function DashNav({ activeTab, onTab, tabs }: DashNavProps) {
                         { href: "/admin/suivi",          icon: BarChart2,     label: "Suivi & Qualité" },
                         { href: "/admin/audit",          icon: ShieldCheck,   label: "Rapports & Audit" },
                         { href: "/admin/roles",          icon: ShieldCheck,   label: "Niveaux d'admin" },
+                        { href: "/admin/annees",         icon: ClipboardList, label: "Années & semestres" },
                         { href: "/messagerie",           icon: Megaphone,     label: "Messagerie" },
                         { href: "/admin/media",          icon: FileText,      label: "Ressources média" },
                         { href: "/admin/journal",        icon: Newspaper,     label: "Journal JFN" },
@@ -183,6 +222,7 @@ export default function DashNav({ activeTab, onTab, tabs }: DashNavProps) {
                         { href: "/tp",                     icon: ClipboardList, label: "TP & Machines" },
                         { href: "/bibliotheque",           icon: Library,       label: "Bibliothèque" },
                         { href: "/etudiant/parascolaire",  icon: Sparkles,      label: "Parascolaire" },
+                        { href: "/etudiant/dossier",       icon: ClipboardList, label: "Mon dossier" },
                       ].map((l) => (
                         <Link key={l.href} href={l.href} onClick={() => setMoreOpen(false)}
                           className="flex items-center gap-3 px-4 py-3 text-sm text-ink hover:bg-surface transition-colors">
@@ -225,10 +265,74 @@ export default function DashNav({ activeTab, onTab, tabs }: DashNavProps) {
                 <CalendarClock className="w-[18px] h-[18px]" />
               </button>
             )}
-            <button className="relative p-2 text-muted hover:text-ink transition-colors rounded-lg hover:bg-surface" title="Notifications">
-              <Bell className="w-[18px] h-[18px]" />
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-green-500 border-2 border-white" />
-            </button>
+            <div className="relative" ref={notifRef}>
+              <button
+                onClick={() => setNotifOpen(!notifOpen)}
+                className={`relative p-2 transition-colors rounded-lg hover:bg-surface ${notifOpen ? "text-cama" : "text-muted hover:text-ink"}`}
+                title="Notifications">
+                <Bell className="w-[18px] h-[18px]" />
+                {unread > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 bg-cama text-white text-[9px] font-black flex items-center justify-center border-2 border-white">
+                    {unread > 99 ? "99+" : unread}
+                  </span>
+                )}
+              </button>
+
+              {notifOpen && (
+                <div className="absolute right-0 top-full mt-2 w-96 bg-white border border-border shadow-2xl overflow-hidden z-50 animate-scale-in">
+                  <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+                    <div className="flex items-center gap-2">
+                      <Bell className="w-4 h-4 text-gold-dark" />
+                      <p className="text-[10px] font-black uppercase tracking-widest text-muted">Notifications</p>
+                      {unread > 0 && (
+                        <span className="text-[9px] font-black bg-cama text-white px-1.5 py-0.5">{unread} non lu{unread > 1 ? "s" : ""}</span>
+                      )}
+                    </div>
+                    <button onClick={() => setNotifOpen(false)} className="p-1 hover:bg-surface transition-colors">
+                      <X className="w-4 h-4 text-subtle" />
+                    </button>
+                  </div>
+                  <div className="divide-y divide-border max-h-[380px] overflow-y-auto">
+                    {notifs.length === 0 && (
+                      <p className="p-6 text-center text-xs text-muted">Aucune notification pour le moment.</p>
+                    )}
+                    {notifs.map((n) => {
+                      const inner = (
+                        <div className="flex items-start gap-3">
+                          <span className={`mt-1.5 w-2 h-2 flex-shrink-0 ${n.read_at ? "bg-border" : "bg-cama"}`} />
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center justify-between gap-2 mb-0.5">
+                              <span className="text-[10px] font-black uppercase tracking-widest text-gold-dark">{n.kind}</span>
+                              <span className="text-[9px] text-subtle flex-shrink-0">{timeAgo(n.created_at)}</span>
+                            </div>
+                            <p className={`text-xs leading-snug ${n.read_at ? "font-semibold text-muted" : "font-bold text-ink"}`}>{n.title}</p>
+                            {n.body && <p className="text-[11px] text-muted leading-relaxed mt-0.5 line-clamp-2">{n.body}</p>}
+                          </div>
+                        </div>
+                      );
+                      return n.link ? (
+                        <Link key={n.id} href={n.link} onClick={(e) => { e.preventDefault(); handleNotifClick(n); }}
+                          className="block p-4 hover:bg-surface transition-colors">
+                          {inner}
+                        </Link>
+                      ) : (
+                        <div key={n.id} onClick={() => handleNotifClick(n)} className="p-4 hover:bg-surface transition-colors cursor-pointer">
+                          {inner}
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {notifs.length > 0 && (
+                    <div className="p-3 border-t border-border bg-surface">
+                      <button onClick={handleMarkAll} disabled={unread === 0}
+                        className="w-full text-[10px] font-black uppercase tracking-widest text-cama hover:underline disabled:text-muted disabled:no-underline">
+                        Tout marquer lu
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Séparateur */}
@@ -236,56 +340,6 @@ export default function DashNav({ activeTab, onTab, tabs }: DashNavProps) {
 
           {/* Groupe 2 — actions fortes */}
           <div className="flex items-center gap-1.5">
-
-            {/* Communication Administration */}
-            <div className="relative">
-              <button
-                onClick={() => setCommOpen(!commOpen)}
-                className={`relative flex items-center px-2.5 py-2 rounded-full text-xs font-bold transition-all group/adm ${
-                  commOpen ? "bg-cama text-white" : "bg-cama/10 text-cama hover:bg-cama/20 border border-cama/20"
-                }`}
-                title="Communication Administration">
-                <Megaphone className="w-4 h-4 flex-shrink-0" />
-                <span className="hidden lg:block max-w-0 opacity-0 group-hover/adm:max-w-[110px] group-hover/adm:opacity-100 group-hover/adm:ml-1.5 overflow-hidden whitespace-nowrap transition-all duration-300">Administration</span>
-                <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center border-2 border-white">4</span>
-              </button>
-
-              {commOpen && (
-                <div className="absolute right-0 top-full mt-2 w-96 bg-white rounded-2xl border border-border shadow-2xl overflow-hidden animate-scale-in z-50">
-                  <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-cama/5">
-                    <div className="flex items-center gap-2">
-                      <Megaphone className="w-4 h-4 text-cama" />
-                      <p className="text-sm font-bold text-ink">Communication Administration</p>
-                    </div>
-                    <button onClick={() => setCommOpen(false)} className="p-1 hover:bg-surface rounded-lg transition-colors">
-                      <X className="w-4 h-4 text-subtle" />
-                    </button>
-                  </div>
-                  <div className="divide-y divide-border max-h-[380px] overflow-y-auto">
-                    {ADMIN_COMMS.map((c, i) => (
-                      <div key={i} className="p-4 hover:bg-surface transition-colors cursor-pointer">
-                        <div className="flex items-start gap-3">
-                          <div className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 ${c.color.split(" ")[1]}`}>
-                            <c.icon className={`w-4 h-4 ${c.color.split(" ")[0]}`} />
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center justify-between gap-2 mb-0.5">
-                              <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${c.color.split(" ")[1]} ${c.color.split(" ")[0]}`}>{c.type}</span>
-                              <span className="text-[9px] text-subtle flex-shrink-0">{c.time}</span>
-                            </div>
-                            <p className="text-xs font-bold text-ink leading-snug">{c.title}</p>
-                            <p className="text-[11px] text-muted leading-relaxed mt-0.5 line-clamp-2">{c.body}</p>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="p-3 border-t border-border bg-surface">
-                    <button className="w-full text-xs text-cama font-bold hover:underline">Voir toutes les communications →</button>
-                  </div>
-                </div>
-              )}
-            </div>
 
           {/* Profil — style NetAcad : icône + nom + rôle */}
           <div className="relative">

@@ -157,6 +157,9 @@ export interface DBExam {
   scheduled_at: string | null;
   shuffle: boolean;
   require_camera: boolean;      // caméra imposée pour composer
+  resit_open: boolean;          // session de rattrapage ouverte
+  resit_scheduled_at: string | null;
+  resit_rule: "best" | "last";  // note retenue : meilleure ou dernière
   created_by: string | null;
   created_at: string;
 }
@@ -176,6 +179,8 @@ export interface DBExamAttempt {
   id: string;
   exam_id: string;
   student_id: string;
+  session: number;              // 1 = session normale, 2 = rattrapage
+  is_resit: boolean;            // tentative de rattrapage
   status: AttemptStatus;
   started_at: string;
   submitted_at: string | null;

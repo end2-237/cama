@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/supabase";
 import type { DBUser, DBInscription, UserRole } from "@/lib/supabase";
+import { notify } from "@/lib/notifications";
 
 // ════════════════════════════════════════════════════════════
 // ADMINISTRATION — utilisateurs & inscriptions
@@ -29,7 +30,21 @@ export async function fetchInscriptions(status?: DBInscription["status"]): Promi
 }
 
 export async function setInscriptionStatus(id: string, status: DBInscription["status"]) {
-  return supabase.from("inscriptions").update({ status }).eq("id", id);
+  const res = await supabase.from("inscriptions").update({ status })
+    .eq("id", id).select("user_id,parcours_title").maybeSingle();
+  const row = res.data as Pick<DBInscription, "user_id" | "parcours_title"> | null;
+  if (row && (status === "validee" || status === "rejetee")) {
+    await notify(
+      row.user_id,
+      "inscription",
+      status === "validee" ? "Inscription validée" : "Inscription rejetée",
+      status === "validee"
+        ? `Votre inscription au parcours ${row.parcours_title} a été validée par l'administration.`
+        : `Votre inscription au parcours ${row.parcours_title} a été rejetée. Contactez l'administration.`,
+      "/etudiant/programme",
+    );
+  }
+  return res;
 }
 
 export interface AdminStats {

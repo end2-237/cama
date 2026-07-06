@@ -12,6 +12,7 @@ import type { DBProgramCourse, DBChapter, DBSession, DBChapterProgress, CycleMod
 import {
   fetchStudentProgram, fetchProgress, markChapter, fetchChapters, fetchSessions,
 } from "@/lib/program";
+import { degreeProgress, fetchLedger, type DBEctsEntry } from "@/lib/academic";
 
 const JOUR_ORDER = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"];
 
@@ -25,6 +26,8 @@ export default function StudentProgramPage() {
   const [chaptersByCourse, setCh] = useState<Record<string, DBChapter[]>>({});
   const [fetching, setFetching]   = useState(true);
   const [open, setOpen]           = useState<Record<string, boolean>>({});
+  const [degree, setDegree]       = useState<{ earned: number; target: number; pct: number } | null>(null);
+  const [ledger, setLedger]       = useState<DBEctsEntry[]>([]);
 
   useEffect(() => {
     if (!loading && !user) router.replace("/auth/login");
@@ -32,6 +35,8 @@ export default function StudentProgramPage() {
 
   useEffect(() => {
     if (!user) return;
+    degreeProgress(user.id).then(setDegree).catch(() => {});
+    fetchLedger(user.id).then(setLedger).catch(() => {});
     const slug = user.dossier?.parcoursSlug;
     if (!slug) { setFetching(false); return; }
     (async () => {
@@ -113,6 +118,37 @@ export default function StudentProgramPage() {
           </div>
         ) : (
           <>
+            {/* Jauge crédits ECTS vers le diplôme */}
+            {degree && (
+              <div className="bg-white border border-border rounded-xl p-4 mb-4">
+                <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
+                  <p className="text-[11px] font-black text-ink uppercase tracking-widest">
+                    Crédits ECTS : {degree.earned} / {degree.target}
+                  </p>
+                  <span className="text-xs font-bold text-cama">{degree.pct}% du diplôme</span>
+                </div>
+                <div className="h-2 bg-surface rounded-full overflow-hidden">
+                  <div className="h-full bg-cama transition-all" style={{ width: `${degree.pct}%` }} />
+                </div>
+                {ledger.some((e) => e.obtained && e.semester != null) && (
+                  <div className="flex flex-wrap gap-1.5 mt-2">
+                    {Object.entries(
+                      ledger.filter((e) => e.obtained && e.semester != null)
+                        .reduce<Record<string, number>>((m, e) => {
+                          const k = `S${e.semester}${e.academic_year ? ` · ${e.academic_year}` : ""}`;
+                          m[k] = (m[k] ?? 0) + e.ects;
+                          return m;
+                        }, {}),
+                    ).map(([k, v]) => (
+                      <span key={k} className="text-[10px] font-bold text-muted border border-border px-1.5 py-0.5">
+                        {k} : {v} ECTS
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Bandeau filière + progression */}
             <div className="bg-white border border-border rounded-xl p-4 mb-5 flex flex-wrap items-center gap-4">
               <div className="flex-1 min-w-[200px]">

@@ -23,7 +23,8 @@ import type { DBLive } from "@/lib/lives";
 import { saveNativeProgress, fetchMyFeedback, submitFeedback, liveAccess } from "@/lib/tracking";
 import type { CycleMode } from "@/lib/tracking";
 import { fetchResources } from "@/lib/resources";
-import { fetchForum, postForum } from "@/lib/chat";
+import { fetchForum, postForum, fetchCourseChat, sendCourseChat } from "@/lib/chat";
+import { fetchNote, saveNote } from "@/lib/notes";
 import type { DBCourseResource, DBRemoteMachine } from "@/lib/supabase";
 import {
   fetchTpsForCourses, fetchMachines, fetchMyTpProgress, saveTpProgress,
@@ -518,7 +519,7 @@ export default function CoursePlayer() {
           </div>
 
           {/* Zone de notes personnelles */}
-          <ChapterNotes chapId={chapter?.id || ""} />
+          <ChapterNotes chapId={chapter?.id || ""} studentId={user.id} />
 
           {/* Chapitres voisins */}
           <div className="bg-white border-r border-border border-t border-border px-6 py-4">
@@ -584,7 +585,7 @@ export default function CoursePlayer() {
           {isStudent && <CourseFeedbackWidget courseId={course.id} studentId={user.id} />}
 
           {/* Chat prof — prend le reste */}
-          <ProfChat courseTitle={course.title} />
+          <ProfChat courseId={course.id} courseTitle={course.title} user={user} />
         </div>
       </div>
     </div>
@@ -777,12 +778,30 @@ const PROF_REPLIES = [
   "Excellente remarque. J'en parlerai lors du prochain live pour tout le groupe.",
 ];
 
-function ProfChat({ courseTitle }: { courseTitle: string }) {
+function ProfChat({ courseId, courseTitle, user }: { courseId: string; courseTitle: string; user: AppUser }) {
   const [msgs, setMsgs] = useState<ChatMsg[]>(PROF_INIT);
   const [input, setInput] = useState("");
   const [typing, setTyping] = useState(false);
   const [online] = useState(true);
   const endRef = useRef<HTMLDivElement>(null);
+
+  /* Historique du chat de cours — persisté sur Supabase (table course_chat) */
+  useEffect(() => {
+    if (!courseId) return;
+    let cancelled = false;
+    (async () => {
+      const rows = await fetchCourseChat(courseId);
+      if (cancelled || rows.length === 0) return;
+      setMsgs([
+        ...PROF_INIT,
+        ...rows.map((r) => ({
+          from: (r.user_id === user.id ? "moi" : "prof") as ChatMsg["from"],
+          text: r.body,
+        })),
+      ]);
+    })();
+    return () => { cancelled = true; };
+  }, [courseId, user.id]);
 
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth" }); }, [msgs, typing]);
 
@@ -791,6 +810,7 @@ function ProfChat({ courseTitle }: { courseTitle: string }) {
     if (!q) return;
     setInput("");
     setMsgs((m) => [...m, { from: "moi" as ChatMsg["from"], text: q }]);
+    sendCourseChat(courseId, user.id, user.name, user.role, q);
     setTyping(true);
     const delay = 1200 + Math.random() * 1000;
     setTimeout(() => {
@@ -1457,13 +1477,21 @@ function ProfIA({ chapter, courseTitle }: { chapter: DBChapter; courseTitle: str
   );
 }
 
-/* ════ NOTES PERSONNELLES ════ */
-function ChapterNotes({ chapId }: { chapId: string }) {
-  const key = `notes-chap-${chapId}`;
-  const [note, setNote] = useState(() => (typeof window !== "undefined" ? localStorage.getItem(key) || "" : ""));
+/* ════ NOTES PERSONNELLES (persistées sur Supabase — course_notes) ════ */
+function ChapterNotes({ chapId, studentId }: { chapId: string; studentId: string }) {
+  const [note, setNote] = useState("");
   const [saved, setSaved] = useState(false);
-  const save = () => {
-    localStorage.setItem(key, note);
+
+  useEffect(() => {
+    if (!chapId || !studentId) return;
+    let cancelled = false;
+    fetchNote(studentId, chapId).then((n) => { if (!cancelled) setNote(n?.body ?? ""); });
+    return () => { cancelled = true; };
+  }, [chapId, studentId]);
+
+  const save = async () => {
+    if (!chapId || !studentId) return;
+    await saveNote(studentId, chapId, note);
     setSaved(true);
     setTimeout(() => setSaved(false), 1500);
   };
@@ -1471,7 +1499,7 @@ function ChapterNotes({ chapId }: { chapId: string }) {
     <div className="bg-white border-r border-border border-t border-border px-6 py-4">
       <p className="text-[9px] font-black text-subtle uppercase tracking-widest mb-2 flex items-center gap-1">
         <StickyNote className="w-3 h-3 text-gold-dark" /> Mes notes — chapitre
-        <span className="ml-auto text-[8px] text-subtle font-normal normal-case">sauvegardé localement</span>
+        <span className="ml-auto text-[8px] text-subtle font-normal normal-case">synchronisé sur votre compte</span>
       </p>
       <textarea
         value={note}

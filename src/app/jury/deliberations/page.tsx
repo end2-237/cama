@@ -9,6 +9,7 @@ import {
 import { useAuth } from "@/context/AuthContext";
 import type { DelibStatus } from "@/lib/supabase";
 import { fetchDeliberations, setDelibStatus, upsertDeliberation, type DelibWithMeta } from "@/lib/exams";
+import { creditStudent, currentYear, currentSemester } from "@/lib/academic";
 
 const BADGE: Record<DelibStatus, { label: string; cls: string }> = {
   en_delib: { label: "En délibération", cls: "bg-gold/10 text-gold-dark" },
@@ -39,7 +40,17 @@ export default function DeliberationsPage() {
     if (!user) return;
     const credits = d.course?.ects ?? 0;
     setDelibs((ds) => ds.map((x) => x.id === d.id ? { ...x, status, credits: status === "valide" ? credits : 0 } : x));
-    await setDelibStatus(d.id, status, user.id, credits);
+    const { error } = await setDelibStatus(d.id, status, user.id, credits);
+    // Alimente le ledger ECTS quand le jury valide la matière
+    if (!error && status === "valide" && d.program_course_id) {
+      try {
+        const [y, s] = await Promise.all([currentYear(), currentSemester()]);
+        await creditStudent(
+          d.student_id, d.program_course_id, credits, true, "deliberation",
+          user.id, y?.label ?? null, s?.number ?? null,
+        );
+      } catch { /* le ledger ne doit pas bloquer la délibération */ }
+    }
   };
 
   const filtered = useMemo(() => {

@@ -100,6 +100,39 @@ export async function likeCommunity(id: string, current: number): Promise<void> 
   await supabase.from("community_messages").update({ likes: current + 1 }).eq("id", id);
 }
 
+/* ── Chat de cours (panneau « Chat prof » du lecteur de cours) ──
+ * Table course_chat — voir supabase/migrations/016_local_to_server.sql.
+ */
+export interface DBCourseChatMessage {
+  id: string;
+  program_course_id: string;
+  user_id: string | null;
+  author_name: string | null;
+  role: string | null;
+  body: string;
+  created_at: string;
+}
+
+export async function fetchCourseChat(courseId: string): Promise<DBCourseChatMessage[]> {
+  const { data, error } = await supabase
+    .from("course_chat").select("*")
+    .eq("program_course_id", courseId)
+    .order("created_at", { ascending: true });
+  if (error) return [];
+  return (data as DBCourseChatMessage[]) ?? [];
+}
+
+export async function sendCourseChat(
+  courseId: string, userId: string | null, authorName: string, role: string, body: string
+): Promise<DBCourseChatMessage | null> {
+  const { data, error } = await supabase
+    .from("course_chat")
+    .insert({ program_course_id: courseId, user_id: userId, author_name: authorName, role, body })
+    .select("*").single();
+  if (error) return null;
+  return data as DBCourseChatMessage;
+}
+
 /* ── Réponse automatique du « prof » via Groq (DM) ──
  * Quand l'étudiant écrit à un enseignant hors-ligne, on génère une réponse
  * pédagogique plausible. Retourne null si Groq n'est pas configuré (le front

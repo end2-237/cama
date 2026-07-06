@@ -12,7 +12,7 @@ import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabase";
 import type { DBExam, DBExamQuestion, DBExamAttempt } from "@/lib/supabase";
 import {
-  fetchExam, fetchQuestions, fetchAttempt, startAttempt, pushAlert, submitAttempt,
+  fetchExam, fetchQuestions, fetchMyAttempts, startAttempt, pushAlert, submitAttempt,
 } from "@/lib/exams";
 
 function shuffle<T>(arr: T[], seed: string): T[] {
@@ -45,6 +45,10 @@ export default function ExamPage() {
     alertCount: number; durationMin: number;
   } | null>(null);
   const submitting = useRef(false);
+
+  // ── Rattrapage (session 2) ──
+  const [session, setSession] = useState(1);        // session à composer / composée
+  const [resitAvailable, setResitAvailable] = useState(false); // session 1 finie + rattrapage ouvert
 
   // ── Caméra / proctoring ──
   const [cameraOk, setCameraOk] = useState(false);
@@ -98,7 +102,13 @@ export default function ExamPage() {
       const e = await fetchExam(id);
       if (!e) { setPhase("blocked"); return; }
       setExam(e);
-      const att = await fetchAttempt(id, user.id);
+      const atts = await fetchMyAttempts(id, user.id);
+      const s1 = atts.find((a) => (a.session ?? 1) === 1) ?? null;
+      const s2 = atts.find((a) => a.session === 2) ?? null;
+      // Tentative « active » : la session 2 prime si elle existe
+      const att = s2 ?? s1;
+      // Rattrapage proposable : session 1 terminée, rattrapage ouvert, pas encore de session 2
+      setResitAvailable(!!s1 && s1.status !== "encours" && !!e.resit_open && !s2);
       if (att && att.status !== "encours") {
         const qs = await fetchQuestions(id);
         const hasOpen = qs.some((q) => q.type === "ouverte");
@@ -115,6 +125,7 @@ export default function ExamPage() {
         const answeredCount = att.answers ? Object.keys(att.answers).length : 0;
         setQuestions(qs);
         setAttempt(att);
+        setSession(att.session ?? 1);
         setResult({
           score: Number(att.score ?? 0), max: Number(att.score_max ?? 0),
           note: att.score_max ? Math.round((Number(att.score) / Number(att.score_max)) * 20 * 10) / 10 : 0,
@@ -124,10 +135,13 @@ export default function ExamPage() {
         setPhase("done");
         return;
       }
-      if (e.status !== "ouvert") { setPhase("blocked"); return; }
+      // Reprise possible : examen ouvert, ou rattrapage ouvert pour une session 2 en cours
+      const canResume = !!att && (e.status === "ouvert" || (att.session === 2 && !!e.resit_open));
+      if (!att && e.status !== "ouvert") { setPhase("blocked"); return; }
+      if (att && !canResume) { setPhase("blocked"); return; }
       const qs = await fetchQuestions(id);
       setQuestions(e.shuffle ? shuffle(qs, id + user.id) : qs);
-      if (att) { setAttempt(att); setAnswers(att.answers ?? {}); setPhase("running"); }
+      if (att) { setAttempt(att); setSession(att.session ?? 1); setAnswers(att.answers ?? {}); setPhase("running"); }
       else setPhase("ready");
     })();
   }, [user, id]);
@@ -203,9 +217,21 @@ export default function ExamPage() {
     document.documentElement.requestFullscreen?.().then(() => setLocked(false)).catch(() => setLocked(false));
   };
 
+  // Passe à l'écran de consignes pour composer la session 2 (rattrapage)
+  const startResit = () => {
+    if (!exam || !user) return;
+    setSession(2);
+    setResult(null);
+    setAttempt(null);
+    setAnswers({});
+    setIdx(0);
+    setQuestions((qs) => (exam.shuffle ? shuffle(qs, id + user.id + "s2") : qs));
+    setPhase("ready");
+  };
+
   const begin = async (asPhysical = false) => {
     if (!user) return;
-    const att = await startAttempt(id, user.id);
+    const att = await startAttempt(id, user.id, session);
     if (!att) return;
     // Persiste le mode de composition sur la tentative
     await supabase.from("exam_attempts")
@@ -292,6 +318,11 @@ export default function ExamPage() {
               <Award className={`w-8 h-8 ${isPending ? "text-gold-dark" : result.note >= 10 ? "text-green-600" : "text-gold-dark"}`} />
             </div>
             <h1 className="text-lg font-bold text-ink mb-1">{exam?.title}</h1>
+            {attempt?.is_resit && (
+              <span className="inline-block text-[10px] font-black uppercase tracking-widest text-gold-dark bg-gold/10 border border-gold/30 px-2 py-0.5 mb-2">
+                Session 2 · Rattrapage
+              </span>
+            )}
             <p className="text-xs text-muted mb-4">
               {isPending ? "Correction en attente" : "Note finale"}
             </p>
@@ -379,6 +410,21 @@ export default function ExamPage() {
             </div>
           )}
 
+          {/* Rattrapage disponible */}
+          {resitAvailable && (
+            <div className="bg-white border border-gold/40 rounded-2xl p-4 text-center">
+              <p className="text-[10px] font-black uppercase tracking-widest text-gold-dark mb-1">Rattrapage ouvert</p>
+              <p className="text-xs text-muted mb-3">
+                Une session de rattrapage est ouverte pour cet examen.
+                {exam?.resit_scheduled_at && <> Prévue le {new Date(exam.resit_scheduled_at).toLocaleDateString("fr-FR", { day: "2-digit", month: "long", hour: "2-digit", minute: "2-digit" })}.</>}
+              </p>
+              <button onClick={startResit}
+                className="inline-block text-xs font-bold bg-gold-dark text-white px-5 py-2.5 rounded-lg hover:opacity-90 transition-opacity">
+                Composer en rattrapage (session 2)
+              </button>
+            </div>
+          )}
+
           <div className="text-center pt-2 pb-8">
             <Link href="/etudiant/examens" className="inline-block text-xs font-bold bg-cama text-white px-5 py-2.5 rounded-lg hover:bg-cama-700">← Mes examens</Link>
           </div>
@@ -395,6 +441,11 @@ export default function ExamPage() {
           <ShieldCheck className="w-6 h-6 text-cama" />
           <h1 className="text-lg font-bold text-ink">{exam?.title}</h1>
         </div>
+        {session === 2 && (
+          <span className="inline-block text-[10px] font-black uppercase tracking-widest text-gold-dark bg-gold/10 border border-gold/30 px-2 py-0.5 mb-3">
+            Session 2 · Rattrapage
+          </span>
+        )}
         <p className="text-sm text-muted mb-4">Environnement surveillé <strong>Safe-CAMA</strong>. En commençant, vous acceptez les règles d&apos;intégrité.</p>
         <ul className="space-y-2 text-xs text-ink mb-5">
           <li className="flex items-center gap-2"><Clock className="w-4 h-4 text-cama" /> Durée : <strong>{exam?.duration_min} minutes</strong> (chrono non interruptible)</li>
@@ -494,6 +545,9 @@ export default function ExamPage() {
           <span className="text-[10px] font-black uppercase tracking-widest text-green-400">Safe-CAMA</span>
           <span className="hidden sm:inline text-white/20">|</span>
           <span className="hidden sm:inline text-xs font-bold truncate">{exam?.title}</span>
+          {session === 2 && (
+            <span className="text-[10px] font-bold text-gold-dark bg-gold/20 px-2 py-0.5 rounded-full">Rattrapage</span>
+          )}
           {physical ? (
             <span className="flex items-center gap-1 text-[10px] font-bold text-gold-dark bg-gold/20 px-2 py-0.5 rounded-full"><CameraOff className="w-3 h-3" /> Mode physique</span>
           ) : cameraOk ? (

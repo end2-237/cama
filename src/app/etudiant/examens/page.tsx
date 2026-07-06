@@ -11,7 +11,7 @@ import {
 import { useAuth } from "@/context/AuthContext";
 import type { DBProgramCourse, DBExam, DBExamAttempt } from "@/lib/supabase";
 import { fetchStudentProgram } from "@/lib/program";
-import { fetchExamsForCourses, fetchAttemptsForStudent, fetchQuestions } from "@/lib/exams";
+import { fetchExamsForCourses, fetchAttemptsForStudent, fetchQuestions, effectiveScore } from "@/lib/exams";
 
 type FilterMode = "all" | "open" | "done";
 
@@ -57,7 +57,22 @@ export default function StudentExamsPage() {
 
   // ── Derived data ──
   const courseById = useMemo(() => new Map(courses.map((c) => [c.id, c])), [courses]);
-  const attemptByExam = useMemo(() => new Map(attempts.map((a) => [a.exam_id, a])), [attempts]);
+  // Toutes les tentatives par examen (session 1 + rattrapage éventuel)
+  const attemptsByExam = useMemo(() => {
+    const m = new Map<string, DBExamAttempt[]>();
+    attempts.forEach((a) => {
+      const arr = m.get(a.exam_id) ?? [];
+      arr.push(a);
+      m.set(a.exam_id, arr.sort((x, y) => (x.session ?? 1) - (y.session ?? 1)));
+    });
+    return m;
+  }, [attempts]);
+  // Tentative « active » d'un examen = la plus récente (rattrapage prioritaire)
+  const attemptByExam = useMemo(() => {
+    const m = new Map<string, DBExamAttempt>();
+    attemptsByExam.forEach((arr, examId) => { m.set(examId, arr[arr.length - 1]); });
+    return m;
+  }, [attemptsByExam]);
 
   const openExams = useMemo(() => allExams.filter((e) => e.status === "ouvert"), [allExams]);
   const completedAttempts = useMemo(() => attempts.filter((a) => a.status === "soumis" || a.status === "corrige"), [attempts]);
@@ -333,10 +348,14 @@ export default function StudentExamsPage() {
                 <div className="divide-y divide-border">
                   {openExams.map((e) => {
                     const c = courseById.get(e.program_course_id);
-                    const att = attemptByExam.get(e.id);
+                    const atts = attemptsByExam.get(e.id) ?? [];
+                    const s1 = atts.find((a) => (a.session ?? 1) === 1);
+                    const s2 = atts.find((a) => (a.session ?? 1) === 2);
+                    const att = s2 ?? s1;
                     const qInfo = questionCounts[e.id];
                     const done = att && att.status !== "encours";
                     const n = att ? note20(att) : null;
+                    const canResit = e.resit_open && s1 && s1.status !== "encours" && !s2;
                     return (
                       <div key={e.id} className="px-4 py-3 flex items-center gap-3">
                         <div className="w-10 h-10 bg-cama-50 flex items-center justify-center flex-shrink-0">
@@ -356,12 +375,18 @@ export default function StudentExamsPage() {
                         </div>
                         <div className="flex-shrink-0">
                           {done ? (
-                            <div className="text-right">
+                            <div className="text-right space-y-1">
                               {att.status === "corrige" && n !== null ? (
-                                <span className="flex items-center gap-1 text-sm font-black text-green-700"><Award className="w-4 h-4" />{n}/20</span>
+                                <span className="flex items-center gap-1 text-sm font-black text-green-700"><Award className="w-4 h-4" />{n}/20{s2 && <span className="text-[9px] font-bold text-gold-dark ml-1">S2</span>}</span>
                               ) : att.status === "soumis" ? (
-                                <span className="text-[10px] font-bold text-gold-dark bg-gold/10 px-2 py-1 flex items-center gap-1"><CheckCircle2 className="w-3 h-3" /> Soumis</span>
+                                <span className="text-[10px] font-bold text-gold-dark bg-gold/10 px-2 py-1 flex items-center gap-1"><CheckCircle2 className="w-3 h-3" /> Soumis{s2 ? " · S2" : ""}</span>
                               ) : null}
+                              {canResit && (
+                                <Link href={`/examen/${e.id}`}
+                                  className="flex items-center gap-1.5 text-[10px] font-black bg-gold text-white px-3 py-1.5 hover:bg-gold-dark transition-colors uppercase tracking-wider">
+                                  <Play className="w-3 h-3" /> Rattrapage
+                                </Link>
+                              )}
                             </div>
                           ) : (
                             <Link href={`/examen/${e.id}`}
@@ -440,9 +465,12 @@ export default function StudentExamsPage() {
                 <div className="divide-y divide-border">
                   {filteredExams.map((e) => {
                     const c = courseById.get(e.program_course_id);
+                    const atts = attemptsByExam.get(e.id) ?? [];
                     const att = attemptByExam.get(e.id);
                     const n = att ? note20(att) : null;
                     const qInfo = questionCounts[e.id];
+                    const noted = atts.filter((a) => note20(a) !== null);
+                    const retained = noted.length > 1 ? effectiveScore(atts, e.resit_rule ?? "best") : null;
                     return (
                       <div key={e.id} className="px-4 py-2.5 sm:grid sm:grid-cols-[1fr_80px_60px_60px_120px_100px] sm:items-center flex flex-col gap-1">
                         <div className="min-w-0">
@@ -473,8 +501,13 @@ export default function StudentExamsPage() {
                           )}
                         </div>
                         <div className="text-right">
-                          {n !== null ? (
-                            <span className={`text-xs font-black ${n >= 10 ? "text-green-700" : "text-red-700"}`}>{n}/20</span>
+                          {retained !== null && retained !== undefined ? (
+                            <div>
+                              <span className={`text-xs font-black ${retained >= 10 ? "text-green-700" : "text-red-700"}`}>{retained}/20</span>
+                              <p className="text-[8px] text-muted">retenue · S1 {note20(atts[0]) ?? "—"} / S2 {note20(atts[1]) ?? "—"}</p>
+                            </div>
+                          ) : n !== null ? (
+                            <span className={`text-xs font-black ${n >= 10 ? "text-green-700" : "text-red-700"}`}>{n}/20{(att?.session ?? 1) > 1 ? <span className="text-[8px] text-gold-dark ml-1">S2</span> : null}</span>
                           ) : att?.status === "soumis" ? (
                             <span className="text-[9px] text-muted italic">En correction</span>
                           ) : (

@@ -15,6 +15,7 @@ import {
   fetchExamsForCourses, fetchAttemptsForExam, fetchQuestions,
   createExam, updateExam, setExamStatus, deleteExam, gradeAttempt,
   addQuestion, updateQuestion, deleteQuestion,
+  openResit, closeResit, effectiveScore,
 } from "@/lib/exams";
 import { fetchUsers } from "@/lib/admin";
 import { fetchLivesForCourses, subscribeLives } from "@/lib/lives";
@@ -503,6 +504,14 @@ function EvalTab() {
     await reload();
   };
 
+  // Ouvre / ferme la session de rattrapage (session 2)
+  const onToggleResit = async (e: DBExam) => {
+    if (e.resit_open) await closeResit(e.id);
+    else await openResit(e.id);
+    if (selExam?.id === e.id) setSelExam((s) => s ? { ...s, resit_open: !e.resit_open } : s);
+    await reload();
+  };
+
   const onStatusChange = async (id: string, status: ExamStatus) => {
     await setExamStatus(id, status);
     if (selExam?.id === id) setSelExam((s) => s ? { ...s, status } : s);
@@ -790,6 +799,15 @@ function EvalTab() {
                 <option value="ouvert">Ouvert</option>
                 <option value="termine">Terminé</option>
               </select>
+              {selExam.status !== "planifie" && (
+                <button onClick={() => onToggleResit(selExam)}
+                  className={`text-xs font-bold px-3 py-1.5 border-2 transition-colors ${
+                    selExam.resit_open
+                      ? "border-gold-dark text-gold-dark bg-gold/10 hover:bg-gold/20"
+                      : "border-border text-muted hover:border-gold-dark hover:text-gold-dark"}`}>
+                  {selExam.resit_open ? "Fermer le rattrapage" : "Ouvrir le rattrapage"}
+                </button>
+              )}
               <button onClick={() => onDelExam(selExam.id)} className="text-subtle hover:text-red-500 p-1.5"><Trash2 className="w-4 h-4" /></button>
             </div>
 
@@ -855,9 +873,23 @@ function EvalTab() {
                   <p className="text-xs text-muted italic">Aucune copie soumise pour le moment.</p>
                 ) : (
                   <div className="space-y-3">
-                    {(attemptsByExam[selExam.id] ?? []).map((a) => (
-                      <AttemptCard key={a.id} attempt={a} questions={questionsByExam[selExam.id] ?? []} users={users} onGraded={reload} isTP={isTP(selExam)} examTitle={selExam.title} />
-                    ))}
+                    {(() => {
+                      const atts = attemptsByExam[selExam.id] ?? [];
+                      const byStudent = new Map<string, DBExamAttempt[]>();
+                      atts.forEach((a) => byStudent.set(a.student_id, [...(byStudent.get(a.student_id) ?? []), a]));
+                      const sorted = [...atts].sort((x, y) =>
+                        x.student_id === y.student_id
+                          ? (x.session ?? 1) - (y.session ?? 1)
+                          : x.student_id.localeCompare(y.student_id));
+                      return sorted.map((a) => {
+                        const mine = byStudent.get(a.student_id) ?? [a];
+                        const retained = mine.length > 1 ? effectiveScore(mine, selExam.resit_rule ?? "best") : null;
+                        return (
+                          <AttemptCard key={a.id} attempt={a} questions={questionsByExam[selExam.id] ?? []} users={users}
+                            onGraded={reload} isTP={isTP(selExam)} examTitle={selExam.title} retained={retained} />
+                        );
+                      });
+                    })()}
                   </div>
                 )}
               </div>
@@ -918,7 +950,7 @@ function EvalTab() {
 }
 
 function AttemptCard({
-  attempt: a, questions, users, onGraded, isTP, examTitle,
+  attempt: a, questions, users, onGraded, isTP, examTitle, retained,
 }: {
   attempt: DBExamAttempt;
   questions: DBExamQuestion[];
@@ -926,6 +958,7 @@ function AttemptCard({
   onGraded: () => void | Promise<void>;
   isTP?: boolean;
   examTitle?: string;
+  retained?: number | null;   // note retenue (/20) quand l'étudiant a deux sessions
 }) {
   const [note, setNote] = useState("");
   const [fb, setFb] = useState("");
@@ -965,6 +998,16 @@ function AttemptCard({
           {name.split(" ").map((x) => x[0]).join("").slice(0, 2)}
         </div>
         <p className="text-sm font-bold text-ink flex-1">{name}</p>
+        {a.is_resit && (
+          <span className="inline-flex items-center px-2 py-0.5 bg-gold/10 border border-gold/30 text-gold-dark text-[10px] font-black uppercase tracking-widest">
+            Session 2 · Rattrapage
+          </span>
+        )}
+        {retained !== null && retained !== undefined && (
+          <span className="inline-flex items-center px-2 py-0.5 bg-cama-50 text-cama text-[10px] font-bold">
+            Note retenue : {retained}/20
+          </span>
+        )}
         {a.alerts.length > 0 ? (
           <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-gold/10 text-gold-dark text-[10px] font-bold"><AlertTriangle className="w-3 h-3" /> {a.alerts.length} signalement(s)</span>
         ) : (
