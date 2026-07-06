@@ -63,7 +63,12 @@ export default function DashboardPage() {
     window.scrollTo({ top: 0 });
   }, [activeTab]);
 
-  if (loading || !user) {
+  // Étudiant sans dossier validé : on ne rend JAMAIS le dashboard (la redirection
+  // vers /onboarding est en cours) — évite tout flash de la plateforme.
+  const studentBlocked =
+    user?.role === "etudiant" && (user.dossier == null || user.dossier.status !== "validee");
+
+  if (loading || !user || studentBlocked) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="w-8 h-8 rounded-full border-4 border-cama border-t-transparent animate-spin" />

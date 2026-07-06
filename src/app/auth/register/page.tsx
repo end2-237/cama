@@ -78,6 +78,9 @@ export default function RegisterPage() {
 
     setLoading(true);
 
+    // 0. Ne jamais rester connecté sous un autre compte (ex: admin) en créant une inscription
+    await supabase.auth.signOut();
+
     // 1. Création du compte Supabase Auth
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
