@@ -61,7 +61,11 @@ export default function OnboardingPage() {
     setFetching(true);
     const [d, s] = await Promise.all([fetchDocuments(user.id), fetchSettings(user.id)]);
     setDocs(d);
-    setSubmitted(Boolean(s?.prefs?.onboarding_submitted));
+    // Soumis si le marqueur existe, OU si toutes les pièces requises + la photo sont déposées
+    // (repli robuste tant que la table student_settings n'est pas encore migrée).
+    const allDocsReady =
+      REQUIRED_KINDS.every((k) => d.some((x) => x.kind === k.id)) && d.some((x) => x.kind === "photo");
+    setSubmitted(Boolean(s?.prefs?.onboarding_submitted) || allDocsReady);
     setFetching(false);
   }, [user]);
 
@@ -440,12 +444,15 @@ function StepSubmit({
   const submit = async () => {
     setSubmitting(true);
     setError(null);
-    const existing = await fetchSettings(user.id);
-    const res = await saveSettings(user.id, {
-      prefs: { ...(existing?.prefs ?? {}), onboarding_submitted: true },
-    });
-    if (!res) setError("Impossible d'enregistrer la soumission. Réessayez.");
-    else onSubmitted();
+    // Meilleur effort : on persiste le marqueur si la table existe, mais on ne bloque
+    // jamais la soumission dessus (le dossier est de toute façon complet côté pièces).
+    try {
+      const existing = await fetchSettings(user.id);
+      await saveSettings(user.id, {
+        prefs: { ...(existing?.prefs ?? {}), onboarding_submitted: true },
+      });
+    } catch { /* table pas encore migrée : on continue quand même */ }
+    onSubmitted();
     setSubmitting(false);
   };
 
