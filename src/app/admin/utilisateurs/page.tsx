@@ -164,6 +164,12 @@ export default function AdminUsersPage() {
                     </div>
                     <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${b.cls}`}>{b.label}</span>
                     <div className="flex gap-1.5">
+                      {i.user_id && (
+                        <Link href={`/admin/etudiant/${i.user_id}`}
+                          className="flex items-center gap-1 text-[11px] font-bold text-cama border border-cama/30 rounded-lg px-2.5 py-1.5 hover:bg-cama-50 transition-colors">
+                          <FolderOpen className="w-3.5 h-3.5" /> Dossier
+                        </Link>
+                      )}
                       <button onClick={() => onStatus(i.id, "validee")} disabled={i.status === "validee"}
                         className="flex items-center gap-1 text-[11px] font-bold text-green-600 border border-green-200 rounded-lg px-2.5 py-1.5 hover:bg-green-50 disabled:opacity-40 transition-colors">
                         <CheckCircle2 className="w-3.5 h-3.5" /> Valider
