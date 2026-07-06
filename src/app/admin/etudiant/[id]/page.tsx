@@ -62,6 +62,13 @@ function isImageUrl(url: string): boolean {
   return /\.(png|jpe?g|gif|webp|bmp|svg|avif)(\?|$)/i.test(url);
 }
 
+// Regroupement des pièces en « dossiers » (vue gestionnaire de fichiers)
+const DOC_FOLDERS: { id: string; label: string; kinds: string[] }[] = [
+  { id: "identite", label: "Identité",           kinds: ["acte_naissance", "cni", "photo"] },
+  { id: "diplomes", label: "Diplômes & relevés", kinds: ["diplome", "releve_anterieur"] },
+  { id: "autres",   label: "Autres pièces",      kinds: ["autre"] },
+];
+
 // ── Petits composants de mise en page « document » ─────────────
 function Section({ icon: Icon, title, children }: {
   icon: React.ComponentType<{ className?: string }>;
@@ -106,6 +113,7 @@ export default function FicheEtudiantPage() {
   const [native, setNative]     = useState<DBNativeProgress[]>([]);
   const [progress, setProgress] = useState<DBChapterProgress[]>([]);
   const [documents, setDocuments] = useState<DBStudentDocument[]>([]);
+  const [docFolder, setDocFolder] = useState<string | null>(null);
   const [reviewing, setReviewing] = useState<string | null>(null);
   const [showDossier, setShowDossier] = useState(false);
   const [candAction, setCandAction] = useState(false);
@@ -521,56 +529,89 @@ export default function FicheEtudiantPage() {
             )}
           </Section>
 
-          {/* 5 — Dossier administratif */}
+          {/* 5 — Dossier administratif (vue gestionnaire de fichiers) */}
           <Section icon={FolderOpen} title="Dossier administratif">
             {documents.length ? (
-              <ul className="divide-y divide-border/60">
-                {documents.map((d) => {
-                  const db = DOC_BADGE[d.status] ?? DOC_BADGE.depose;
-                  return (
-                    <li key={d.id} className="py-2.5">
-                      <div className="flex items-center gap-3">
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm text-ink truncate">{docKindLabel(d.kind)}</p>
-                          <p className="text-xs text-muted truncate">
-                            {d.title ?? "Document"}{d.size_mo != null ? ` · ${d.size_mo} Mo` : ""} · déposé le {fmtDate(d.uploaded_at)}
-                          </p>
+              <div className="space-y-4">
+                {/* Dossiers par catégorie */}
+                <div className="grid grid-cols-3 gap-px bg-border border border-border print:hidden">
+                  {DOC_FOLDERS.map((f) => {
+                    const list = documents.filter((d) => f.kinds.includes(d.kind));
+                    const valid = list.filter((d) => d.status === "valide").length;
+                    const active = docFolder === f.id;
+                    return (
+                      <button key={f.id} onClick={() => setDocFolder(active ? null : f.id)}
+                        className={`text-left bg-white p-3 hover:bg-cama-50 transition-colors ${active ? "ring-2 ring-inset ring-cama" : ""}`}>
+                        <div className="w-8 h-8 flex items-center justify-center mb-2" style={{ background: active ? "#4F46E5" : "#EEF2FF" }}>
+                          <FolderOpen className={`w-4 h-4 ${active ? "text-white" : "text-cama"}`} />
                         </div>
-                        <span className={`inline-block rounded-full border px-2.5 py-0.5 text-xs font-semibold ${db.cls}`}>
-                          {db.label}
-                        </span>
-                        <a href={d.url} target="_blank" rel="noreferrer"
-                          className="inline-flex items-center gap-1 text-xs font-medium text-cama hover:underline print:hidden">
-                          <ExternalLink className="w-3.5 h-3.5" /> Ouvrir
-                        </a>
-                        {d.status === "depose" && (
-                          <div className="flex items-center gap-1.5 print:hidden">
-                            <button
-                              onClick={() => handleReview(d.id, "valide")}
-                              disabled={reviewing === d.id}
-                              className="inline-flex items-center gap-1 rounded-full bg-green-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-green-700 transition-colors disabled:opacity-50"
-                            >
-                              <CheckCircle2 className="w-3.5 h-3.5" /> Valider
-                            </button>
-                            <button
-                              onClick={() => handleReview(d.id, "refuse")}
-                              disabled={reviewing === d.id}
-                              className="inline-flex items-center gap-1 rounded-full bg-red-50 border border-red-200 px-2.5 py-1 text-xs font-semibold text-red-600 hover:bg-red-100 transition-colors disabled:opacity-50"
-                            >
-                              <XCircle className="w-3.5 h-3.5" /> Refuser
-                            </button>
+                        <p className="text-[12px] font-bold text-ink leading-tight">{f.label}</p>
+                        <p className="text-[10px] text-muted mt-0.5">{list.length} pièce{list.length > 1 ? "s" : ""} · {valid} validée{valid > 1 ? "s" : ""}</p>
+                      </button>
+                    );
+                  })}
+                </div>
+                {docFolder && (
+                  <button onClick={() => setDocFolder(null)} className="text-[11px] font-bold text-cama hover:underline print:hidden">
+                    ← Toutes les pièces
+                  </button>
+                )}
+
+                {/* Grille de fichiers (vignettes) */}
+                <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {documents
+                    .filter((d) => !docFolder || DOC_FOLDERS.find((f) => f.id === docFolder)?.kinds.includes(d.kind))
+                    .map((d) => {
+                      const db = DOC_BADGE[d.status] ?? DOC_BADGE.depose;
+                      const img = isImageUrl(d.url);
+                      return (
+                        <div key={d.id} className="border border-border bg-white flex flex-col break-inside-avoid">
+                          {/* Aperçu épinglé */}
+                          <a href={d.url} target="_blank" rel="noreferrer" className="block bg-surface border-b border-border h-32 flex items-center justify-center overflow-hidden group">
+                            {img ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img src={d.url} alt={docKindLabel(d.kind)} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                            ) : (
+                              <div className="flex flex-col items-center text-muted">
+                                <FileText className="w-8 h-8 mb-1" />
+                                <span className="text-[9px] font-black uppercase tracking-widest">Document</span>
+                              </div>
+                            )}
+                          </a>
+                          {/* Métadonnées */}
+                          <div className="p-3 flex-1 flex flex-col">
+                            <div className="flex items-start justify-between gap-2 mb-1">
+                              <p className="text-[12px] font-bold text-ink leading-tight">{docKindLabel(d.kind)}</p>
+                              <span className={`flex-shrink-0 inline-block rounded-full border px-2 py-0.5 text-[9px] font-black uppercase ${db.cls}`}>{db.label}</span>
+                            </div>
+                            <p className="text-[10px] text-muted truncate">{d.size_mo != null ? `${d.size_mo} Mo · ` : ""}déposé le {fmtDate(d.uploaded_at)}</p>
+                            {d.note_admin && (
+                              <p className="mt-2 text-[10px] text-red-600 bg-red-50 border border-red-200 px-2 py-1">Note : {d.note_admin}</p>
+                            )}
+                            <div className="flex items-center gap-1.5 mt-3 print:hidden">
+                              <a href={d.url} target="_blank" rel="noreferrer"
+                                className="inline-flex items-center gap-1 text-[10px] font-bold text-cama border border-cama/30 px-2 py-1 hover:bg-cama-50 transition-colors">
+                                <ExternalLink className="w-3 h-3" /> Ouvrir
+                              </a>
+                              {d.status === "depose" && (
+                                <>
+                                  <button onClick={() => handleReview(d.id, "valide")} disabled={reviewing === d.id}
+                                    className="inline-flex items-center gap-1 bg-green-600 px-2 py-1 text-[10px] font-bold text-white hover:bg-green-700 transition-colors disabled:opacity-50">
+                                    <CheckCircle2 className="w-3 h-3" /> Valider
+                                  </button>
+                                  <button onClick={() => handleReview(d.id, "refuse")} disabled={reviewing === d.id}
+                                    className="inline-flex items-center gap-1 border border-red-200 px-2 py-1 text-[10px] font-bold text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50">
+                                    <XCircle className="w-3 h-3" /> Refuser
+                                  </button>
+                                </>
+                              )}
+                            </div>
                           </div>
-                        )}
-                      </div>
-                      {d.note_admin && (
-                        <p className="mt-1.5 text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-2.5 py-1.5 inline-block">
-                          Note : {d.note_admin}
-                        </p>
-                      )}
-                    </li>
-                  );
-                })}
-              </ul>
+                        </div>
+                      );
+                    })}
+                </div>
+              </div>
             ) : (
               <p className="text-sm text-muted italic">Aucune pièce justificative déposée.</p>
             )}
