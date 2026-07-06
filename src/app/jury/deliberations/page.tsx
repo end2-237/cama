@@ -4,9 +4,10 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  ArrowLeft, Loader2, Gavel, CheckCircle2, XCircle, Award, Search, AlertTriangle,
+  Loader2, Gavel, CheckCircle2, XCircle, Award, Search, AlertTriangle,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import PageShell from "@/components/dashboard/PageShell";
 import type { DelibStatus } from "@/lib/supabase";
 import { fetchDeliberations, setDelibStatus, upsertDeliberation, type DelibWithMeta } from "@/lib/exams";
 import { creditStudent, currentYear, currentSemester } from "@/lib/academic";
@@ -74,37 +75,22 @@ export default function DeliberationsPage() {
   );
 
   return (
-    <div className="min-h-screen bg-surface">
-      <header className="bg-white border-b border-border sticky top-0 z-40">
-        <div className="max-w-[1100px] mx-auto px-4 sm:px-6 flex items-center gap-3 h-12">
-          <Link href="/dashboard" className="flex items-center gap-2 text-sm text-muted hover:text-ink transition-colors">
-            <ArrowLeft className="w-4 h-4" /> Dashboard
-          </Link>
-          <div className="w-px h-5 bg-border" />
-          <span className="text-sm font-bold text-ink flex items-center gap-1.5">
-            <Gavel className="w-4 h-4 text-cama" /> Délibérations du jury
-          </span>
-          <div className="flex-1" />
-          <Link href="/jury/sessions" className="text-sm text-cama font-semibold hover:underline">Sessions de jury →</Link>
-        </div>
-      </header>
-
-      <main className="max-w-[1100px] mx-auto px-4 sm:px-6 py-5">
-        {/* KPIs */}
-        <div className="grid grid-cols-4 gap-px bg-border border border-border rounded-xl overflow-hidden mb-5">
-          {[
-            { label: "Dossiers", value: stats.total, color: "text-ink" },
-            { label: "En délibération", value: stats.pending, color: "text-gold-dark" },
-            { label: "Validés", value: stats.validated, color: "text-green-600" },
-            { label: "ECTS attribués", value: stats.ects, color: "text-cama" },
-          ].map((k) => (
-            <div key={k.label} className="bg-white p-3 text-center">
-              <p className={`text-lg font-bold ${k.color}`}>{k.value}</p>
-              <p className="text-[10px] text-muted mt-1">{k.label}</p>
-            </div>
-          ))}
-        </div>
-
+    <PageShell
+      title="Délibérations du jury"
+      subtitle="Notez et validez les matières envoyées par les enseignants — attribution des ECTS."
+      icon={Gavel}
+      breadcrumb="Délibérations"
+      maxWidth="max-w-[1100px]"
+      actions={
+        <Link href="/jury/sessions" className="text-sm text-cama font-semibold hover:underline">Sessions de jury →</Link>
+      }
+      stats={[
+        { label: "Dossiers",        value: stats.total,     accent: "ink" },
+        { label: "En délibération", value: stats.pending,   accent: "gold" },
+        { label: "Validés",         value: stats.validated, accent: "green" },
+        { label: "ECTS attribués",  value: stats.ects,      accent: "cama" },
+      ]}
+    >
         <div className="flex items-center gap-2 bg-white border border-border rounded-lg px-3 py-1.5 mb-4 max-w-xs focus-within:border-cama">
           <Search className="w-3.5 h-3.5 text-subtle" />
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Rechercher étudiant / matière…"
@@ -160,7 +146,6 @@ export default function DeliberationsPage() {
           <AlertTriangle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0 text-gold-dark" />
           Politique human-in-the-loop : l&apos;IA signale les alertes d&apos;intégrité, le jury décide. La validation attribue les ECTS de la matière.
         </p>
-      </main>
-    </div>
+    </PageShell>
   );
 }

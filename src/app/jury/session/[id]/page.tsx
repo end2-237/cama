@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import { useRouter, useParams } from "next/navigation";
 import {
-  ArrowLeft, Loader2, Gavel, Calculator, Save, Lock, Printer, Scale, CheckCircle2,
+  Loader2, Gavel, Calculator, Save, Lock, Printer, Scale, CheckCircle2,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import PageShell from "@/components/dashboard/PageShell";
 import { logAudit } from "@/lib/governance";
 import {
   fetchJurySession, closeJurySession, fetchJuryMembers, fetchDecisions,
@@ -154,85 +154,60 @@ export default function JurySessionPage() {
     ? `${session.academic_year ?? "—"} · Semestre ${session.semester ?? "—"} · ${session.parcours_slug ?? "—"}`
     : "";
 
+  const actions = session && !fetching ? (
+    <>
+      {!closed && (
+        <button onClick={compute} disabled={computing}
+          className="flex items-center gap-1.5 text-[12px] font-bold text-cama border border-cama/30 rounded-lg px-3 py-2 hover:bg-cama/5 disabled:opacity-50">
+          {computing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Calculator className="w-3.5 h-3.5" />}
+          Calculer les résultats
+        </button>
+      )}
+      {!closed && (
+        <button onClick={save} disabled={saving || rows.length === 0}
+          className="flex items-center gap-1.5 text-[12px] font-bold text-white bg-cama rounded-lg px-3 py-2 hover:opacity-90 disabled:opacity-50">
+          {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : saved ? <CheckCircle2 className="w-3.5 h-3.5" /> : <Save className="w-3.5 h-3.5" />}
+          {saved ? "Enregistré" : "Enregistrer"}
+        </button>
+      )}
+      {!closed && (
+        <button onClick={closeJury} disabled={rows.length === 0}
+          className="flex items-center gap-1.5 text-[12px] font-bold text-red-500 border border-red-200 rounded-lg px-3 py-2 hover:bg-red-50 disabled:opacity-50">
+          <Lock className="w-3.5 h-3.5" /> Clôturer le jury
+        </button>
+      )}
+      <button onClick={() => window.print()} disabled={rows.length === 0}
+        className="flex items-center gap-1.5 text-[12px] font-bold text-ink border border-border rounded-lg px-3 py-2 hover:bg-surface disabled:opacity-50">
+        <Printer className="w-3.5 h-3.5" /> Imprimer le PV
+      </button>
+    </>
+  ) : undefined;
+
   return (
-    <div className="min-h-screen bg-surface">
+    <>
       {/* ── Écran ── */}
       <div className="print:hidden">
-        <header className="bg-white border-b border-border sticky top-0 z-40">
-          <div className="max-w-[1200px] mx-auto px-4 sm:px-6 flex items-center gap-3 h-12">
-            <Link href="/jury/sessions" className="flex items-center gap-2 text-sm text-muted hover:text-ink transition-colors">
-              <ArrowLeft className="w-4 h-4" /> Sessions de jury
-            </Link>
-            <div className="w-px h-5 bg-border" />
-            <span className="text-sm font-bold text-ink flex items-center gap-1.5">
-              <Gavel className="w-4 h-4 text-cama" /> Jury de semestre
-            </span>
-            {session && (
-              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${closed ? "bg-red-50 text-red-500" : "bg-green-50 text-green-600"}`}>
-                {closed ? "Clôturé" : "Ouvert"}
-              </span>
-            )}
-          </div>
-        </header>
-
-        <main className="max-w-[1200px] mx-auto px-4 sm:px-6 py-5">
+        <PageShell
+          title="Jury de semestre"
+          subtitle={session ? `${titre} · ${members.length} membre${members.length > 1 ? "s" : ""} · tenu le ${new Date(session.held_at).toLocaleDateString("fr-FR")}` : undefined}
+          icon={Gavel}
+          breadcrumb="Jury de semestre"
+          context={session ? (closed ? "Jury clôturé" : "Jury ouvert") : undefined}
+          maxWidth="max-w-[1200px]"
+          actions={actions}
+          stats={session && !fetching ? [
+            { label: "Étudiants",     value: stats.total,      accent: "ink" },
+            { label: "Admis",         value: stats.admis,      accent: "green" },
+            { label: "Rattrapage",    value: stats.rattrapage, accent: "gold" },
+            { label: "Compensations", value: stats.compense,   accent: "cama" },
+          ] : undefined}
+        >
           {fetching ? (
             <div className="py-16 text-center"><Loader2 className="w-6 h-6 animate-spin text-cama mx-auto" /></div>
           ) : !session ? (
             <div className="bg-white border border-border rounded-xl p-8 text-center text-sm text-muted">Session introuvable.</div>
           ) : (
             <>
-              <div className="flex flex-wrap items-center gap-3 mb-4">
-                <div className="flex-1 min-w-[220px]">
-                  <h1 className="text-base font-bold text-ink">{titre}</h1>
-                  <p className="text-[11px] text-muted">
-                    {members.length} membre{members.length > 1 ? "s" : ""} du jury ·{" "}
-                    Tenue le {new Date(session.held_at).toLocaleDateString("fr-FR")}
-                  </p>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {!closed && (
-                    <button onClick={compute} disabled={computing}
-                      className="flex items-center gap-1.5 text-[12px] font-bold text-cama border border-cama/30 rounded-lg px-3 py-2 hover:bg-cama/5 disabled:opacity-50">
-                      {computing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Calculator className="w-3.5 h-3.5" />}
-                      Calculer les résultats
-                    </button>
-                  )}
-                  {!closed && (
-                    <button onClick={save} disabled={saving || rows.length === 0}
-                      className="flex items-center gap-1.5 text-[12px] font-bold text-white bg-cama rounded-lg px-3 py-2 hover:opacity-90 disabled:opacity-50">
-                      {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : saved ? <CheckCircle2 className="w-3.5 h-3.5" /> : <Save className="w-3.5 h-3.5" />}
-                      {saved ? "Enregistré" : "Enregistrer"}
-                    </button>
-                  )}
-                  {!closed && (
-                    <button onClick={closeJury} disabled={rows.length === 0}
-                      className="flex items-center gap-1.5 text-[12px] font-bold text-red-500 border border-red-200 rounded-lg px-3 py-2 hover:bg-red-50 disabled:opacity-50">
-                      <Lock className="w-3.5 h-3.5" /> Clôturer le jury
-                    </button>
-                  )}
-                  <button onClick={() => window.print()} disabled={rows.length === 0}
-                    className="flex items-center gap-1.5 text-[12px] font-bold text-ink border border-border rounded-lg px-3 py-2 hover:bg-surface disabled:opacity-50">
-                    <Printer className="w-3.5 h-3.5" /> Imprimer le PV
-                  </button>
-                </div>
-              </div>
-
-              {/* KPIs */}
-              <div className="grid grid-cols-4 gap-px bg-border border border-border rounded-xl overflow-hidden mb-5">
-                {[
-                  { label: "Étudiants", value: stats.total, color: "text-ink" },
-                  { label: "Admis", value: stats.admis, color: "text-green-600" },
-                  { label: "Rattrapage", value: stats.rattrapage, color: "text-gold-dark" },
-                  { label: "Compensations", value: stats.compense, color: "text-cama" },
-                ].map((k) => (
-                  <div key={k.label} className="bg-white p-3 text-center">
-                    <p className={`text-lg font-bold ${k.color}`}>{k.value}</p>
-                    <p className="text-[10px] text-muted mt-1">{k.label}</p>
-                  </div>
-                ))}
-              </div>
-
               {rows.length === 0 ? (
                 <div className="bg-white border border-border rounded-xl p-8 text-center text-sm text-muted">
                   Aucun résultat. Cliquez sur « Calculer les résultats » pour agréger les notes du semestre.
@@ -303,7 +278,7 @@ export default function JurySessionPage() {
               </p>
             </>
           )}
-        </main>
+        </PageShell>
       </div>
 
       {/* ── Procès-verbal (impression A4) ── */}
@@ -357,6 +332,6 @@ export default function JurySessionPage() {
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }

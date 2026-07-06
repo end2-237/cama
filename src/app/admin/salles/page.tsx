@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Loader2, DoorOpen, Plus, AlertTriangle, Trash2, CalendarRange } from "lucide-react";
+import { Loader2, DoorOpen, Plus, AlertTriangle, Trash2, CalendarRange } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import PageShell from "@/components/dashboard/PageShell";
 import {
   DAYS, fetchRooms, addRoom, setRoomActive,
   fetchBookings, createBooking, deleteBooking,
@@ -151,19 +151,25 @@ export default function AdminSallesPage() {
     <div className="min-h-screen flex items-center justify-center bg-surface"><Loader2 className="w-6 h-6 animate-spin text-cama" /></div>
   );
 
-  return (
-    <div className="min-h-screen bg-surface">
-      <header className="bg-white border-b border-border sticky top-0 z-40">
-        <div className="max-w-[1100px] mx-auto px-4 flex items-center gap-3 h-12">
-          <Link href="/dashboard" className="flex items-center gap-2 text-[11px] text-muted hover:text-ink"><ArrowLeft className="w-3.5 h-3.5" /> Dashboard</Link>
-          <div className="w-px h-5 bg-border" />
-          <span className="text-[11px] font-black uppercase tracking-widest text-ink flex items-center gap-1.5">
-            <DoorOpen className="w-3.5 h-3.5 text-cama" /> Salles &amp; réservations
-          </span>
-        </div>
-      </header>
+  const activeRooms = rooms.filter((r) => r.active).length;
+  const weeklyBookings = bookings.filter((b) => b.weekly).length;
+  const oneOffBookings = bookings.filter((b) => !b.weekly).length;
 
-      <main className="max-w-[1100px] mx-auto px-4 py-5 space-y-4">
+  return (
+    <PageShell
+      title="Salles & réservations"
+      subtitle="Gérez les salles, réservez des créneaux et visualisez la grille hebdomadaire."
+      icon={DoorOpen}
+      breadcrumb="Salles & réservations"
+      maxWidth="max-w-[1100px]"
+      stats={[
+        { label: "Salles",        value: rooms.length,     accent: "cama" },
+        { label: "Actives",       value: activeRooms,      accent: "green" },
+        { label: "Créneaux hebdo",value: weeklyBookings,   accent: "ink" },
+        { label: "Ponctuelles",   value: oneOffBookings,   accent: "gold" },
+      ]}
+    >
+      <div className="space-y-4">
         {/* ── Volet Salles ─────────────────────────────── */}
         <div className="bg-white border border-border p-3">
           <p className="text-[10px] font-black uppercase tracking-widest text-muted mb-2">Nouvelle salle</p>
@@ -348,7 +354,7 @@ export default function AdminSallesPage() {
         )}
 
         <p className="text-[10px] text-subtle">Chaque réservation est tracée dans le journal d&apos;audit (action « room.book »).</p>
-      </main>
-    </div>
+      </div>
+    </PageShell>
   );
 }

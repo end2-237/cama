@@ -4,14 +4,15 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  ArrowLeft, GraduationCap, Mail, MapPin, ShieldCheck, Award,
+  GraduationCap, ShieldCheck, Award,
   BookOpen, CheckCircle2, TrendingUp, QrCode, CalendarDays,
   CalendarClock, HelpCircle, MessagesSquare, Bot, FileText,
-  Pencil, Globe, Wifi, Bell, Lock, ChevronRight, Building2,
+  Globe, Wifi, Bell, Lock, ChevronRight, Building2,
   Clock, Radio, LayoutDashboard, Star, Zap, UserCheck, AlarmClock,
-  BadgeCheck, BarChart2, Hash, Search, Library,
+  BadgeCheck, BarChart2, Hash, Library,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import PageShell from "@/components/dashboard/PageShell";
 import QrSvg from "@/components/QrSvg";
 import PersonalCalendarDrawer from "@/components/PersonalCalendarDrawer";
 import { fetchLibrary, teacherLibrary, docCover, type LibraryDoc, KIND_LABEL } from "@/lib/library";
@@ -108,17 +109,12 @@ export default function ProfilePage() {
   const parcoursSlug   = d?.parcoursSlug ?? "genie-logiciel";
   const filiereTitle   = d?.parcoursTitle ?? "Génie Logiciel";
   const filiereSchool  = d?.school ?? user.school ?? "École d'Informatique";
-  const campus         = d?.campus ?? "Yaoundé";
   const modeLabel      = d?.modeLabel ?? "Hybride";
-  const matricule      = user.studentCard || d?.matricule || "—";
   const academicYear   = d?.academicYear ?? "2025–2026";
   const semestre       = d?.semester ?? 1;
   const niveau         = d?.level || user.level || "L1";
   const cycleType      = d?.cycleType ?? "Licence";
   const totalEcts      = d?.totalEcts ?? 180;
-  const enrolledLabel  = d?.enrolledAt
-    ? new Date(d.enrolledAt).toLocaleDateString("fr-FR", { month: "long", year: "numeric" })
-    : "—";
 
   const QUICK_LINKS = [
     { icon: CalendarClock, label: "Mon planning", sub: "Programme hebdo selon votre mode", action: () => setCalOpen(true) },
@@ -128,129 +124,26 @@ export default function ProfilePage() {
   ];
 
   return (
-    <div className="min-h-screen bg-surface">
-      {/* Top bar */}
-      <header className="bg-white border-b border-border sticky top-0 z-40">
-        <div className="max-w-[1400px] mx-auto px-4 sm:px-6 flex items-center gap-3 h-12">
-
-          {/* Retour + logo */}
-          <Link href="/dashboard" className="flex items-center gap-2 text-sm text-muted hover:text-ink transition-colors flex-shrink-0">
-            <ArrowLeft className="w-4 h-4" />
-            <span className="hidden sm:block">Dashboard</span>
-          </Link>
-          <div className="w-px h-5 bg-border flex-shrink-0" />
-          <Link href="/" className="flex items-center gap-2 flex-shrink-0">
-            <div className="w-1 h-6 bg-gradient-to-b from-cama to-gold" />
-            <span className="text-sm font-bold text-ink tracking-tight">CA<span className="text-cama">MA</span></span>
-          </Link>
-          <span className="text-[10px] font-black uppercase tracking-widest text-subtle hidden md:block">Mon profil</span>
-
-          {/* Recherche */}
-          <div className="hidden md:flex flex-1 max-w-xs items-center gap-2 bg-surface px-3 py-1.5 border border-border focus-within:border-cama transition-colors ml-2">
-            <Search className="w-3.5 h-3.5 text-subtle flex-shrink-0" />
-            <input type="text" placeholder="Rechercher dans mon profil..."
-              className="bg-transparent text-xs text-ink placeholder-subtle outline-none w-full" />
-          </div>
-
-          <div className="flex-1" />
-
-          {/* Liens rapides */}
-          <nav className="hidden lg:flex items-center gap-0.5 text-xs font-semibold">
-            {[
-              { label: "Mes cours",  href: "/dashboard" },
-              { label: "Calendrier", href: "/calendrier" },
-              { label: "Diplôme",    href: "/diplome" },
-              { label: "Guide",      href: "/guide" },
-            ].map((l) => (
-              <Link key={l.label} href={l.href}
-                className="px-3 py-1.5 text-muted hover:text-cama hover:bg-cama-50/40 transition-colors">
-                {l.label}
-              </Link>
-            ))}
-          </nav>
-          <div className="w-px h-5 bg-border hidden lg:block" />
-
-          {/* Icônes actions */}
-          <div className="flex items-center gap-0.5">
-            <button onClick={() => setCalOpen(true)} title="Mon planning"
-              className="p-1.5 text-muted hover:text-cama hover:bg-surface transition-colors">
-              <CalendarClock className="w-4 h-4" />
-            </button>
-            <Link href="/calendrier" title="Calendrier académique"
-              className="p-1.5 text-muted hover:text-cama hover:bg-surface transition-colors hidden sm:block">
-              <CalendarDays className="w-4 h-4" />
-            </Link>
-            <button title="Notifications" className="relative p-1.5 text-muted hover:text-cama hover:bg-surface transition-colors">
-              <Bell className="w-4 h-4" />
-              <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-red-500" />
-            </button>
-            <Link href="/guide" title="Aide"
-              className="p-1.5 text-muted hover:text-cama hover:bg-surface transition-colors hidden sm:block">
-              <HelpCircle className="w-4 h-4" />
-            </Link>
-          </div>
-
-          {/* Mini profil */}
-          <div className="flex items-center gap-2 pl-2 border-l border-border flex-shrink-0">
-            <div className={`w-7 h-7 rounded-full ${user.avatarColor} flex items-center justify-center text-white text-[10px] font-bold`}>
-              {user.initials}
-            </div>
-            <div className="hidden md:block leading-tight">
-              <p className="text-xs font-bold text-ink leading-none">{user.firstName}</p>
-              <p className="text-[9px] text-subtle leading-none mt-0.5">{user.level || user.roleLabel}</p>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      {/* ── HERO PROFIL ── */}
-      <section className="relative overflow-hidden text-white"
-        style={{ background: "linear-gradient(120deg, #1E1B4B 0%, #312E81 55%, #4F46E5 100%)" }}>
-        <div className="absolute inset-0 opacity-[0.07]" style={{
-          backgroundImage: "repeating-linear-gradient(90deg, transparent, transparent 22px, #fff 22px, #fff 23px), repeating-linear-gradient(0deg, transparent, transparent 22px, #fff 22px, #fff 23px)",
-        }} />
-        <div className="relative max-w-[1100px] mx-auto px-4 sm:px-6 py-8 flex flex-wrap items-center gap-6">
-          <div className="relative">
-            <div className={`w-20 h-20 rounded-full ${user.avatarColor} flex items-center justify-center text-white text-2xl font-bold border-4 border-white/20`}>
-              {user.initials}
-            </div>
-            <button className="absolute -bottom-1 -right-1 w-7 h-7 bg-gold flex items-center justify-center hover:bg-gold-dark transition-colors" title="Changer la photo">
-              <Pencil className="w-3.5 h-3.5 text-white" />
-            </button>
-          </div>
-          <div className="flex-1 min-w-[240px]">
-            <div className="flex items-center gap-2 flex-wrap mb-1">
-              <h1 className="text-2xl font-bold">{user.name}</h1>
-              <span className="text-[10px] font-black uppercase tracking-widest bg-gold text-white px-2 py-0.5">{niveau || user.roleLabel}</span>
-              <span className="text-[10px] font-bold bg-white/15 px-2 py-0.5">Mode {modeLabel.toLowerCase()}</span>
-            </div>
-            <p className="text-white/70 text-sm flex items-center gap-2 flex-wrap">
-              <span className="flex items-center gap-1"><Mail className="w-3.5 h-3.5" /> {user.email}</span>
-              <span className="text-white/30">·</span>
-              <span className="flex items-center gap-1"><GraduationCap className="w-3.5 h-3.5" /> {cycleType} {filiereTitle}</span>
-              <span className="text-white/30">·</span>
-              <span className="flex items-center gap-1"><MapPin className="w-3.5 h-3.5" /> Campus {campus}</span>
-            </p>
-            <p className="text-white/50 text-xs mt-1">Matricule {matricule} · inscrit depuis {enrolledLabel} · semestre {semestre} en cours</p>
-          </div>
-          {/* Anneau progression */}
-          <div className="flex items-center gap-3">
-            <div className="text-right">
-              <p className="text-3xl font-black text-gold leading-none">{pct}%</p>
-              <p className="text-[10px] text-white/60 mt-1">{doneIds.size}/{totalChapters} chapitres validés</p>
-            </div>
-            <div className="w-14 h-14">
-              <svg className="w-full h-full -rotate-90" viewBox="0 0 36 36">
-                <circle cx="18" cy="18" r="15.9" fill="none" stroke="rgba(255,255,255,.15)" strokeWidth="3" />
-                <circle cx="18" cy="18" r="15.9" fill="none" stroke="#F59E0B" strokeWidth="3"
-                  strokeDasharray={`${pct} 100`} strokeLinecap="round" />
-              </svg>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <main className="max-w-[1400px] mx-auto grid lg:grid-cols-[220px_1fr_300px] gap-0 items-start">
+    <PageShell
+      title="Mon profil"
+      subtitle="Cursus, résultats, préférences et identité certifiée."
+      icon={GraduationCap}
+      breadcrumb="Mon profil"
+      context={`${niveau} · ${filiereTitle}`}
+      actions={
+        <Link href={`/parcours/${parcoursSlug}`}
+          className="inline-flex items-center gap-1.5 text-[11px] font-black uppercase tracking-widest border border-cama/30 text-cama px-4 py-2.5 hover:bg-cama-50 transition-colors">
+          <GraduationCap className="w-3.5 h-3.5" /> Fiche du parcours
+        </Link>
+      }
+      stats={[
+        { label: "Progression", value: `${pct}%`, accent: "cama", hint: `${doneIds.size}/${totalChapters} chapitres` },
+        { label: "Chapitres validés", value: doneIds.size, accent: "green" },
+        { label: "ECTS certifiés", value: ects, accent: "gold" },
+        { label: "Examens passés", value: attempts.length, accent: "ink" },
+      ]}
+    >
+      <main className="grid lg:grid-cols-[220px_1fr_300px] gap-0 items-start">
 
         {/* ══ SIDEBAR GAUCHE STICKY ══ */}
         <aside className="hidden lg:block bg-white border-r border-border lg:sticky lg:top-12 lg:h-[calc(100vh-48px)] lg:overflow-y-auto">
@@ -621,7 +514,7 @@ export default function ProfilePage() {
       </main>
 
       <PersonalCalendarDrawer open={calOpen} onClose={() => setCalOpen(false)} />
-    </div>
+    </PageShell>
   );
 }
 

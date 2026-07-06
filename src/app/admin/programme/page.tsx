@@ -1,14 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  ArrowLeft, Loader2, GraduationCap, CheckCircle2, AlertCircle,
-  UserCheck, Plus, X, Save, ChevronDown, ChevronRight, Trash2,
-  Users, BookOpen, Clock, TrendingUp, CalendarClock, Eye, EyeOff,
+  Loader2, GraduationCap, CheckCircle2, AlertCircle,
+  Plus, X, Save, ChevronDown, ChevronRight, Trash2,
+  CalendarClock, Eye, EyeOff,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import PageShell from "@/components/dashboard/PageShell";
 import { supabase } from "@/lib/supabase";
 import type { DBProgramCourse, DBSession, CycleMode } from "@/lib/supabase";
 import { PARCOURS } from "@/lib/parcours";
@@ -173,35 +173,27 @@ export default function AdminProgrammePage() {
     </div>
   );
 
-  const KPIS = analytics ? [
-    { icon: Users,       label: "Étudiants",       value: analytics.students,                 color: "text-cama" },
-    { icon: BookOpen,    label: "Matières",        value: analytics.matieres,                 color: "text-ink" },
-    { icon: UserCheck,   label: "Affectées",       value: `${analytics.assigned}/${analytics.matieres}`, color: "text-green-600" },
-    { icon: Clock,       label: "Volume total",    value: `${analytics.totalHours}h`,         color: "text-gold-dark" },
-    { icon: TrendingUp,  label: "Taux complétion", value: `${analytics.avgCompletion}%`,      color: "text-purple-600" },
-  ] : [];
-
   return (
-    <div className="min-h-screen bg-surface">
-      {/* Header */}
-      <header className="bg-white border-b border-border sticky top-0 z-40">
-        <div className="max-w-[1200px] mx-auto px-4 sm:px-6 flex items-center gap-3 h-12">
-          <Link href="/dashboard" className="flex items-center gap-2 text-sm text-muted hover:text-ink transition-colors">
-            <ArrowLeft className="w-4 h-4" /> Dashboard
-          </Link>
-          <div className="w-px h-5 bg-border" />
-          <span className="text-sm font-bold text-ink flex items-center gap-1.5">
-            <GraduationCap className="w-4 h-4 text-cama" /> Programme académique
-          </span>
-          <div className="flex-1" />
-          <button onClick={() => { setAddOpen(true); setNewCourse({ ...EMPTY_COURSE, annee_niveau: niveau }); setMsg(null); }}
-            className="flex items-center gap-1.5 text-xs font-bold bg-cama text-white px-3 py-1.5 rounded-lg hover:bg-cama-700 transition-colors">
-            <Plus className="w-3.5 h-3.5" /> Ajouter une matière
-          </button>
-        </div>
-      </header>
-
-      <main className="max-w-[1200px] mx-auto px-4 sm:px-6 py-5">
+    <PageShell
+      title="Programme académique"
+      subtitle="Matières, affectations, horaires et publication par filière et niveau."
+      icon={GraduationCap}
+      breadcrumb="Programme académique"
+      maxWidth="max-w-[1200px]"
+      actions={
+        <button onClick={() => { setAddOpen(true); setNewCourse({ ...EMPTY_COURSE, annee_niveau: niveau }); setMsg(null); }}
+          className="flex items-center gap-1.5 text-xs font-bold bg-cama text-white px-3 py-1.5 rounded-lg hover:bg-cama-700 transition-colors">
+          <Plus className="w-3.5 h-3.5" /> Ajouter une matière
+        </button>
+      }
+      stats={analytics ? [
+        { label: "Étudiants",       value: analytics.students,                             accent: "cama" },
+        { label: "Matières",        value: analytics.matieres,                             accent: "ink" },
+        { label: "Affectées",       value: `${analytics.assigned}/${analytics.matieres}`,  accent: "green" },
+        { label: "Volume total",    value: `${analytics.totalHours}h`,                     accent: "gold" },
+        { label: "Taux complétion", value: `${analytics.avgCompletion}%`,                  accent: "ink" },
+      ] : undefined}
+    >
 
         {msg && (
           <div className={`flex items-center gap-2 text-sm rounded-xl px-4 py-3 mb-4 ${
@@ -219,19 +211,6 @@ export default function AdminProgrammePage() {
             {PARCOURS.map((p) => <option key={p.slug} value={p.slug}>{p.title} — {p.school}</option>)}
           </select>
         </div>
-
-        {/* Analytics */}
-        {analytics && (
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-px bg-border border border-border rounded-xl overflow-hidden mb-5">
-            {KPIS.map((k) => (
-              <div key={k.label} className="bg-white p-3 text-center">
-                <k.icon className={`w-4 h-4 mx-auto mb-1 ${k.color}`} />
-                <p className={`text-lg font-bold leading-none ${k.color}`}>{k.value}</p>
-                <p className="text-[10px] text-muted mt-1">{k.label}</p>
-              </div>
-            ))}
-          </div>
-        )}
 
         {/* Onglets niveau */}
         <div className="flex gap-0.5 mb-5 bg-white border border-border rounded-xl p-1 w-fit">
@@ -382,7 +361,6 @@ export default function AdminProgrammePage() {
             ))}
           </div>
         )}
-      </main>
 
       {/* Modal — Ajouter une matière */}
       {addOpen && (
@@ -472,6 +450,6 @@ export default function AdminProgrammePage() {
           </div>
         </div>
       )}
-    </div>
+    </PageShell>
   );
 }

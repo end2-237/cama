@@ -1,13 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  ArrowLeft, Loader2, ClipboardCheck, Star, Users, AlertTriangle,
-  TrendingUp, Radio, UserX, GraduationCap, Save, BookOpen, Eye,
+  Loader2, ClipboardCheck, Star, AlertTriangle,
+  Radio, UserX, GraduationCap, Save, BookOpen, Eye,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import PageShell from "@/components/dashboard/PageShell";
 import { supabase } from "@/lib/supabase";
 import type { DBUser, DBChapter, DBLiveAttendance, DBCahierEntry, DBProgramCourse } from "@/lib/supabase";
 import {
@@ -220,45 +220,25 @@ export default function AdminSuiviPage() {
     </div>
   );
 
-  const KPIS = [
-    { icon: Users,        label: "Enseignants suivis",    value: teacherKpis.trackedTeachers, color: "text-cama" },
-    { icon: AlertTriangle,label: "Cours en retard (<50%)",value: teacherKpis.late,            color: "text-red-500" },
-    { icon: TrendingUp,   label: "Moyenne d'avancement",  value: `${teacherKpis.avg}%`,       color: "text-green-600" },
-    { icon: Radio,        label: "Lives tenus",           value: attendanceStats.held,        color: "text-purple-600" },
-    { icon: GraduationCap,label: "Étudiants inscrits",    value: inscriptions.length,         color: "text-gold-dark" },
-  ];
-
   return (
-    <div className="min-h-screen bg-surface">
-      {/* Header */}
-      <header className="bg-white border-b border-border sticky top-0 z-40">
-        <div className="max-w-[1200px] mx-auto px-4 sm:px-6 flex items-center gap-3 h-12">
-          <Link href="/dashboard" className="flex items-center gap-2 text-sm text-muted hover:text-ink transition-colors">
-            <ArrowLeft className="w-4 h-4" /> Dashboard
-          </Link>
-          <div className="w-px h-5 bg-border" />
-          <span className="text-sm font-bold text-ink flex items-center gap-1.5">
-            <ClipboardCheck className="w-4 h-4 text-cama" /> Suivi &amp; Qualité
-          </span>
-        </div>
-      </header>
-
-      <main className="max-w-[1200px] mx-auto px-4 sm:px-6 py-5">
-        {fetching ? (
-          <div className="py-16 text-center"><Loader2 className="w-6 h-6 animate-spin text-cama mx-auto" /></div>
-        ) : (
+    <PageShell
+      title="Suivi & Qualité"
+      subtitle="Progression des enseignants, qualité, présences et évolution des étudiants."
+      icon={ClipboardCheck}
+      breadcrumb="Suivi & Qualité"
+      maxWidth="max-w-[1200px]"
+      stats={[
+        { label: "Enseignants suivis",   value: teacherKpis.trackedTeachers, accent: "cama" },
+        { label: "Cours en retard <50%", value: teacherKpis.late,            accent: teacherKpis.late ? "ink" : "green" },
+        { label: "Moyenne avancement",   value: `${teacherKpis.avg}%`,       accent: "green" },
+        { label: "Lives tenus",          value: attendanceStats.held,        accent: "ink" },
+        { label: "Étudiants inscrits",   value: inscriptions.length,         accent: "gold" },
+      ]}
+    >
+      {fetching ? (
+        <div className="py-16 text-center"><Loader2 className="w-6 h-6 animate-spin text-cama mx-auto" /></div>
+      ) : (
         <div className="space-y-8">
-
-          {/* KPI */}
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-px bg-border border border-border rounded-xl overflow-hidden">
-            {KPIS.map((k) => (
-              <div key={k.label} className="bg-white p-3 text-center">
-                <k.icon className={`w-4 h-4 mx-auto mb-1 ${k.color}`} />
-                <p className={`text-lg font-bold leading-none ${k.color}`}>{k.value}</p>
-                <p className="text-[10px] text-muted mt-1">{k.label}</p>
-              </div>
-            ))}
-          </div>
 
           {/* 1 — Progression des enseignants */}
           <section>
@@ -468,8 +448,7 @@ export default function AdminSuiviPage() {
             )}
           </section>
         </div>
-        )}
-      </main>
-    </div>
+      )}
+    </PageShell>
   );
 }

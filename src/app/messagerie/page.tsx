@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import Link from "next/link";
 import {
-  ArrowLeft, Mail, Search, X, Send, PenSquare, Loader2, ShieldCheck,
+  Mail, Search, X, Send, PenSquare, Loader2, ShieldCheck,
   GraduationCap, UserCog, MessageSquare, Inbox,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import PageShell from "@/components/dashboard/PageShell";
 import type { DBUser } from "@/lib/supabase";
 import { fetchUsers, fetchInscriptions, type InscriptionWithUser } from "@/lib/admin";
 import { fetchProgram } from "@/lib/program";
@@ -241,27 +241,28 @@ export default function MessageriePage() {
   );
 
   return (
-    <div className="min-h-screen bg-surface flex flex-col">
-      {/* Header */}
-      <header className="bg-white border-b border-border sticky top-0 z-40">
-        <div className="max-w-[1200px] mx-auto px-4 sm:px-6 flex items-center gap-3 h-12">
-          <Link href="/dashboard" className="flex items-center gap-2 text-sm text-muted hover:text-ink transition-colors">
-            <ArrowLeft className="w-4 h-4" /> Dashboard
-          </Link>
-          <div className="w-px h-5 bg-border" />
-          <span className="text-sm font-bold text-ink flex items-center gap-1.5">
-            <Mail className="w-4 h-4 text-cama" /> Messagerie
-          </span>
-          {unread > 0 && (
-            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-cama text-white leading-none">
-              {unread}
-            </span>
-          )}
-        </div>
-      </header>
-
+    <PageShell
+      title="Messagerie"
+      subtitle="Échangez avec l'administration, vos enseignants et vos étudiants."
+      icon={Mail}
+      breadcrumb="Messagerie"
+      context={unread > 0 ? `${unread} non lu${unread > 1 ? "s" : ""}` : "Boîte à jour"}
+      maxWidth="max-w-[1200px]"
+      actions={
+        <button onClick={() => { setPicker(true); setPickQ(""); }}
+          className="inline-flex items-center gap-1.5 text-[11px] font-black uppercase tracking-widest bg-cama text-white px-4 py-2.5 hover:bg-cama-700 transition-colors">
+          <PenSquare className="w-3.5 h-3.5" /> Nouveau message
+        </button>
+      }
+      stats={[
+        { label: "Conversations", value: conversations.length, accent: "cama" },
+        { label: "Non lus", value: unread, accent: unread ? "gold" : "green" },
+        { label: "Reçus", value: inbox.length, accent: "ink" },
+        { label: "Envoyés", value: sent.length, accent: "ink" },
+      ]}
+    >
       {/* Corps 2-panneaux */}
-      <main className="flex-1 max-w-[1200px] w-full mx-auto px-4 sm:px-6 py-4">
+      <main className="flex-1">
         <div className="bg-white border border-border rounded-xl overflow-hidden flex h-[calc(100vh-104px)]">
           {/* ── Panneau gauche : conversations ── */}
           <aside className="w-[320px] flex-shrink-0 border-r border-border flex flex-col">
@@ -466,7 +467,7 @@ export default function MessageriePage() {
           </div>
         </div>
       )}
-    </div>
+    </PageShell>
   );
 }
 

@@ -1,13 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  ArrowLeft, Loader2, GraduationCap, CheckCircle2, Circle, BookOpen,
+  Loader2, GraduationCap, CheckCircle2, Circle, BookOpen,
   CalendarClock, TrendingUp, ChevronDown, ChevronRight, Bot,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import PageShell from "@/components/dashboard/PageShell";
 import type { DBProgramCourse, DBChapter, DBSession, DBChapterProgress, CycleMode } from "@/lib/supabase";
 import {
   fetchStudentProgram, fetchProgress, markChapter, fetchChapters, fetchSessions,
@@ -95,20 +95,20 @@ export default function StudentProgramPage() {
   const d = user.dossier;
 
   return (
-    <div className="min-h-screen bg-surface">
-      <header className="bg-white border-b border-border sticky top-0 z-40">
-        <div className="max-w-[1100px] mx-auto px-4 sm:px-6 flex items-center gap-3 h-12">
-          <Link href="/dashboard" className="flex items-center gap-2 text-sm text-muted hover:text-ink transition-colors">
-            <ArrowLeft className="w-4 h-4" /> Dashboard
-          </Link>
-          <div className="w-px h-5 bg-border" />
-          <span className="text-sm font-bold text-ink flex items-center gap-1.5">
-            <GraduationCap className="w-4 h-4 text-cama" /> Mon programme
-          </span>
-        </div>
-      </header>
-
-      <main className="max-w-[1100px] mx-auto px-4 sm:px-6 py-5">
+    <PageShell
+      title="Mon programme"
+      subtitle="Suivez votre parcours, cochez vos chapitres et gardez un œil sur vos crédits."
+      icon={GraduationCap}
+      breadcrumb="Mon programme"
+      context={d ? `${d.parcoursTitle} · S${d.semester}` : undefined}
+      maxWidth="max-w-[1100px]"
+      stats={[
+        { label: "Progression", value: `${pct}%`, accent: "cama", hint: `${doneIds.size}/${allChapters.length} chapitres` },
+        { label: "Matières", value: courses.length, accent: "ink" },
+        { label: "Crédits ECTS", value: degree ? `${degree.earned}/${degree.target}` : "—", accent: "gold" },
+        { label: "Diplôme", value: degree ? `${degree.pct}%` : "—", accent: "green" },
+      ]}
+    >
 
         {!d ? (
           <div className="bg-white border border-border rounded-xl p-8 text-center">
@@ -264,7 +264,6 @@ export default function StudentProgramPage() {
             )}
           </>
         )}
-      </main>
-    </div>
+    </PageShell>
   );
 }

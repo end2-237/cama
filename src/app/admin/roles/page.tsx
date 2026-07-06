@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Loader2, ShieldCheck, Search, Crown, Image as ImageIcon, Check } from "lucide-react";
+import { Loader2, ShieldCheck, Search, Crown, Image as ImageIcon, Check } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import PageShell from "@/components/dashboard/PageShell";
 import { fetchUsers } from "@/lib/admin";
 import { fetchProgram } from "@/lib/program";
 import {
@@ -86,17 +86,25 @@ export default function AdminRolesPage() {
     <div className="min-h-screen flex items-center justify-center bg-surface"><Loader2 className="w-6 h-6 animate-spin text-cama" /></div>
   );
 
-  return (
-    <div className="min-h-screen bg-surface">
-      <header className="bg-white border-b border-border sticky top-0 z-40">
-        <div className="max-w-[1100px] mx-auto px-4 flex items-center gap-3 h-12">
-          <Link href="/dashboard" className="flex items-center gap-2 text-[11px] text-muted hover:text-ink"><ArrowLeft className="w-3.5 h-3.5" /> Dashboard</Link>
-          <div className="w-px h-5 bg-border" />
-          <span className="text-[11px] font-black uppercase tracking-widest text-ink flex items-center gap-1.5"><Crown className="w-3.5 h-3.5 text-gold-dark" /> Niveaux d&apos;administration</span>
-        </div>
-      </header>
+  const adminCount = users.filter((u) => u.admin_level).length;
+  const coordCount = users.filter((u) => u.admin_level === "coordinateur").length;
+  const mediaCount = users.filter((u) => u.is_media_manager).length;
 
-      <main className="max-w-[1100px] mx-auto px-4 py-5 space-y-4">
+  return (
+    <PageShell
+      title="Niveaux d'administration"
+      subtitle="Attribuez les niveaux d'administration, périmètres de filière et droits média."
+      icon={Crown}
+      breadcrumb="Niveaux d'administration"
+      maxWidth="max-w-[1100px]"
+      stats={[
+        { label: "Comptes admin",  value: adminCount, accent: "cama" },
+        { label: "Coordinateurs",  value: coordCount, accent: "gold" },
+        { label: "Gestion média",  value: mediaCount, accent: "ink" },
+        { label: "Utilisateurs",   value: users.length, accent: "ink" },
+      ]}
+    >
+      <div className="space-y-4">
         {/* Explication de la hiérarchie */}
         <div className="grid sm:grid-cols-3 gap-2">
           {ADMIN_LEVELS.map((l) => (
@@ -177,7 +185,7 @@ export default function AdminRolesPage() {
         </div>
 
         <p className="text-[10px] text-subtle flex items-center gap-1.5"><ShieldCheck className="w-3 h-3" /> Chaque changement de niveau est tracé dans le journal d&apos;audit.</p>
-      </main>
-    </div>
+      </div>
+    </PageShell>
   );
 }

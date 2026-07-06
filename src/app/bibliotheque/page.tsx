@@ -4,11 +4,12 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  ArrowLeft, Loader2, Library, Search, Filter, FileText, Video, MonitorPlay,
+  Loader2, Library, Search, Filter, FileText, Video, MonitorPlay,
   BookMarked, ExternalLink, ShieldCheck, Sparkles, Clock, BarChart3, Info,
   RotateCcw, ChevronRight, ChevronLeft, User as UserIcon,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import PageShell from "@/components/dashboard/PageShell";
 import { fetchLibrary, teacherLibrary, KIND_LABEL, docCover, type LibraryDoc, type LibraryKind } from "@/lib/library";
 import { fetchTeacherCourses } from "@/lib/program";
 import { fetchExtraCourses, MODE_LABEL } from "@/lib/extra";
@@ -235,57 +236,23 @@ export default function BibliothequePage() {
   const shown = filtered.slice(0, visible);
 
   return (
-    <div className="min-h-screen bg-surface">
-      {/* Top header */}
-      <header className="bg-white border-b border-border sticky top-0 z-40">
-        <div className="max-w-[1400px] mx-auto px-4 flex items-center gap-3 h-12">
-          <Link href="/dashboard" className="flex items-center gap-2 text-[11px] text-muted hover:text-ink transition-colors">
-            <ArrowLeft className="w-3.5 h-3.5" /> Dashboard
-          </Link>
-          <div className="w-px h-5 bg-border" />
-          <Link href="/" className="hidden sm:flex items-center gap-2 flex-shrink-0">
-            <div className="w-1 h-6 bg-gradient-to-b from-cama to-gold" />
-            <span className="text-sm font-bold text-ink tracking-tight">CA<span className="text-cama">MA</span></span>
-          </Link>
-          <span className="text-[11px] font-black uppercase tracking-widest text-ink flex items-center gap-1.5">
-            <Library className="w-3.5 h-3.5 text-cama" /> {pageTitle}
-          </span>
-
-          <div className="flex-1" />
-
-          {/* Navigation contextuelle */}
-          <nav className="hidden lg:flex items-center gap-0.5 text-xs font-semibold">
-            {(user?.role === "enseignant" ? [
-              { label: "Mes cours",   href: "/dashboard" },
-              { label: "Évaluations", href: "/dashboard?tab=%C3%89valuations" },
-              { label: "Présences",   href: "/presences" },
-              { label: "TP & VM",     href: "/tp" },
-            ] : [
-              { label: "Mes cours",   href: "/dashboard" },
-              { label: "Examens",     href: "/etudiant/examens" },
-              { label: "Journal",     href: "/journal" },
-              { label: "Calendrier",  href: "/calendrier" },
-            ]).map((l) => (
-              <Link key={l.href} href={l.href}
-                className="px-2.5 py-1.5 text-muted hover:text-cama hover:bg-cama-50/50 transition-colors">
-                {l.label}
-              </Link>
-            ))}
-            <Link href="/profil"
-              className="px-2.5 py-1.5 text-muted hover:text-cama hover:bg-cama-50/50 transition-colors">
-              Profil
-            </Link>
-          </nav>
-
-          <span className="text-[9px] text-muted border border-border px-2 py-1 bg-surface flex-shrink-0">
-            {filtered.length} document{filtered.length > 1 ? "s" : ""}
-          </span>
-        </div>
-      </header>
-
+    <PageShell
+      title={pageTitle}
+      subtitle="Tous les supports pédagogiques : PDF, vidéos, cours natifs, syllabus et annales."
+      icon={Library}
+      breadcrumb="Bibliothèque"
+      stats={[
+        { label: "Documents", value: kpi.total, accent: "ink" },
+        { label: "PDF", value: kpi.pdf, accent: "cama" },
+        { label: "Vidéos", value: kpi.video, accent: "ink" },
+        { label: "Épreuves", value: kpi.epreuve, accent: "gold" },
+        { label: "Filières", value: filieres.length, accent: "green" },
+        { label: "Résultats", value: filtered.length, accent: "cama" },
+      ]}
+    >
       {/* ═══════════════ HORS-CURSUS STRIP ═══════════════ */}
       {!fetching && extras.length > 0 && (
-        <section className="max-w-[1400px] mx-auto px-4 pt-4">
+        <section className="pb-4">
           <div className="border-t-2 border-gold text-white flex items-stretch overflow-hidden"
             style={{ background: "linear-gradient(135deg, #1E1B4B 0%, #4F46E5 100%)" }}>
             {/* Left cap label */}
@@ -347,7 +314,7 @@ export default function BibliothequePage() {
       {fetching ? (
         <div className="py-32 text-center"><Loader2 className="w-6 h-6 animate-spin text-cama mx-auto" /></div>
       ) : (
-        <div className="max-w-[1400px] mx-auto px-4 py-4 grid grid-cols-1 lg:grid-cols-[280px_1fr_250px] gap-4 items-start">
+        <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr_250px] gap-4 items-start">
           {/* ═══════════════ LEFT SIDEBAR — FILTRES ═══════════════ */}
           <aside className="space-y-3 lg:sticky lg:top-16 self-start">
             <div className="bg-white border border-border p-4">
@@ -648,6 +615,6 @@ export default function BibliothequePage() {
           </aside>
         </div>
       )}
-    </div>
+    </PageShell>
   );
 }

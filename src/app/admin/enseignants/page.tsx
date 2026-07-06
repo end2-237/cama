@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Loader2, GraduationCap, Plus, AlertCircle, CheckCircle2 } from "lucide-react";
+import { Loader2, GraduationCap, Plus, AlertCircle, CheckCircle2 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import PageShell from "@/components/dashboard/PageShell";
 import { fetchUsers } from "@/lib/admin";
 import { logAudit } from "@/lib/governance";
 import type { DBUser } from "@/lib/supabase";
@@ -81,19 +81,21 @@ export default function AdminEnseignantsPage() {
     <div className="min-h-screen flex items-center justify-center bg-surface"><Loader2 className="w-6 h-6 animate-spin text-cama" /></div>
   );
 
-  return (
-    <div className="min-h-screen bg-surface">
-      <header className="bg-white border-b border-border sticky top-0 z-40">
-        <div className="max-w-[1100px] mx-auto px-4 flex items-center gap-3 h-12">
-          <Link href="/dashboard" className="flex items-center gap-2 text-[11px] text-muted hover:text-ink"><ArrowLeft className="w-3.5 h-3.5" /> Dashboard</Link>
-          <div className="w-px h-5 bg-border" />
-          <span className="text-[11px] font-black uppercase tracking-widest text-ink flex items-center gap-1.5">
-            <GraduationCap className="w-3.5 h-3.5 text-cama" /> Enseignants
-          </span>
-        </div>
-      </header>
+  const withSchool = teachers.filter((t) => t.school).length;
 
-      <main className="max-w-[1100px] mx-auto px-4 py-5 space-y-4">
+  return (
+    <PageShell
+      title="Enseignants"
+      subtitle="Ajoutez les comptes enseignants — connexion par code email, sans mot de passe."
+      icon={GraduationCap}
+      breadcrumb="Enseignants"
+      maxWidth="max-w-[1100px]"
+      stats={[
+        { label: "Enseignants",     value: teachers.length, accent: "cama" },
+        { label: "Avec école",      value: withSchool,      accent: "ink" },
+      ]}
+    >
+      <div className="space-y-4">
         {/* Ajouter un enseignant */}
         <div className="bg-white border border-border p-4">
           <p className="text-[10px] font-black uppercase tracking-widest text-muted mb-3">Ajouter un enseignant</p>
@@ -170,7 +172,7 @@ export default function AdminEnseignantsPage() {
             </div>
           )}
         </div>
-      </main>
-    </div>
+      </div>
+    </PageShell>
   );
 }

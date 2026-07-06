@@ -1,13 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  ArrowLeft, Loader2, BookOpen, CheckCircle2, Plus, Trash2, Save,
+  Loader2, BookOpen, CheckCircle2, Plus, Trash2, Save,
   Bot, FileText, Clock, ChevronRight, CalendarClock, AlertTriangle, ArrowUpDown,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import PageShell from "@/components/dashboard/PageShell";
 import { supabase } from "@/lib/supabase";
 import type { DBProgramCourse, DBChapter, DBSession } from "@/lib/supabase";
 import {
@@ -132,21 +132,23 @@ export default function TeacherCoursesPage() {
     </div>
   );
 
-  return (
-    <div className="min-h-screen bg-surface">
-      <header className="bg-white border-b border-border sticky top-0 z-40">
-        <div className="max-w-[1200px] mx-auto px-4 sm:px-6 flex items-center gap-3 h-12">
-          <Link href="/dashboard" className="flex items-center gap-2 text-sm text-muted hover:text-ink transition-colors">
-            <ArrowLeft className="w-4 h-4" /> Dashboard
-          </Link>
-          <div className="w-px h-5 bg-border" />
-          <span className="text-sm font-bold text-ink flex items-center gap-1.5">
-            <BookOpen className="w-4 h-4 text-cama" /> Mes matières
-          </span>
-        </div>
-      </header>
+  const publishedCount = courses.filter((c) => c.published).length;
 
-      <main className="max-w-[1200px] mx-auto px-4 sm:px-6 py-5 grid lg:grid-cols-[360px_1fr] gap-5 items-start">
+  return (
+    <PageShell
+      title="Mes matières"
+      subtitle="Rédigez le contenu, les chapitres et les horaires des matières qui vous sont assignées."
+      icon={BookOpen}
+      breadcrumb="Mes matières"
+      maxWidth="max-w-[1200px]"
+      stats={[
+        { label: "Matières", value: courses.length, accent: "cama" },
+        { label: "Publiées", value: publishedCount, accent: "green" },
+        { label: "Brouillons", value: courses.length - publishedCount, accent: "gold" },
+        { label: "À traiter", value: alertCount, accent: alertCount ? "gold" : "green" },
+      ]}
+    >
+      <div className="grid lg:grid-cols-[360px_1fr] gap-5 items-start">
 
         {/* Liste matières assignées */}
         <div>
@@ -321,7 +323,7 @@ export default function TeacherCoursesPage() {
             </div>
           </div>
         )}
-      </main>
-    </div>
+      </div>
+    </PageShell>
   );
 }

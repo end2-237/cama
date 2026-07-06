@@ -4,9 +4,10 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  ArrowLeft, Loader2, Gavel, Plus, Users, ChevronRight, X, UserPlus,
+  Loader2, Gavel, Plus, Users, ChevronRight, X, UserPlus,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import PageShell from "@/components/dashboard/PageShell";
 import { fetchYears, type DBAcademicYear } from "@/lib/academic";
 import { fetchProgram } from "@/lib/program";
 import { fetchUsers } from "@/lib/admin";
@@ -104,26 +105,30 @@ export default function JurySessionsPage() {
     </div>
   );
 
+  const openCount = sessions.filter((s) => s.status === "ouvert").length;
+
   return (
-    <div className="min-h-screen bg-surface">
-      <header className="bg-white border-b border-border sticky top-0 z-40">
-        <div className="max-w-[1100px] mx-auto px-4 sm:px-6 flex items-center gap-3 h-12">
-          <Link href="/jury/deliberations" className="flex items-center gap-2 text-sm text-muted hover:text-ink transition-colors">
-            <ArrowLeft className="w-4 h-4" /> Délibérations
-          </Link>
-          <div className="w-px h-5 bg-border" />
-          <span className="text-sm font-bold text-ink flex items-center gap-1.5">
-            <Gavel className="w-4 h-4 text-cama" /> Sessions de jury
-          </span>
-          <div className="flex-1" />
+    <PageShell
+      title="Sessions de jury"
+      subtitle="Créez et composez les jurys de semestre, puis délibérez parcours par parcours."
+      icon={Gavel}
+      breadcrumb="Sessions de jury"
+      maxWidth="max-w-[1100px]"
+      actions={
+        <>
+          <Link href="/jury/deliberations" className="text-sm text-cama font-semibold hover:underline">Délibérations →</Link>
           <button onClick={() => setShowForm((v) => !v)}
             className="flex items-center gap-1.5 text-[12px] font-bold text-white bg-cama rounded-lg px-3 py-1.5 hover:opacity-90">
             <Plus className="w-3.5 h-3.5" /> Nouvelle session
           </button>
-        </div>
-      </header>
-
-      <main className="max-w-[1100px] mx-auto px-4 sm:px-6 py-5">
+        </>
+      }
+      stats={[
+        { label: "Sessions", value: sessions.length,               accent: "ink" },
+        { label: "Ouvertes", value: openCount,                     accent: "green" },
+        { label: "Clôturées", value: sessions.length - openCount,  accent: "gold" },
+      ]}
+    >
         {showForm && (
           <div className="bg-white border border-border rounded-xl p-4 mb-5">
             <p className="text-sm font-bold text-ink mb-3">Créer une session de jury</p>
@@ -240,7 +245,6 @@ export default function JurySessionsPage() {
             ))}
           </div>
         )}
-      </main>
-    </div>
+    </PageShell>
   );
 }

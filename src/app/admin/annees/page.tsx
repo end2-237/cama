@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Loader2, CalendarRange, Plus, Star } from "lucide-react";
+import { Loader2, CalendarRange, Plus, Star } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import PageShell from "@/components/dashboard/PageShell";
 import {
   fetchYears, fetchSemesters, createYear, createSemester,
   setCurrentYear, setCurrentSemester,
@@ -82,19 +82,23 @@ export default function AdminAnneesPage() {
     <div className="min-h-screen flex items-center justify-center bg-surface"><Loader2 className="w-6 h-6 animate-spin text-cama" /></div>
   );
 
-  return (
-    <div className="min-h-screen bg-surface">
-      <header className="bg-white border-b border-border sticky top-0 z-40">
-        <div className="max-w-[1100px] mx-auto px-4 flex items-center gap-3 h-12">
-          <Link href="/dashboard" className="flex items-center gap-2 text-[11px] text-muted hover:text-ink"><ArrowLeft className="w-3.5 h-3.5" /> Dashboard</Link>
-          <div className="w-px h-5 bg-border" />
-          <span className="text-[11px] font-black uppercase tracking-widest text-ink flex items-center gap-1.5">
-            <CalendarRange className="w-3.5 h-3.5 text-cama" /> Années &amp; semestres
-          </span>
-        </div>
-      </header>
+  const currentYear = years.find((y) => y.is_current);
 
-      <main className="max-w-[1100px] mx-auto px-4 py-5 space-y-4">
+  return (
+    <PageShell
+      title="Années & semestres"
+      subtitle="Créez les années académiques et semestres, et définissez la période courante."
+      icon={CalendarRange}
+      breadcrumb="Années & semestres"
+      maxWidth="max-w-[1100px]"
+      context={currentYear ? `Année courante · ${currentYear.label}` : undefined}
+      stats={[
+        { label: "Années",          value: years.length,                 accent: "cama" },
+        { label: "Semestres",       value: semesters.length,             accent: "ink" },
+        { label: "Année courante",  value: currentYear?.label ?? "—",    accent: "gold" },
+      ]}
+    >
+      <div className="space-y-4">
         {/* Nouvelle année */}
         <div className="bg-white border border-border p-3">
           <p className="text-[10px] font-black uppercase tracking-widest text-muted mb-2">Nouvelle année académique</p>
@@ -161,7 +165,7 @@ export default function AdminAnneesPage() {
         })}
 
         <p className="text-[10px] text-subtle">Chaque changement d&apos;année ou de semestre courant est tracé dans le journal d&apos;audit.</p>
-      </main>
-    </div>
+      </div>
+    </PageShell>
   );
 }

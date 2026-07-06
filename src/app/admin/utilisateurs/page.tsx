@@ -4,10 +4,11 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  ArrowLeft, Loader2, Users, CheckCircle2, XCircle, Clock,
-  GraduationCap, UserCog, Search, ShieldCheck, FolderOpen,
+  Loader2, Users, CheckCircle2, XCircle,
+  Search, FolderOpen,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import PageShell from "@/components/dashboard/PageShell";
 import type { DBUser, UserRole, DBInscription } from "@/lib/supabase";
 import {
   fetchUsers, updateUserRole, fetchInscriptions, setInscriptionStatus,
@@ -85,43 +86,24 @@ export default function AdminUsersPage() {
     </div>
   );
 
-  const KPIS = stats ? [
-    { icon: GraduationCap, label: "Étudiants",   value: stats.students,  color: "text-cama" },
-    { icon: UserCog,       label: "Enseignants", value: stats.teachers,  color: "text-ink" },
-    { icon: Clock,         label: "En attente",  value: stats.pending,   color: "text-gold-dark" },
-    { icon: ShieldCheck,   label: "Validées",    value: stats.validated, color: "text-green-600" },
-  ] : [];
-
   return (
-    <div className="min-h-screen bg-surface">
-      <header className="bg-white border-b border-border sticky top-0 z-40">
-        <div className="max-w-[1200px] mx-auto px-4 sm:px-6 flex items-center gap-3 h-12">
-          <Link href="/dashboard" className="flex items-center gap-2 text-sm text-muted hover:text-ink transition-colors">
-            <ArrowLeft className="w-4 h-4" /> Dashboard
-          </Link>
-          <div className="w-px h-5 bg-border" />
-          <span className="text-sm font-bold text-ink flex items-center gap-1.5">
-            <Users className="w-4 h-4 text-cama" /> Utilisateurs & inscriptions
-          </span>
-          <div className="flex-1" />
-          <Link href="/admin/programme" className="text-xs font-bold text-cama hover:underline">Programme →</Link>
-        </div>
-      </header>
-
-      <main className="max-w-[1200px] mx-auto px-4 sm:px-6 py-5">
-        {/* KPIs */}
-        {stats && (
-          <div className="grid grid-cols-4 gap-px bg-border border border-border rounded-xl overflow-hidden mb-5">
-            {KPIS.map((k) => (
-              <div key={k.label} className="bg-white p-3 text-center">
-                <k.icon className={`w-4 h-4 mx-auto mb-1 ${k.color}`} />
-                <p className={`text-lg font-bold leading-none ${k.color}`}>{k.value}</p>
-                <p className="text-[10px] text-muted mt-1">{k.label}</p>
-              </div>
-            ))}
-          </div>
-        )}
-
+    <PageShell
+      title="Utilisateurs & inscriptions"
+      subtitle="Validez les inscriptions et gérez les rôles des membres de la plateforme."
+      icon={Users}
+      breadcrumb="Utilisateurs"
+      maxWidth="max-w-[1200px]"
+      actions={
+        <Link href="/admin/programme" className="text-xs font-bold text-cama hover:underline">Programme →</Link>
+      }
+      stats={stats ? [
+        { label: "Étudiants",   value: stats.students,  accent: "cama" },
+        { label: "Enseignants", value: stats.teachers,  accent: "ink" },
+        { label: "En attente",  value: stats.pending,   accent: "gold" },
+        { label: "Validées",    value: stats.validated, accent: "green" },
+      ] : undefined}
+    >
+      <div>
         {/* Onglets + recherche */}
         <div className="flex flex-wrap items-center gap-3 mb-4">
           <div className="flex gap-0.5 bg-white border border-border rounded-xl p-1">
@@ -220,7 +202,7 @@ export default function AdminUsersPage() {
             </div>
           )
         )}
-      </main>
-    </div>
+      </div>
+    </PageShell>
   );
 }

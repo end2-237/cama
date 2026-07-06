@@ -4,11 +4,12 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  ArrowLeft, Loader2, FileQuestion, Clock, CheckCircle2, Play, Award,
+  Loader2, FileQuestion, Clock, CheckCircle2, Play, Award,
   BookOpen, Shield, AlertTriangle, Calendar, Timer, BarChart3,
   ChevronRight, Filter, Target, TrendingUp, Info,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import PageShell from "@/components/dashboard/PageShell";
 import type { DBProgramCourse, DBExam, DBExamAttempt } from "@/lib/supabase";
 import { fetchStudentProgram } from "@/lib/program";
 import { fetchExamsForCourses, fetchAttemptsForStudent, fetchQuestions, effectiveScore } from "@/lib/exams";
@@ -186,24 +187,24 @@ export default function StudentExamsPage() {
   );
 
   return (
-    <div className="min-h-screen bg-surface">
-      {/* Top header */}
-      <header className="bg-white border-b border-border sticky top-0 z-40">
-        <div className="max-w-[1400px] mx-auto px-4 flex items-center gap-3 h-12">
-          <Link href="/dashboard" className="flex items-center gap-2 text-[11px] text-muted hover:text-ink transition-colors">
-            <ArrowLeft className="w-3.5 h-3.5" /> Dashboard
-          </Link>
-          <div className="w-px h-5 bg-border" />
-          <span className="text-[11px] font-black uppercase tracking-widest text-ink flex items-center gap-1.5">
-            <FileQuestion className="w-3.5 h-3.5 text-cama" /> Mes Evaluations
-          </span>
-        </div>
-      </header>
-
+    <PageShell
+      title="Mes évaluations"
+      subtitle="Passez vos examens, suivez vos notes et gardez un dossier Safe-CAMA propre."
+      icon={FileQuestion}
+      breadcrumb="Mes évaluations"
+      stats={[
+        { label: "Examens", value: allExams.length, accent: "ink" },
+        { label: "Ouverts", value: openExams.length, accent: "cama" },
+        { label: "Notes", value: gradedAttempts.length, accent: "green" },
+        { label: "Moyenne /20", value: avgScore ?? "—", accent: "gold" },
+        { label: "Meilleure /20", value: bestScore ?? "—", accent: "gold" },
+        { label: "Alertes", value: totalAlerts, accent: totalAlerts ? "ink" : "green" },
+      ]}
+    >
       {fetching ? (
         <div className="py-32 text-center"><Loader2 className="w-6 h-6 animate-spin text-cama mx-auto" /></div>
       ) : (
-        <div className="max-w-[1400px] mx-auto px-4 py-4 flex gap-4">
+        <div className="flex gap-4">
           {/* ═══════════════ LEFT SIDEBAR ═══════════════ */}
           <aside className="w-[280px] flex-shrink-0 space-y-3 sticky top-16 self-start hidden lg:block">
             {/* Stats card */}
@@ -634,6 +635,6 @@ export default function StudentExamsPage() {
           </aside>
         </div>
       )}
-    </div>
+    </PageShell>
   );
 }

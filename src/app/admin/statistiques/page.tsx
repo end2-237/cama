@@ -1,14 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  ArrowLeft, Loader2, BarChart3, Users, GraduationCap, BookOpen,
+  Loader2, BarChart3, Users, GraduationCap, BookOpen,
   ClipboardList, Radio, FlaskConical, UserCheck, Layers, Bot, Clock,
   Star, CheckCircle2, XCircle, AlertTriangle, TrendingUp, FileCheck,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import PageShell from "@/components/dashboard/PageShell";
 import type {
   DBUser, DBProgramCourse, DBExam, DBExamAttempt, DBDeliberation, DBLiveAttendance,
 } from "@/lib/supabase";
@@ -99,22 +99,23 @@ export default function AdminStatistiquesPage() {
   if (loading || !user) return <Spinner />;
 
   return (
-    <div className="min-h-screen bg-surface">
-      <header className="bg-white border-b border-border sticky top-0 z-40">
-        <div className="max-w-[1200px] mx-auto px-4 sm:px-6 flex items-center gap-3 h-12">
-          <Link href="/dashboard" className="flex items-center gap-2 text-sm text-muted hover:text-ink transition-colors">
-            <ArrowLeft className="w-4 h-4" /> Dashboard
-          </Link>
-          <div className="w-px h-5 bg-border" />
-          <span className="text-sm font-bold text-ink flex items-center gap-1.5">
-            <BarChart3 className="w-4 h-4 text-cama" /> Statistiques de la plateforme
-          </span>
-          <div className="flex-1" />
-          <span className="text-[11px] text-muted hidden sm:block">au {FR_DATE.format(new Date())}</span>
-        </div>
-      </header>
-
-      <main className="max-w-[1200px] mx-auto px-4 sm:px-6 py-5">
+    <PageShell
+      title="Statistiques de la plateforme"
+      subtitle="Indicateurs de population, pédagogie, évaluations, assiduité et qualité perçue."
+      icon={BarChart3}
+      breadcrumb="Statistiques"
+      context={`au ${FR_DATE.format(new Date())}`}
+      maxWidth="max-w-[1200px]"
+      stats={m ? [
+        { label: "Étudiants",    value: m.students,      accent: "cama" },
+        { label: "Enseignants",  value: m.teachers,      accent: "ink" },
+        { label: "Filières",     value: m.filieres,      accent: "gold" },
+        { label: "Cours",        value: m.courses,       accent: "ink" },
+        { label: "Inscriptions", value: m.inscriptions,  accent: "ink" },
+        { label: "Examens",      value: m.exams,         accent: "cama" },
+      ] : undefined}
+    >
+      <div>
         {fetching || !m ? (
           <div className="py-24 text-center"><Loader2 className="w-7 h-7 animate-spin text-cama mx-auto" /></div>
         ) : (
@@ -231,8 +232,8 @@ export default function AdminStatistiquesPage() {
             <p className="text-[11px] text-subtle pt-2">Données arrêtées au {FR_DATE.format(new Date())}.</p>
           </div>
         )}
-      </main>
-    </div>
+      </div>
+    </PageShell>
   );
 }
 

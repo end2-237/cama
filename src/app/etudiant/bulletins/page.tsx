@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  ArrowLeft, Loader2, FileText, Printer, CheckCircle2, XCircle, Award,
+  Loader2, FileText, Printer, CheckCircle2, XCircle, Award,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import PageShell from "@/components/dashboard/PageShell";
 import {
   fetchTranscriptsForStudent, fetchTranscriptLines, DECISION_LABEL,
   type DBTranscript, type DBTranscriptLine,
@@ -63,38 +63,37 @@ export default function BulletinsEtudiantPage() {
   );
 
   return (
-    <div className="min-h-screen bg-surface print:bg-white">
-      {/* Top header (masqué à l'impression) */}
-      <header className="bg-white border-b border-border sticky top-0 z-40 print:hidden">
-        <div className="max-w-[1000px] mx-auto px-4 flex items-center gap-3 h-12">
-          <Link href="/dashboard" className="flex items-center gap-2 text-[11px] text-muted hover:text-ink transition-colors">
-            <ArrowLeft className="w-3.5 h-3.5" /> Dashboard
-          </Link>
-          <div className="w-px h-5 bg-border" />
-          <span className="text-[11px] font-black uppercase tracking-widest text-ink flex items-center gap-1.5">
-            <FileText className="w-3.5 h-3.5 text-cama" /> Mes bulletins
-          </span>
-          {selected && (
-            <button
-              onClick={() => window.print()}
-              className="ml-auto flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest bg-cama text-white px-3 py-1.5 hover:bg-cama-700 transition-colors"
-            >
-              <Printer className="w-3.5 h-3.5" /> Imprimer
-            </button>
-          )}
-        </div>
-      </header>
-
+    <PageShell
+      title="Mes bulletins"
+      subtitle="Consultez et imprimez vos relevés de notes semestriels officiels."
+      icon={FileText}
+      breadcrumb="Mes bulletins"
+      maxWidth="max-w-[1000px]"
+      actions={selected && (
+        <button
+          onClick={() => window.print()}
+          className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest bg-cama text-white px-3 py-2.5 hover:bg-cama-700 transition-colors print:hidden"
+        >
+          <Printer className="w-3.5 h-3.5" /> Imprimer
+        </button>
+      )}
+      stats={[
+        { label: "Relevés", value: transcripts.length, accent: "ink" },
+        { label: "Moyenne", value: selected?.average != null ? `${selected.average}/20` : "—", accent: "cama" },
+        { label: "ECTS", value: selected ? `${selected.ects_earned}/${selected.ects_total}` : "—", accent: "gold" },
+        { label: "Mention", value: selected?.mention ?? "—", accent: "green" },
+      ]}
+    >
       {fetching ? (
         <div className="py-32 text-center"><Loader2 className="w-6 h-6 animate-spin text-cama mx-auto" /></div>
       ) : transcripts.length === 0 ? (
-        <div className="max-w-[1000px] mx-auto px-4 py-20 text-center">
+        <div className="py-20 text-center">
           <FileText className="w-8 h-8 text-muted mx-auto mb-3" />
           <p className="text-sm font-bold text-ink">Aucun bulletin disponible</p>
           <p className="text-xs text-muted mt-1">Vos relevés semestriels apparaîtront ici dès leur génération par l&apos;administration.</p>
         </div>
       ) : (
-        <div className="max-w-[1000px] mx-auto px-4 py-4 grid md:grid-cols-[260px_1fr] gap-4 items-start print:block print:max-w-none print:px-0 print:py-0">
+        <div className="grid md:grid-cols-[260px_1fr] gap-4 items-start print:block print:max-w-none print:px-0 print:py-0">
           {/* Liste des semestres */}
           <div className="bg-white border border-border print:hidden">
             <div className="px-4 py-3 border-b border-border">
@@ -239,6 +238,6 @@ export default function BulletinsEtudiantPage() {
           body { background: white !important; }
         }
       `}</style>
-    </div>
+    </PageShell>
   );
 }
