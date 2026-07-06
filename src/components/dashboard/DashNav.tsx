@@ -56,6 +56,17 @@ export default function DashNav({ activeTab, onTab, tabs }: DashNavProps) {
     return () => document.removeEventListener("mousedown", onDown);
   }, [notifOpen]);
 
+  // Fermer le méga-menu « Plus » au clic extérieur
+  const moreRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!moreOpen) return;
+    const onDown = (e: MouseEvent) => {
+      if (moreRef.current && !moreRef.current.contains(e.target as Node)) setMoreOpen(false);
+    };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [moreOpen]);
+
   const handleNotifClick = (n: DBNotification) => {
     if (!n.read_at) {
       markRead(n.id);
@@ -142,36 +153,67 @@ export default function DashNav({ activeTab, onTab, tabs }: DashNavProps) {
                   className="px-3 h-16 flex items-center text-[13px] font-semibold border-b-2 border-transparent text-muted hover:text-cama transition-all duration-200 whitespace-nowrap">
                   Utilisateurs
                 </Link>
-                <div className="relative">
+                <div className="relative" ref={moreRef}>
                   <button onClick={() => setMoreOpen(!moreOpen)}
                     className={`px-3 h-16 flex items-center gap-1 text-[13px] font-semibold border-b-2 transition-all duration-200 whitespace-nowrap ${
                       moreOpen ? "border-cama text-cama" : "border-transparent text-muted hover:text-ink"}`}>
                     Plus <ChevronDown className={`w-3 h-3 transition-transform ${moreOpen ? "rotate-180" : ""}`} />
                   </button>
                   {moreOpen && (
-                    <div className="absolute left-0 top-full mt-0 w-56 bg-white rounded-xl border border-border shadow-xl overflow-hidden z-50 animate-scale-in">
-                      {[
-                        { href: "/admin/statistiques",   icon: BarChart2,     label: "Statistiques" },
-                        { href: "/admin/suivi",          icon: BarChart2,     label: "Suivi & Qualité" },
-                        { href: "/admin/audit",          icon: ShieldCheck,   label: "Rapports & Audit" },
-                        { href: "/admin/roles",          icon: ShieldCheck,   label: "Niveaux d'admin" },
-                        { href: "/admin/enseignants",    icon: GraduationCap, label: "Enseignants" },
-                        { href: "/admin/annees",         icon: ClipboardList, label: "Années & semestres" },
-                        { href: "/admin/salles",         icon: ClipboardList, label: "Salles & réservations" },
-                        { href: "/messagerie",           icon: Megaphone,     label: "Messagerie" },
-                        { href: "/admin/media",          icon: FileText,      label: "Ressources média" },
-                        { href: "/admin/journal",        icon: Newspaper,     label: "Journal JFN" },
-                        { href: "/admin/hors-cursus",    icon: Sparkles,      label: "Hors-cursus" },
-                        { href: "/admin/certifications", icon: Award,         label: "Certifications" },
-                        { href: "/presences",            icon: ClipboardList, label: "Présences" },
-                        { href: "/jury/deliberations",   icon: ShieldCheck,   label: "Délibérations" },
-                        { href: "/jury/sessions",        icon: ShieldCheck,   label: "Sessions de jury" },
-                      ].map((l) => (
-                        <Link key={l.href} href={l.href} onClick={() => setMoreOpen(false)}
-                          className="flex items-center gap-3 px-4 py-3 text-sm text-ink hover:bg-surface transition-colors">
-                          <l.icon className="w-4 h-4 text-cama" /> {l.label}
-                        </Link>
-                      ))}
+                    <div className="absolute right-0 top-full mt-0 w-[620px] bg-white border border-border shadow-2xl z-50 animate-scale-in">
+                      {/* Filet dégradé signature */}
+                      <div className="h-0.5 w-full bg-gradient-to-r from-cama via-cama-400 to-gold" />
+                      <div className="grid grid-cols-3 gap-x-5 gap-y-5 p-5">
+                        {[
+                          { cat: "Pilotage", items: [
+                            { href: "/admin/statistiques", icon: BarChart2,   label: "Statistiques",     sub: "Vue d'ensemble" },
+                            { href: "/admin/suivi",        icon: BarChart2,   label: "Suivi & Qualité",  sub: "Progression" },
+                            { href: "/admin/audit",        icon: ShieldCheck, label: "Rapports & Audit", sub: "Journal & exports" },
+                          ]},
+                          { cat: "Académique", items: [
+                            { href: "/admin/annees",  icon: ClipboardList, label: "Années & semestres", sub: "Structure" },
+                            { href: "/admin/salles",  icon: CalendarClock, label: "Salles & créneaux",  sub: "Réservations" },
+                            { href: "/presences",     icon: ClipboardList, label: "Présences",          sub: "Assiduité" },
+                          ]},
+                          { cat: "Scolarité & Jury", items: [
+                            { href: "/jury/deliberations", icon: Award,       label: "Délibérations",    sub: "Par cours" },
+                            { href: "/jury/sessions",      icon: ShieldCheck, label: "Sessions de jury", sub: "PV & décisions" },
+                          ]},
+                          { cat: "Personnels & accès", items: [
+                            { href: "/admin/enseignants", icon: GraduationCap, label: "Enseignants",     sub: "Comptes profs" },
+                            { href: "/admin/roles",       icon: ShieldCheck,   label: "Niveaux d'admin", sub: "Permissions" },
+                          ]},
+                          { cat: "Contenus", items: [
+                            { href: "/admin/media",         icon: FileText, label: "Ressources média", sub: "Bibliothèque" },
+                            { href: "/admin/journal",       icon: Newspaper, label: "Journal JFN",     sub: "Actualités" },
+                            { href: "/admin/hors-cursus",   icon: Sparkles, label: "Hors-cursus",      sub: "Ateliers" },
+                            { href: "/admin/certifications", icon: Award,   label: "Certifications",   sub: "Parcours certifiants" },
+                          ]},
+                          { cat: "Communication", items: [
+                            { href: "/messagerie", icon: Megaphone, label: "Messagerie", sub: "Interne" },
+                          ]},
+                        ].map((group) => (
+                          <div key={group.cat}>
+                            <p className="text-[10px] font-black uppercase tracking-widest text-muted mb-2 pb-1.5 border-b border-border">
+                              {group.cat}
+                            </p>
+                            <div className="space-y-0.5">
+                              {group.items.map((l) => (
+                                <Link key={l.href} href={l.href} onClick={() => setMoreOpen(false)}
+                                  className="flex items-start gap-2.5 p-2 hover:bg-surface transition-colors group/mi border border-transparent hover:border-border">
+                                  <span className="w-7 h-7 flex-shrink-0 flex items-center justify-center bg-cama-50 group-hover/mi:bg-cama transition-colors">
+                                    <l.icon className="w-3.5 h-3.5 text-cama group-hover/mi:text-white transition-colors" />
+                                  </span>
+                                  <span className="min-w-0">
+                                    <span className="block text-[12px] font-bold text-ink leading-tight group-hover/mi:text-cama transition-colors">{l.label}</span>
+                                    <span className="block text-[10px] text-subtle leading-tight">{l.sub}</span>
+                                  </span>
+                                </Link>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   )}
                 </div>
