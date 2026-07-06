@@ -16,6 +16,11 @@ create table if not exists public.course_notes (
   updated_at         timestamptz not null default now(),
   unique (student_id, program_course_id)
 );
+-- Répare une table pré-existante à qui il manquerait des colonnes (run partiel antérieur)
+alter table public.course_notes add column if not exists student_id        uuid;
+alter table public.course_notes add column if not exists program_course_id uuid;
+alter table public.course_notes add column if not exists body              text;
+alter table public.course_notes add column if not exists updated_at        timestamptz not null default now();
 create index if not exists idx_course_notes_student on public.course_notes(student_id);
 alter table public.course_notes enable row level security;
 drop policy if exists "course_notes_all" on public.course_notes;
@@ -28,6 +33,9 @@ create table if not exists public.student_settings (
   prefs       jsonb not null default '{}',
   updated_at  timestamptz not null default now()
 );
+alter table public.student_settings add column if not exists cycle_mode text;
+alter table public.student_settings add column if not exists prefs      jsonb not null default '{}';
+alter table public.student_settings add column if not exists updated_at timestamptz not null default now();
 alter table public.student_settings enable row level security;
 drop policy if exists "student_settings_all" on public.student_settings;
 create policy "student_settings_all" on public.student_settings for all using (true) with check (true);
@@ -41,6 +49,10 @@ create table if not exists public.slot_requests (
   status             text not null default 'en_attente', -- en_attente | valide | rejete
   created_at         timestamptz not null default now()
 );
+alter table public.slot_requests add column if not exists student_id        uuid;
+alter table public.slot_requests add column if not exists program_course_id uuid;
+alter table public.slot_requests add column if not exists desired           text;
+alter table public.slot_requests add column if not exists status            text not null default 'en_attente';
 create index if not exists idx_slot_requests_student on public.slot_requests(student_id);
 create index if not exists idx_slot_requests_course on public.slot_requests(program_course_id);
 alter table public.slot_requests enable row level security;
@@ -57,6 +69,9 @@ create table if not exists public.course_chat (
   body               text not null,
   created_at         timestamptz not null default now()
 );
+alter table public.course_chat add column if not exists user_id     uuid;
+alter table public.course_chat add column if not exists author_name text;
+alter table public.course_chat add column if not exists role        text;
 create index if not exists idx_course_chat_course on public.course_chat(program_course_id, created_at);
 alter table public.course_chat enable row level security;
 drop policy if exists "course_chat_all" on public.course_chat;
