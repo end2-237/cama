@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Reveal from "@/components/landing/Reveal";
 
 const stats = [
-  { value: 3,   suffix: "",    label: "Écoles de l'Institut JFN",         color: "text-cama" },
-  { value: 500, suffix: "+",   label: "Étudiants inscrits",                color: "text-gold" },
-  { value: 12,  suffix: "",    label: "Filières disponibles",              color: "text-cama" },
-  { value: 100, suffix: "%",   label: "Examens surveillés par IA",         color: "text-gold" },
-  { value: 97,  suffix: "%",   label: "Taux de satisfaction étudiant",     color: "text-cama" },
+  { value: 3,   suffix: "",  label: "Écoles de l'Institut JFN",      color: "text-cama" },
+  { value: 500, suffix: "+", label: "Étudiants inscrits",             color: "text-gold-dark" },
+  { value: 12,  suffix: "",  label: "Filières disponibles",           color: "text-cama" },
+  { value: 100, suffix: "%", label: "Examens surveillés par IA",      color: "text-gold-dark" },
+  { value: 97,  suffix: "%", label: "Taux de satisfaction étudiant",  color: "text-cama" },
 ];
 
 function Counter({ target, suffix, color }: { target: number; suffix: string; color: string }) {
@@ -33,31 +34,37 @@ function Counter({ target, suffix, color }: { target: number; suffix: string; co
     return () => obs.disconnect();
   }, [target]);
 
-  return <span ref={ref} className={`text-4xl font-bold tabular-nums ${color}`}>{count}{suffix}</span>;
+  return (
+    <span ref={ref} className={`text-[2.6rem] leading-none font-extrabold tracking-tight tabular-nums ${color}`}>
+      {count}{suffix}
+    </span>
+  );
 }
 
 export default function StatsBar() {
   return (
-    <section className="section-surface py-10">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+    <section className="bg-white border-b border-border">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14">
 
-        {/* ── Card avec bordure top colorée — originalité ── */}
-        <div className="bg-white border border-border rounded-3xl shadow-sm overflow-hidden">
-          {/* Barre indigo→or en haut */}
-          <div className="h-1 w-full bg-gradient-to-r from-cama via-cama-400 to-gold" />
+        <Reveal variant="up">
+          <div className="flex items-baseline justify-between flex-wrap gap-2 mb-8">
+            <p className="text-[11px] font-black uppercase tracking-[0.28em] text-muted">
+              L&apos;Institut en chiffres
+            </p>
+            <p className="text-[11px] text-subtle">Année académique 2024–2025 · Cameroun</p>
+          </div>
+        </Reveal>
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 divide-x divide-border">
-            {stats.map(({ value, suffix, label, color }, i) => (
-              <div key={i} className="flex flex-col items-center text-center px-6 py-8">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 border-t border-border">
+          {stats.map(({ value, suffix, label, color }, i) => (
+            <Reveal key={label} variant="up" delay={i * 90}
+              className="border-b sm:border-b-0 border-r border-border last:border-r-0 [&:nth-child(2n)]:border-r-0 sm:[&:nth-child(2n)]:border-r lg:[&:nth-child(5n)]:border-r-0">
+              <div className="pt-7 pb-4 pr-6">
                 <Counter target={value} suffix={suffix} color={color} />
-                <p className="text-sm text-muted mt-2 leading-snug max-w-[110px]">{label}</p>
+                <p className="text-[12px] text-muted mt-2.5 leading-snug">{label}</p>
               </div>
-            ))}
-          </div>
-
-          <div className="text-center py-2.5 border-t border-border bg-surface/50">
-            <span className="text-xs text-subtle italic">Données · Année académique 2024–2025 · Institut JFN Cameroun</span>
-          </div>
+            </Reveal>
+          ))}
         </div>
       </div>
     </section>

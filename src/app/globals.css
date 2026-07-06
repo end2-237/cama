@@ -178,6 +178,73 @@
 .delay-800 { animation-delay: 800ms; }
 
 /* ═══════════════════════════════════════════════
+   Landing 2.0 — révélations au scroll & cinétique
+   ═══════════════════════════════════════════════ */
+
+/* Révélation au scroll (pilotée par IntersectionObserver → .is-in) */
+.reveal {
+  opacity: 0;
+  transition:
+    opacity   .8s cubic-bezier(.22,.61,.36,1),
+    transform .8s cubic-bezier(.22,.61,.36,1);
+  will-change: opacity, transform;
+}
+.reveal-up    { transform: translateY(32px); }
+.reveal-left  { transform: translateX(-32px); }
+.reveal-right { transform: translateX(32px); }
+.reveal-zoom  { transform: scale(.94); }
+.reveal.is-in { opacity: 1; transform: none; }
+
+/* Lignes de titre masquées (hero) — montée depuis le bas du masque */
+.hero-mask { overflow: hidden; display: block; }
+.hero-line {
+  display: block;
+  transform: translateY(110%);
+  animation: hero-rise .9s cubic-bezier(.16,1,.3,1) both;
+}
+@keyframes hero-rise { to { transform: translateY(0); } }
+
+/* Défilement horizontal infini (bandeau filières) */
+@keyframes marquee-x {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+.marquee-track {
+  display: flex;
+  width: max-content;
+  animation: marquee-x 38s linear infinite;
+}
+.marquee-track:hover { animation-play-state: paused; }
+
+/* Zoom lent type Ken Burns (fonds vidéo/photo) */
+@keyframes ken-burns {
+  from { transform: scale(1.12); }
+  to   { transform: scale(1.02); }
+}
+.animate-ken-burns { animation: ken-burns 14s ease-out both; }
+
+/* Indicateur de scroll (hero) */
+@keyframes scroll-dot {
+  0%, 20%  { transform: translateY(0);   opacity: 1; }
+  80%      { transform: translateY(14px); opacity: 0; }
+  100%     { transform: translateY(0);   opacity: 0; }
+}
+.animate-scroll-dot { animation: scroll-dot 1.8s ease-in-out infinite; }
+
+/* Trait qui se dessine sous un mot (accent hero) */
+@keyframes draw-x { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+.animate-draw-x { transform-origin: left; animation: draw-x .7s cubic-bezier(.22,.61,.36,1) both; }
+
+/* Accessibilité : on coupe tout si l'utilisateur préfère moins de mouvement */
+@media (prefers-reduced-motion: reduce) {
+  .reveal, .reveal-up, .reveal-left, .reveal-right, .reveal-zoom {
+    opacity: 1 !important; transform: none !important; transition: none !important;
+  }
+  .hero-line, .marquee-track, .animate-ken-burns,
+  .animate-scroll-dot, .animate-draw-x { animation: none !important; transform: none !important; }
+}
+
+/* ═══════════════════════════════════════════════
    Scrollbars CAMA — fines, arrondies, dégradé indigo
    ═══════════════════════════════════════════════ */
 

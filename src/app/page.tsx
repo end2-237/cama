@@ -1,6 +1,7 @@
 import Navbar          from "@/components/landing/Navbar";
 import Hero            from "@/components/landing/Hero";
 import StatsBar        from "@/components/landing/StatsBar";
+import ScrollShowcase  from "@/components/landing/ScrollShowcase";
 import Filieres        from "@/components/landing/Filieres";
 import CoursesCarousel from "@/components/landing/CoursesCarousel";
 import FindSection     from "@/components/landing/FindSection";
@@ -16,6 +17,7 @@ export default function HomePage() {
       <Navbar />
       <Hero />
       <StatsBar />
+      <ScrollShowcase />
       <Filieres />
       <CoursesCarousel />
       <FindSection />

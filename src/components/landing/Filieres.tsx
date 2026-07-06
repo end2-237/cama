@@ -4,6 +4,7 @@ import {
   Calculator, Globe, Cpu, FlaskConical,
 } from "lucide-react";
 import Link from "next/link";
+import Reveal from "@/components/landing/Reveal";
 
 const filieres = [
   { icon: Monitor,      label: "Informatique",           school: "École Informatique", slug: "informatique" },
@@ -31,7 +32,7 @@ export default function Filieres() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 
         {/* ── Section témoignage centré — guillemets or (originalité vs NetAcad vert) ── */}
-        <div className="text-center mb-16 max-w-3xl mx-auto">
+        <Reveal variant="up" className="text-center mb-16 max-w-3xl mx-auto">
           <div className="flex justify-center mb-6">
             <svg width="52" height="44" viewBox="0 0 52 44" fill="none">
               <path d="M0 44V26C0 11.7 9.1 3.6 27.3 0l3.3 5.5C20.3 7.7 16.2 12.8 15.1 19.8h8.8V44H0zm27.9 0V26C27.9 11.7 37 3.6 55.2 0l3.3 5.5C48.2 7.7 44.1 12.8 43 19.8h8.8V44H27.9z"
@@ -45,10 +46,10 @@ export default function Filieres() {
           </p>
           <div className="w-20 h-1 bg-gradient-to-r from-cama to-gold mx-auto mt-6 mb-5 rounded-full" />
           <p className="text-sm text-muted">Parcourez les domaines de formation disponibles à JFN.</p>
-        </div>
+        </Reveal>
 
         {/* ── Titre section ── */}
-        <div className="flex items-center justify-between mb-8">
+        <Reveal variant="up" className="flex items-center justify-between mb-8">
           <h2 className="text-2xl font-semibold text-ink">Domaines de formation</h2>
           {/* Légende écoles — originalité */}
           <div className="hidden sm:flex items-center gap-4 text-xs text-muted">
@@ -59,32 +60,33 @@ export default function Filieres() {
               </span>
             ))}
           </div>
-        </div>
+        </Reveal>
 
         {/* ── Grid filières — avec hover indigo (plus notre couleur) ── */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 mb-10">
-          {filieres.map(({ icon: Icon, label, school, slug }) => (
-            <Link
-              key={label}
-              href={`/parcours/${slug}`}
-              className="feature-card flex items-center gap-4 group border-l-4 border-transparent hover:border-cama"
-            >
-              <div className="w-10 h-10 flex-shrink-0 flex items-center justify-center rounded-xl bg-cama-50 group-hover:bg-cama group-hover:text-white transition-all duration-200">
-                <Icon className="w-5 h-5 text-cama group-hover:text-white transition-colors" strokeWidth={1.5} />
-              </div>
-              <div className="min-w-0">
-                <p className="text-sm font-bold text-ink group-hover:text-cama transition-colors leading-snug">{label}</p>
-                <p className="text-[10px] text-subtle truncate">{school}</p>
-              </div>
-            </Link>
+          {filieres.map(({ icon: Icon, label, school, slug }, i) => (
+            <Reveal key={label} variant="up" delay={(i % 4) * 70}>
+              <Link
+                href={`/parcours/${slug}`}
+                className="feature-card flex items-center gap-4 group border-l-4 border-transparent hover:border-cama h-full"
+              >
+                <div className="w-10 h-10 flex-shrink-0 flex items-center justify-center rounded-xl bg-cama-50 group-hover:bg-cama group-hover:text-white transition-all duration-200">
+                  <Icon className="w-5 h-5 text-cama group-hover:text-white transition-colors" strokeWidth={1.5} />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-bold text-ink group-hover:text-cama transition-colors leading-snug">{label}</p>
+                  <p className="text-[10px] text-subtle truncate">{school}</p>
+                </div>
+              </Link>
+            </Reveal>
           ))}
         </div>
 
-        <div className="text-center">
+        <Reveal variant="up" className="text-center">
           <Link href="/auth/register" className="btn-outline text-sm">
             Voir le catalogue complet
           </Link>
-        </div>
+        </Reveal>
       </div>
 
       {/* Vague bas */}
