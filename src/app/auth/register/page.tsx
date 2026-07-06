@@ -38,8 +38,10 @@ export default function RegisterPage() {
 
   const [showPwd,   setShowPwd]   = useState(false);
   const [step,      setStep]      = useState<1|2>(1);
-  const [role,      setRole]      = useState<"etudiant"|"enseignant">("etudiant");
   const [accepted,  setAccepted]  = useState(false);
+
+  // L'auto-inscription est réservée aux étudiants ; les enseignants sont créés par l'administration.
+  const role = "etudiant" as const;
 
   // Données du formulaire — tout est capté et persisté
   const [firstName,   setFirstName]   = useState("");
@@ -147,9 +149,9 @@ export default function RegisterPage() {
 
     setLoading(false);
 
-    // 3. Si la session est active (confirmation email désactivée) → dashboard
+    // 3. Si la session est active (confirmation email désactivée) → onboarding
     if (authData.session) {
-      router.push("/dashboard");
+      router.push("/onboarding");
     } else {
       router.push("/auth/login?registered=1");
     }
@@ -224,30 +226,6 @@ export default function RegisterPage() {
                 <p className="text-muted text-sm mb-7">
                   Vous pourrez accéder à vos cours dès l&apos;inscription validée.
                 </p>
-
-                {/* Rôle */}
-                <div className="mb-5">
-                  <p className="text-xs font-semibold text-muted uppercase tracking-wider mb-2">Je m&apos;inscris en tant que</p>
-                  <div className="grid grid-cols-2 gap-2">
-                    {([
-                      { id: "etudiant",   label: "Étudiant",   sub: "Accès aux cours & examens" },
-                      { id: "enseignant", label: "Enseignant", sub: "Créer cours & évaluations" },
-                    ] as const).map(({ id, label, sub }) => (
-                      <button
-                        key={id}
-                        onClick={() => setRole(id)}
-                        className={`p-4 rounded-2xl border-2 text-left transition-all duration-200 ${
-                          role === id
-                            ? "border-cama bg-cama-50 scale-[1.02] shadow-md shadow-cama/15"
-                            : "border-border hover:border-cama/30 hover:scale-[1.01]"
-                        }`}
-                      >
-                        <p className={`text-sm font-bold ${role === id ? "text-cama" : "text-ink"}`}>{label}</p>
-                        <p className="text-xs text-muted mt-0.5">{sub}</p>
-                      </button>
-                    ))}
-                  </div>
-                </div>
 
                 {/* Google */}
                 <button className="w-full flex items-center justify-center gap-3 border border-border rounded-xl py-3 text-sm font-medium text-ink hover:bg-surface hover:border-cama/30 hover:scale-[1.01] active:scale-95 transition-all duration-200 mb-4">

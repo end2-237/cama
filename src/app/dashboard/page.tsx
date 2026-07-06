@@ -43,6 +43,14 @@ export default function DashboardPage() {
     if (!loading && !user) router.replace("/auth/login");
   }, [loading, user, router]);
 
+  /* Ceinture + bretelles : un étudiant sans dossier validé n'accède pas au dashboard */
+  useEffect(() => {
+    if (!loading && user && user.role === "etudiant" &&
+        (user.dossier == null || user.dossier.status !== "validee")) {
+      router.replace("/onboarding");
+    }
+  }, [loading, user, router]);
+
   /* Mode maintenance : les étudiants sont redirigés (admin/enseignant/jury passent) */
   useEffect(() => {
     if (!loading && user && user.role === "etudiant" && maintenance.on) {

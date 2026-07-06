@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft, Loader2, Users, CheckCircle2, XCircle, Clock,
-  GraduationCap, UserCog, Search, ShieldCheck,
+  GraduationCap, UserCog, Search, ShieldCheck, FolderOpen,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import type { DBUser, UserRole, DBInscription } from "@/lib/supabase";
@@ -59,6 +59,12 @@ export default function AdminUsersPage() {
     await setInscriptionStatus(id, status);
     setStats(await fetchAdminStats());
   };
+
+  const pendingByUser = useMemo(() => {
+    const s = new Set<string>();
+    inscriptions.forEach((i) => { if (i.status === "en_attente") s.add(i.user_id); });
+    return s;
+  }, [inscriptions]);
 
   const filteredUsers = useMemo(() => {
     const s = q.toLowerCase();
@@ -185,13 +191,18 @@ export default function AdminUsersPage() {
                     {(u.first_name[0] ?? "?")}{(u.last_name[0] ?? "")}
                   </div>
                   <div className="flex-1 min-w-[180px]">
-                    <p className="text-sm font-bold text-ink">{u.first_name} {u.last_name}</p>
+                    <p className="text-sm font-bold text-ink flex items-center gap-2">
+                      {u.first_name} {u.last_name}
+                      {u.role === "etudiant" && pendingByUser.has(u.id) && (
+                        <span className="text-[9px] font-bold uppercase tracking-wide bg-gold/10 text-gold-dark px-1.5 py-0.5 rounded">À valider</span>
+                      )}
+                    </p>
                     <p className="text-[11px] text-muted">{u.email}{u.level && ` · ${u.level}`}{u.school && ` · ${u.school}`}</p>
                   </div>
                   {u.role === "etudiant" && (
                     <Link href={`/admin/etudiant/${u.id}`}
-                      className="text-[11px] font-bold text-cama border border-cama/30 rounded-lg px-2.5 py-1.5 hover:bg-cama-50 transition-colors">
-                      Fiche →
+                      className="inline-flex items-center gap-1.5 text-[11px] font-bold text-cama border border-cama/30 rounded-lg px-2.5 py-1.5 hover:bg-cama-50 transition-colors">
+                      <FolderOpen className="w-3.5 h-3.5" /> Dossier
                     </Link>
                   )}
                   <select value={u.role} onChange={(e) => onRole(u.id, e.target.value as UserRole)}

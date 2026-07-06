@@ -6,14 +6,14 @@ import { useParams, useRouter } from "next/navigation";
 import {
   ArrowLeft, Loader2, Printer, UserX, GraduationCap, BookOpen,
   Award, ClipboardCheck, Activity, ShieldAlert, FolderOpen,
-  CheckCircle2, XCircle, ExternalLink, FileText,
+  CheckCircle2, XCircle, ExternalLink, FileText, X, Paperclip,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import type {
   DBUser, DBInscription, DBProgramCourse, DBChapterProgress,
   DBExamAttempt, DBExam,
 } from "@/lib/supabase";
-import { fetchUsers, fetchInscriptions } from "@/lib/admin";
+import { fetchUsers, fetchInscriptions, setInscriptionStatus } from "@/lib/admin";
 import { fetchStudentProgram, fetchProgress, fetchChapters } from "@/lib/program";
 import { fetchAttemptsForStudent, fetchDeliberations, fetchExamsForCourses, type DelibWithMeta } from "@/lib/exams";
 import { fetchNativeProgress, type DBNativeProgress } from "@/lib/tracking";
@@ -57,6 +57,9 @@ function fmtDate(iso: string | null): string {
 function note20(a: DBExamAttempt): number | null {
   if (a.score == null || !a.score_max) return null;
   return Math.round((a.score / a.score_max) * 20 * 10) / 10;
+}
+function isImageUrl(url: string): boolean {
+  return /\.(png|jpe?g|gif|webp|bmp|svg|avif)(\?|$)/i.test(url);
 }
 
 // ── Petits composants de mise en page « document » ─────────────
@@ -104,6 +107,8 @@ export default function FicheEtudiantPage() {
   const [progress, setProgress] = useState<DBChapterProgress[]>([]);
   const [documents, setDocuments] = useState<DBStudentDocument[]>([]);
   const [reviewing, setReviewing] = useState<string | null>(null);
+  const [showDossier, setShowDossier] = useState(false);
+  const [candAction, setCandAction] = useState(false);
 
   // Bulletins
   const [years, setYears]           = useState<DBAcademicYear[]>([]);
@@ -199,6 +204,46 @@ export default function FicheEtudiantPage() {
     setReviewing(null);
   };
 
+  const handleValidateCandidature = async () => {
+    if (!user || !inscr || candAction) return;
+    if (!window.confirm("Valider la candidature de cet étudiant ? L'inscription passera à « Validée » et les pièces déposées seront validées.")) return;
+    setCandAction(true);
+    await setInscriptionStatus(inscr.id, "validee");
+    const toValidate = documents.filter((d) => d.status === "depose");
+    await Promise.all(toValidate.map((d) => reviewDocument(d.id, "valide", null, user.id)));
+    await logAudit({
+      actorId: user.id,
+      actorName: user.name,
+      action: "candidature.valider",
+      entity: `inscription:${inscr.id}`,
+      detail: `Candidature de ${student?.first_name ?? ""} ${student?.last_name ?? ""} (${inscr.matricule}) validée — ${toValidate.length} pièce(s) validée(s).`,
+      severity: "warn",
+    });
+    setInscr((p) => (p ? { ...p, status: "validee" } : p));
+    setDocuments((ds) => ds.map((d) => d.status === "depose"
+      ? { ...d, status: "valide", reviewed_by: user.id, reviewed_at: new Date().toISOString() }
+      : d));
+    setCandAction(false);
+  };
+
+  const handleRejectCandidature = async () => {
+    if (!user || !inscr || candAction) return;
+    const motif = window.prompt("Motif du rejet de la candidature (transmis à l'étudiant) :");
+    if (motif === null) return;
+    setCandAction(true);
+    await setInscriptionStatus(inscr.id, "rejetee");
+    await logAudit({
+      actorId: user.id,
+      actorName: user.name,
+      action: "candidature.rejeter",
+      entity: `inscription:${inscr.id}`,
+      detail: `Candidature de ${student?.first_name ?? ""} ${student?.last_name ?? ""} (${inscr.matricule}) rejetée${motif ? ` — ${motif}` : ""}.`,
+      severity: "warn",
+    });
+    setInscr((p) => (p ? { ...p, status: "rejetee" } : p));
+    setCandAction(false);
+  };
+
   const handleGenerate = async () => {
     if (!user || !inscr || generating) return;
     const year = selYear || inscr.academic_year;
@@ -270,12 +315,29 @@ export default function FicheEtudiantPage() {
         <Link href="/admin/utilisateurs" className="inline-flex items-center gap-2 text-sm font-medium text-muted hover:text-cama">
           <ArrowLeft className="w-4 h-4" /> Utilisateurs
         </Link>
-        <button
-          onClick={() => window.print()}
-          className="inline-flex items-center gap-2 rounded-full bg-cama px-4 py-2 text-sm font-semibold text-white shadow-md shadow-cama/25 hover:bg-cama-700 transition-colors"
-        >
-          <Printer className="w-4 h-4" /> Imprimer / PDF
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowDossier(true)}
+            className="inline-flex items-center gap-2 border-2 border-cama px-4 py-2 text-sm font-semibold text-cama hover:bg-cama-50 transition-colors"
+          >
+            <FolderOpen className="w-4 h-4" /> Voir le dossier de candidature (A4)
+          </button>
+          {inscr?.status === "en_attente" && (
+            <button
+              onClick={handleValidateCandidature}
+              disabled={candAction}
+              className="inline-flex items-center gap-2 bg-green-600 px-4 py-2 text-sm font-bold text-white hover:bg-green-700 transition-colors disabled:opacity-50"
+            >
+              {candAction ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />} Valider la candidature
+            </button>
+          )}
+          <button
+            onClick={() => window.print()}
+            className="inline-flex items-center gap-2 bg-cama px-4 py-2 text-sm font-semibold text-white shadow-md shadow-cama/25 hover:bg-cama-700 transition-colors"
+          >
+            <Printer className="w-4 h-4" /> Imprimer / PDF
+          </button>
+        </div>
       </div>
 
       {/* Document A4 */}
@@ -645,6 +707,156 @@ export default function FicheEtudiantPage() {
           </footer>
         </div>
       </article>
+
+      {/* ══ Vue A4 — Dossier de candidature ══ */}
+      {showDossier && (
+        <div className="fixed inset-0 z-50 bg-black/70 overflow-y-auto print:bg-white print:static print:overflow-visible">
+          {/* Barre d'actions */}
+          <div className="sticky top-0 z-10 flex flex-wrap items-center justify-between gap-2 bg-cama-900 px-4 py-3 print:hidden">
+            <span className="text-sm font-semibold text-white flex items-center gap-2">
+              <FolderOpen className="w-4 h-4 text-gold" /> Dossier de candidature — {student.first_name} {student.last_name}
+            </span>
+            <div className="flex items-center gap-2">
+              {inscr?.status === "en_attente" && (
+                <>
+                  <button
+                    onClick={handleValidateCandidature}
+                    disabled={candAction}
+                    className="inline-flex items-center gap-2 bg-green-600 px-4 py-2 text-sm font-bold text-white hover:bg-green-700 transition-colors disabled:opacity-50"
+                  >
+                    {candAction ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />} Valider la candidature
+                  </button>
+                  <button
+                    onClick={handleRejectCandidature}
+                    disabled={candAction}
+                    className="inline-flex items-center gap-2 border border-red-300 bg-white px-3 py-2 text-sm font-semibold text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50"
+                  >
+                    <XCircle className="w-4 h-4" /> Rejeter
+                  </button>
+                </>
+              )}
+              <button
+                onClick={() => window.print()}
+                className="inline-flex items-center gap-2 bg-white px-3 py-2 text-sm font-semibold text-cama hover:bg-cama-50 transition-colors"
+              >
+                <Printer className="w-4 h-4" /> Imprimer
+              </button>
+              <button
+                onClick={() => setShowDossier(false)}
+                className="inline-flex items-center gap-2 bg-white/10 px-3 py-2 text-sm font-semibold text-white hover:bg-white/20 transition-colors"
+              >
+                <X className="w-4 h-4" /> Fermer
+              </button>
+            </div>
+          </div>
+
+          {/* Feuille A4 (flux normal, PAS de sticky) */}
+          <div className="py-6 print:py-0">
+            <div className="max-w-[210mm] mx-auto bg-white text-black p-[15mm] shadow-2xl print:shadow-none">
+              {/* En-tête */}
+              <header className="border-b-2 border-black pb-4 mb-6">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <h1 className="text-xl font-bold uppercase tracking-tight leading-tight">Institut JFN — Dossier d'inscription étudiant</h1>
+                    <p className="text-xs mt-1 uppercase tracking-widest text-black/60">Plateforme CAMA · Document officiel</p>
+                  </div>
+                  <div className="text-right text-xs leading-relaxed shrink-0">
+                    <p><span className="font-semibold">Matricule :</span> {inscr?.matricule ?? "—"}</p>
+                    <p><span className="font-semibold">Statut :</span> {inscr ? INSCR_BADGE[inscr.status].label : "—"}</p>
+                    <p><span className="font-semibold">Édité le :</span> {fmtDate(new Date().toISOString())}</p>
+                  </div>
+                </div>
+              </header>
+
+              {/* Informations personnelles */}
+              <section className="mb-8">
+                <h2 className="text-sm font-bold uppercase tracking-wide border-b border-black/40 pb-1 mb-3">Informations personnelles</h2>
+                <dl className="grid grid-cols-2 gap-x-8 gap-y-2 text-sm">
+                  <A4Field label="Nom" value={student.last_name} />
+                  <A4Field label="Prénom" value={student.first_name} />
+                  <A4Field label="Email" value={student.email} />
+                  <A4Field label="Téléphone" value={student.phone ? `${student.phone_prefix ?? "+237"} ${student.phone}` : null} />
+                  <A4Field label="N° carte étudiant" value={student.student_card} />
+                  <A4Field label="Nationalité" value={null} />
+                  <A4Field label="Filière" value={inscr?.parcours_title ?? student.school} />
+                  <A4Field label="École" value={inscr?.school ?? student.school} />
+                  <A4Field label="Niveau" value={inscr?.level ?? student.level} />
+                  <A4Field label="Cycle" value={inscr?.cycle_type} />
+                  <A4Field label="Mode" value={inscr ? (MODE_LABEL[inscr.mode] ?? inscr.mode) : null} />
+                  <A4Field label="Campus" value={inscr?.campus} />
+                  <A4Field label="Année académique" value={inscr?.academic_year} />
+                  <A4Field label="Semestre" value={inscr ? `S${inscr.semester}` : null} />
+                </dl>
+              </section>
+
+              {/* Pièces justificatives */}
+              <section className="mb-8">
+                <h2 className="text-sm font-bold uppercase tracking-wide border-b border-black/40 pb-1 mb-3 flex items-center gap-2">
+                  <Paperclip className="w-3.5 h-3.5" /> Pièces justificatives ({documents.length})
+                </h2>
+                {documents.length ? (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                    {documents.map((d) => {
+                      const db = DOC_BADGE[d.status] ?? DOC_BADGE.depose;
+                      return (
+                        <a
+                          key={d.id}
+                          href={d.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="block border border-black/30 bg-white p-2 no-underline hover:border-black transition-colors"
+                          title="Ouvrir la pièce dans un nouvel onglet"
+                        >
+                          <div className="h-28 flex items-center justify-center overflow-hidden bg-black/5 border border-black/10">
+                            {isImageUrl(d.url) ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img src={d.url} alt={docKindLabel(d.kind)} className="max-h-full max-w-full object-contain" />
+                            ) : (
+                              <div className="flex flex-col items-center text-black/50">
+                                <FileText className="w-8 h-8" />
+                                <span className="mt-1 text-[10px] uppercase tracking-wide">Fichier</span>
+                              </div>
+                            )}
+                          </div>
+                          <p className="mt-2 text-xs font-semibold text-black truncate">{docKindLabel(d.kind)}</p>
+                          <div className="mt-1 flex items-center justify-between">
+                            <span className="text-[10px] text-black/50 truncate">{d.title ?? "Document"}</span>
+                            <span className={`inline-block border px-1.5 py-0.5 text-[9px] font-semibold ${db.cls}`}>{db.label}</span>
+                          </div>
+                        </a>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className="text-sm italic text-black/50">Aucune pièce justificative déposée.</p>
+                )}
+              </section>
+
+              {/* Pied de page — vérification */}
+              <footer className="mt-12 pt-6 border-t-2 border-black grid grid-cols-2 gap-8 text-sm">
+                <div>
+                  <p className="mb-8">Vu et vérifié par :</p>
+                  <div className="border-b border-black" />
+                </div>
+                <div>
+                  <p className="mb-8">Date :</p>
+                  <div className="border-b border-black" />
+                </div>
+              </footer>
+              <p className="mt-6 text-center text-[10px] text-black/40">CAMA — Institut JFN · Document confidentiel réservé à l'administration</p>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function A4Field({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="flex flex-col">
+      <dt className="text-[10px] font-semibold uppercase tracking-wider text-black/50">{label}</dt>
+      <dd className="text-sm text-black">{value || "—"}</dd>
     </div>
   );
 }
