@@ -156,6 +156,7 @@ export default function DashNav({ activeTab, onTab, tabs }: DashNavProps) {
                         { href: "/admin/audit",          icon: ShieldCheck,   label: "Rapports & Audit" },
                         { href: "/admin/roles",          icon: ShieldCheck,   label: "Niveaux d'admin" },
                         { href: "/admin/annees",         icon: ClipboardList, label: "Années & semestres" },
+                        { href: "/admin/salles",         icon: ClipboardList, label: "Salles & réservations" },
                         { href: "/messagerie",           icon: Megaphone,     label: "Messagerie" },
                         { href: "/admin/media",          icon: FileText,      label: "Ressources média" },
                         { href: "/admin/journal",        icon: Newspaper,     label: "Journal JFN" },
@@ -163,6 +164,7 @@ export default function DashNav({ activeTab, onTab, tabs }: DashNavProps) {
                         { href: "/admin/certifications", icon: Award,         label: "Certifications" },
                         { href: "/presences",            icon: ClipboardList, label: "Présences" },
                         { href: "/jury/deliberations",   icon: ShieldCheck,   label: "Délibérations" },
+                        { href: "/jury/sessions",        icon: ShieldCheck,   label: "Sessions de jury" },
                       ].map((l) => (
                         <Link key={l.href} href={l.href} onClick={() => setMoreOpen(false)}
                           className="flex items-center gap-3 px-4 py-3 text-sm text-ink hover:bg-surface transition-colors">
@@ -223,6 +225,7 @@ export default function DashNav({ activeTab, onTab, tabs }: DashNavProps) {
                         { href: "/bibliotheque",           icon: Library,       label: "Bibliothèque" },
                         { href: "/etudiant/parascolaire",  icon: Sparkles,      label: "Parascolaire" },
                         { href: "/etudiant/dossier",       icon: ClipboardList, label: "Mon dossier" },
+                        { href: "/etudiant/bulletins",     icon: FileText,      label: "Mes bulletins" },
                       ].map((l) => (
                         <Link key={l.href} href={l.href} onClick={() => setMoreOpen(false)}
                           className="flex items-center gap-3 px-4 py-3 text-sm text-ink hover:bg-surface transition-colors">

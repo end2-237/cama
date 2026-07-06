@@ -84,6 +84,8 @@ export default function DeliberationsPage() {
           <span className="text-sm font-bold text-ink flex items-center gap-1.5">
             <Gavel className="w-4 h-4 text-cama" /> Délibérations du jury
           </span>
+          <div className="flex-1" />
+          <Link href="/jury/sessions" className="text-sm text-cama font-semibold hover:underline">Sessions de jury →</Link>
         </div>
       </header>
 

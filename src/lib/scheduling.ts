@@ -52,6 +52,149 @@ export function studentMode(settings: DBStudentSetting[], studentId: string): Cy
   return settings.find((s) => s.studentId === studentId)?.mode || "presentiel";
 }
 
+/* ════════════════════════════════════════════════════════════
+   Salles & réservations (chantier E2)
+════════════════════════════════════════════════════════════ */
+import { supabase } from "./supabase";
+
+export interface DBRoom {
+  id: string;
+  name: string;
+  capacity: number | null;
+  kind: string;              // 'salle' | 'amphi' | 'labo'
+  campus: string | null;
+  active: boolean;
+  created_at: string;
+}
+
+export interface DBRoomBooking {
+  id: string;
+  room_id: string;
+  program_course_id: string | null;
+  title: string | null;
+  day: number | null;        // 0=lundi..5=samedi (hebdo), null si ponctuel
+  starts_at: string | null;  // ponctuel
+  ends_at: string | null;    // ponctuel
+  start_time: string | null; // "HH:MM" (hebdo)
+  end_time: string | null;   // "HH:MM" (hebdo)
+  weekly: boolean;
+  booked_by: string | null;
+  created_at: string;
+}
+
+export async function fetchRooms(): Promise<DBRoom[]> {
+  const { data } = await supabase.from("rooms").select("*").order("name");
+  return (data as DBRoom[]) ?? [];
+}
+
+export async function addRoom(room: {
+  name: string; capacity?: number | null; kind?: string; campus?: string | null;
+}): Promise<{ error: string | null }> {
+  const { error } = await supabase.from("rooms").insert({
+    name: room.name, capacity: room.capacity ?? null,
+    kind: room.kind ?? "salle", campus: room.campus ?? null,
+  });
+  return { error: error?.message ?? null };
+}
+
+export async function updateRoom(
+  id: string,
+  patch: Partial<Pick<DBRoom, "name" | "capacity" | "kind" | "campus" | "active">>,
+): Promise<{ error: string | null }> {
+  const { error } = await supabase.from("rooms").update(patch).eq("id", id);
+  return { error: error?.message ?? null };
+}
+
+export async function setRoomActive(id: string, active: boolean) {
+  return updateRoom(id, { active });
+}
+
+export async function fetchBookings(roomId?: string): Promise<DBRoomBooking[]> {
+  let q = supabase.from("room_bookings").select("*").order("created_at");
+  if (roomId) q = q.eq("room_id", roomId);
+  const { data } = await q;
+  return (data as DBRoomBooking[]) ?? [];
+}
+
+export async function createBooking(b: {
+  room_id: string; program_course_id?: string | null; title?: string | null;
+  day?: number | null; starts_at?: string | null; ends_at?: string | null;
+  start_time?: string | null; end_time?: string | null;
+  weekly?: boolean; booked_by?: string | null;
+}): Promise<{ error: string | null }> {
+  const { error } = await supabase.from("room_bookings").insert({
+    room_id: b.room_id, program_course_id: b.program_course_id ?? null,
+    title: b.title ?? null, day: b.day ?? null,
+    starts_at: b.starts_at ?? null, ends_at: b.ends_at ?? null,
+    start_time: b.start_time ?? null, end_time: b.end_time ?? null,
+    weekly: b.weekly ?? true, booked_by: b.booked_by ?? null,
+  });
+  return { error: error?.message ?? null };
+}
+
+export async function deleteBooking(id: string): Promise<{ error: string | null }> {
+  const { error } = await supabase.from("room_bookings").delete().eq("id", id);
+  return { error: error?.message ?? null };
+}
+
+/** "HH:MM" → minutes depuis minuit (NaN si invalide). */
+function toMinutes(t: string | null | undefined): number {
+  if (!t) return NaN;
+  const [h, m] = t.split(":").map((x) => parseInt(x, 10));
+  return h * 60 + (m || 0);
+}
+
+/** Chevauchement strict de deux intervalles [a1,a2) / [b1,b2). */
+function overlaps(a1: number, a2: number, b1: number, b2: number): boolean {
+  return a1 < b2 && b1 < a2;
+}
+
+/**
+ * Réservations existantes en conflit avec `booking` (même salle).
+ * — hebdo : même jour et plages "HH:MM" qui se chevauchent ;
+ * — ponctuel : intervalles starts_at/ends_at qui se chevauchent.
+ */
+export function conflictsFor(
+  booking: Pick<DBRoomBooking, "room_id" | "weekly" | "day" | "start_time" | "end_time" | "starts_at" | "ends_at"> & { id?: string },
+  existing: DBRoomBooking[],
+): DBRoomBooking[] {
+  return existing.filter((e) => {
+    if (e.room_id !== booking.room_id) return false;
+    if (booking.id && e.id === booking.id) return false;
+    if (booking.weekly && e.weekly) {
+      if (booking.day == null || e.day == null || booking.day !== e.day) return false;
+      const a1 = toMinutes(booking.start_time), a2 = toMinutes(booking.end_time);
+      const b1 = toMinutes(e.start_time), b2 = toMinutes(e.end_time);
+      if ([a1, a2, b1, b2].some((n) => isNaN(n))) return false;
+      return overlaps(a1, a2, b1, b2);
+    }
+    if (!booking.weekly && !e.weekly) {
+      if (!booking.starts_at || !booking.ends_at || !e.starts_at || !e.ends_at) return false;
+      return overlaps(
+        new Date(booking.starts_at).getTime(), new Date(booking.ends_at).getTime(),
+        new Date(e.starts_at).getTime(), new Date(e.ends_at).getTime(),
+      );
+    }
+    return false; // hebdo vs ponctuel : non comparés
+  });
+}
+
+/** Salles actives libres sur un créneau hebdo donné. */
+export function findFreeRooms(
+  day: number, startTime: string, endTime: string,
+  rooms: DBRoom[], bookings: DBRoomBooking[],
+): DBRoom[] {
+  return rooms.filter((r) => {
+    if (!r.active) return false;
+    const probe = {
+      room_id: r.id, weekly: true, day,
+      start_time: startTime, end_time: endTime,
+      starts_at: null, ends_at: null,
+    };
+    return conflictsFor(probe, bookings).length === 0;
+  });
+}
+
 /** Séances validées s'appliquant à un mode donné, groupées par jour. */
 export function weeklyForMode(sessions: DBSession[], mode: CycleMode): Record<string, DBSession[]> {
   const out: Record<string, DBSession[]> = {};

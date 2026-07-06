@@ -6,7 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 import {
   ArrowLeft, Loader2, Printer, UserX, GraduationCap, BookOpen,
   Award, ClipboardCheck, Activity, ShieldAlert, FolderOpen,
-  CheckCircle2, XCircle, ExternalLink,
+  CheckCircle2, XCircle, ExternalLink, FileText,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import type {
@@ -19,6 +19,11 @@ import { fetchAttemptsForStudent, fetchDeliberations, fetchExamsForCourses, type
 import { fetchNativeProgress, type DBNativeProgress } from "@/lib/tracking";
 import { fetchDocuments, reviewDocument, docKindLabel, type DBStudentDocument } from "@/lib/documents";
 import { logAudit } from "@/lib/governance";
+import { fetchYears, fetchSemesters, type DBAcademicYear, type DBSemester } from "@/lib/academic";
+import {
+  buildTranscript, fetchTranscriptsForStudent, DECISION_LABEL,
+  type DBTranscript,
+} from "@/lib/bulletins";
 
 // ── Libellés & badges ──────────────────────────────────────────
 const INSCR_BADGE: Record<DBInscription["status"], { label: string; cls: string }> = {
@@ -100,6 +105,15 @@ export default function FicheEtudiantPage() {
   const [documents, setDocuments] = useState<DBStudentDocument[]>([]);
   const [reviewing, setReviewing] = useState<string | null>(null);
 
+  // Bulletins
+  const [years, setYears]           = useState<DBAcademicYear[]>([]);
+  const [semesters, setSemesters]   = useState<DBSemester[]>([]);
+  const [transcripts, setTranscripts] = useState<DBTranscript[]>([]);
+  const [selYear, setSelYear]       = useState<string>("");
+  const [selSem, setSelSem]         = useState<number>(1);
+  const [generating, setGenerating] = useState(false);
+  const [genError, setGenError]     = useState<string | null>(null);
+
   // Garde admin
   useEffect(() => {
     if (!loading && (!user || user.role !== "admin")) router.replace("/dashboard");
@@ -119,16 +133,23 @@ export default function FicheEtudiantPage() {
       const ins = inscriptions.find((i) => i.user_id === studentId) ?? null;
       setInscr(ins);
 
-      const [prog, delibsAll, atts, nat, docs] = await Promise.all([
+      const [prog, delibsAll, atts, nat, docs, yrs, sems, trs] = await Promise.all([
         fetchProgress(studentId),
         fetchDeliberations(),
         fetchAttemptsForStudent(studentId),
         fetchNativeProgress(studentId),
         fetchDocuments(studentId),
+        fetchYears(),
+        fetchSemesters(),
+        fetchTranscriptsForStudent(studentId),
       ]);
       if (!alive) return;
       setProgress(prog);
       setDocuments(docs);
+      setYears(yrs);
+      setSemesters(sems);
+      setTranscripts(trs);
+      if (yrs.length) setSelYear((y) => y || (yrs.find((x) => x.is_current)?.label ?? yrs[0].label));
       setDelibs(delibsAll.filter((d) => d.student_id === studentId));
       setAttempts(atts);
       setNative(nat);
@@ -176,6 +197,28 @@ export default function FicheEtudiantPage() {
       ? { ...d, status, note_admin: note, reviewed_by: user.id, reviewed_at: new Date().toISOString() }
       : d));
     setReviewing(null);
+  };
+
+  const handleGenerate = async () => {
+    if (!user || !inscr || generating) return;
+    const year = selYear || inscr.academic_year;
+    if (!year) { setGenError("Aucune année académique définie."); return; }
+    setGenerating(true);
+    setGenError(null);
+    const { transcript, error } = await buildTranscript(studentId, year, selSem, inscr.parcours_slug, user.id);
+    if (error || !transcript) {
+      setGenError(error ?? "Échec de la génération du relevé.");
+    } else {
+      await logAudit({
+        actorId: user.id,
+        actorName: user.name,
+        action: "transcript.generate",
+        entity: `transcript:${transcript.id}`,
+        detail: `Relevé ${year} S${selSem} généré pour ${student?.first_name ?? ""} ${student?.last_name ?? ""} — moyenne ${transcript.average ?? "—"}, décision ${transcript.decision}`,
+      });
+      setTranscripts((ts) => [transcript, ...ts.filter((t) => t.id !== transcript.id)]);
+    }
+    setGenerating(false);
   };
 
   const examTitle = useMemo(() => {
@@ -468,6 +511,84 @@ export default function FicheEtudiantPage() {
               </ul>
             ) : (
               <p className="text-sm text-muted italic">Aucune pièce justificative déposée.</p>
+            )}
+          </Section>
+
+          {/* 5bis — Bulletins */}
+          <Section icon={FileText} title="Bulletins">
+            {inscr ? (
+              <>
+                <div className="flex flex-wrap items-end gap-3 mb-4 print:hidden">
+                  <div>
+                    <label className="block text-[10px] font-semibold uppercase tracking-wider text-subtle mb-1">Année académique</label>
+                    <select
+                      value={selYear}
+                      onChange={(e) => setSelYear(e.target.value)}
+                      className="border border-border bg-white text-sm text-ink px-2 py-1.5 focus:outline-none focus:border-cama"
+                    >
+                      {years.length === 0 && inscr.academic_year && (
+                        <option value={inscr.academic_year}>{inscr.academic_year}</option>
+                      )}
+                      {years.map((y) => <option key={y.id} value={y.label}>{y.label}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-semibold uppercase tracking-wider text-subtle mb-1">Semestre</label>
+                    <select
+                      value={selSem}
+                      onChange={(e) => setSelSem(Number(e.target.value))}
+                      className="border border-border bg-white text-sm text-ink px-2 py-1.5 focus:outline-none focus:border-cama"
+                    >
+                      {(semesters.length
+                        ? Array.from(new Set(semesters.map((s) => s.number))).sort((a, b) => a - b)
+                        : [1, 2, 3, 4, 5, 6]
+                      ).map((n) => <option key={n} value={n}>Semestre {n}</option>)}
+                    </select>
+                  </div>
+                  <button
+                    onClick={handleGenerate}
+                    disabled={generating}
+                    className="inline-flex items-center gap-2 bg-cama px-4 py-2 text-xs font-semibold uppercase tracking-wide text-white hover:bg-cama-700 transition-colors disabled:opacity-50"
+                  >
+                    {generating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileText className="w-3.5 h-3.5" />}
+                    Générer le relevé
+                  </button>
+                </div>
+                {genError && <p className="text-xs text-red-600 mb-3 print:hidden">{genError}</p>}
+                {transcripts.length ? (
+                  <ul className="divide-y divide-border/60">
+                    {transcripts.map((t) => (
+                      <li key={t.id} className="flex items-center gap-3 py-2.5">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm text-ink">{t.academic_year} — Semestre {t.semester}</p>
+                          <p className="text-xs text-muted">
+                            Moyenne {t.average != null ? `${t.average}/20` : "—"}
+                            {t.mention ? ` · Mention ${t.mention}` : ""} · {t.ects_earned}/{t.ects_total} ECTS
+                            · généré le {fmtDate(t.generated_at)}
+                          </p>
+                        </div>
+                        <span className={`inline-block rounded-full border px-2.5 py-0.5 text-xs font-semibold ${
+                          t.decision === "admis" ? "bg-green-50 text-green-700 border-green-200"
+                          : t.decision === "rattrapage" ? "bg-gold-light text-gold-dark border-gold/40"
+                          : "bg-red-50 text-red-600 border-red-200"}`}>
+                          {DECISION_LABEL[t.decision ?? ""] ?? "—"}
+                        </span>
+                        <button
+                          onClick={() => window.print()}
+                          className="inline-flex items-center gap-1 text-xs font-medium text-cama hover:underline print:hidden"
+                          title="Imprimer la fiche (bulletins inclus)"
+                        >
+                          <Printer className="w-3.5 h-3.5" /> Imprimer
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-sm text-muted italic">Aucun bulletin généré pour cet étudiant.</p>
+                )}
+              </>
+            ) : (
+              <p className="text-sm text-muted italic">Génération impossible : aucune inscription enregistrée.</p>
             )}
           </Section>
 
