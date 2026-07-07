@@ -146,3 +146,80 @@ export async function degreeProgress(studentId: string): Promise<{ earned: numbe
     pct: Math.min(100, Math.round((earned / DEGREE_TARGET_ECTS) * 100)),
   };
 }
+
+/* ════════════════════════════════════════════════════════════
+   PROMOTIONS & COHORTES — regrouper les étudiants d'une
+   filière + niveau + année (ex. « L3 GL 2025-2026 »).
+════════════════════════════════════════════════════════════ */
+
+export interface DBCohort {
+  id: string;
+  label: string;
+  parcours_slug: string | null;
+  parcours_title: string | null;
+  academic_year: string | null;
+  level: string | null;
+  created_at: string;
+  created_by: string | null;
+}
+
+export interface DBCohortMember {
+  id: string;
+  cohort_id: string;
+  student_id: string;
+  added_at: string;
+}
+
+export async function fetchCohorts(): Promise<DBCohort[]> {
+  const { data } = await supabase.from("cohorts").select("*")
+    .order("created_at", { ascending: false });
+  return (data as DBCohort[]) ?? [];
+}
+
+export async function createCohort(payload: {
+  label: string;
+  parcoursSlug?: string | null;
+  parcoursTitle?: string | null;
+  academicYear?: string | null;
+  level?: string | null;
+  createdBy?: string | null;
+}) {
+  return supabase.from("cohorts").insert({
+    label: payload.label.trim(),
+    parcours_slug: payload.parcoursSlug ?? null,
+    parcours_title: payload.parcoursTitle ?? null,
+    academic_year: payload.academicYear ?? null,
+    level: payload.level ?? null,
+    created_by: payload.createdBy ?? null,
+  }).select("*").maybeSingle();
+}
+
+export async function deleteCohort(id: string) {
+  return supabase.from("cohorts").delete().eq("id", id);
+}
+
+export async function fetchCohortMembers(cohortId: string): Promise<DBCohortMember[]> {
+  const { data } = await supabase.from("cohort_members").select("*")
+    .eq("cohort_id", cohortId).order("added_at", { ascending: false });
+  return (data as DBCohortMember[]) ?? [];
+}
+
+export async function addCohortMember(cohortId: string, studentId: string) {
+  return supabase.from("cohort_members").upsert(
+    { cohort_id: cohortId, student_id: studentId },
+    { onConflict: "cohort_id,student_id", ignoreDuplicates: true });
+}
+
+export async function removeCohortMember(cohortId: string, studentId: string) {
+  return supabase.from("cohort_members").delete()
+    .eq("cohort_id", cohortId).eq("student_id", studentId);
+}
+
+/** Nombre de membres par cohorte : { [cohortId]: count }. */
+export async function cohortMembersCount(): Promise<Record<string, number>> {
+  const { data } = await supabase.from("cohort_members").select("cohort_id");
+  const rows = (data as { cohort_id: string }[]) ?? [];
+  const map: Record<string, number> = {};
+  for (const r of rows) map[r.cohort_id] = (map[r.cohort_id] ?? 0) + 1;
+  return map;
+}

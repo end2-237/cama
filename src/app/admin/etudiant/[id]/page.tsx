@@ -7,6 +7,7 @@ import {
   ArrowLeft, Loader2, Printer, UserX, GraduationCap, BookOpen,
   Award, ClipboardCheck, Activity, ShieldAlert, FolderOpen,
   CheckCircle2, XCircle, ExternalLink, FileText, X, Paperclip,
+  FileCheck2, Ban,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import type {
@@ -21,9 +22,13 @@ import { fetchDocuments, reviewDocument, docKindLabel, type DBStudentDocument } 
 import { logAudit } from "@/lib/governance";
 import { fetchYears, fetchSemesters, type DBAcademicYear, type DBSemester } from "@/lib/academic";
 import {
-  buildTranscript, fetchTranscriptsForStudent, DECISION_LABEL,
+  buildTranscript, fetchTranscriptsForStudent, DECISION_LABEL, mentionFor,
   type DBTranscript,
 } from "@/lib/bulletins";
+import {
+  fetchStudentDiplomas, issueDiploma, revokeDiploma, DIPLOMA_KIND_LABEL,
+  type DBDiploma, type DiplomaKind,
+} from "@/lib/diplomas";
 
 // ── Libellés & badges ──────────────────────────────────────────
 const INSCR_BADGE: Record<DBInscription["status"], { label: string; cls: string }> = {
@@ -127,6 +132,11 @@ export default function FicheEtudiantPage() {
   const [generating, setGenerating] = useState(false);
   const [genError, setGenError]     = useState<string | null>(null);
 
+  // Diplômes & attestations
+  const [diplomas, setDiplomas]     = useState<DBDiploma[]>([]);
+  const [issuing, setIssuing]       = useState<DiplomaKind | null>(null);
+  const [revoking, setRevoking]     = useState<string | null>(null);
+
   // Garde admin
   useEffect(() => {
     if (!loading && (!user || user.role !== "admin")) router.replace("/dashboard");
@@ -146,7 +156,7 @@ export default function FicheEtudiantPage() {
       const ins = inscriptions.find((i) => i.user_id === studentId) ?? null;
       setInscr(ins);
 
-      const [prog, delibsAll, atts, nat, docs, yrs, sems, trs] = await Promise.all([
+      const [prog, delibsAll, atts, nat, docs, yrs, sems, trs, dips] = await Promise.all([
         fetchProgress(studentId),
         fetchDeliberations(),
         fetchAttemptsForStudent(studentId),
@@ -155,6 +165,7 @@ export default function FicheEtudiantPage() {
         fetchYears(),
         fetchSemesters(),
         fetchTranscriptsForStudent(studentId),
+        fetchStudentDiplomas(studentId),
       ]);
       if (!alive) return;
       setProgress(prog);
@@ -162,6 +173,7 @@ export default function FicheEtudiantPage() {
       setYears(yrs);
       setSemesters(sems);
       setTranscripts(trs);
+      setDiplomas(dips);
       if (yrs.length) setSelYear((y) => y || (yrs.find((x) => x.is_current)?.label ?? yrs[0].label));
       setDelibs(delibsAll.filter((d) => d.student_id === studentId));
       setAttempts(atts);
@@ -272,6 +284,52 @@ export default function FicheEtudiantPage() {
       setTranscripts((ts) => [transcript, ...ts.filter((t) => t.id !== transcript.id)]);
     }
     setGenerating(false);
+  };
+
+  const handleIssueDiploma = async (kind: DiplomaKind) => {
+    if (!user || issuing) return;
+    setIssuing(kind);
+    const avg = kind === "attestation" ? null : moyenne;
+    const diploma = await issueDiploma({
+      student_id: studentId,
+      kind,
+      parcours_slug: inscr?.parcours_slug ?? null,
+      parcours_title: inscr?.parcours_title ?? null,
+      academic_year: inscr?.academic_year ?? null,
+      level: inscr?.level ?? null,
+      average: avg,
+      mention: mentionFor(avg),
+      issued_by: user.id,
+    });
+    if (diploma) {
+      await logAudit({
+        actorId: user.id,
+        actorName: user.name,
+        action: "diplome.emettre",
+        entity: `diplome:${diploma.id}`,
+        detail: `${DIPLOMA_KIND_LABEL[kind]} (${diploma.code}) émis pour ${student?.first_name ?? ""} ${student?.last_name ?? ""}${avg != null ? ` — moyenne ${avg}/20` : ""}.`,
+        severity: "warn",
+      });
+      setDiplomas((ds) => [diploma, ...ds]);
+    }
+    setIssuing(null);
+  };
+
+  const handleRevokeDiploma = async (d: DBDiploma) => {
+    if (!user || revoking) return;
+    if (!window.confirm(`Révoquer « ${DIPLOMA_KIND_LABEL[d.kind]} » (${d.code}) ? Le document ne sera plus valable à la vérification.`)) return;
+    setRevoking(d.id);
+    await revokeDiploma(d.id);
+    await logAudit({
+      actorId: user.id,
+      actorName: user.name,
+      action: "diplome.revoquer",
+      entity: `diplome:${d.id}`,
+      detail: `${DIPLOMA_KIND_LABEL[d.kind]} (${d.code}) de ${student?.first_name ?? ""} ${student?.last_name ?? ""} révoqué.`,
+      severity: "warn",
+    });
+    setDiplomas((ds) => ds.map((x) => x.id === d.id ? { ...x, revoked: true, revoked_at: new Date().toISOString() } : x));
+    setRevoking(null);
   };
 
   const examTitle = useMemo(() => {
@@ -692,6 +750,75 @@ export default function FicheEtudiantPage() {
               </>
             ) : (
               <p className="text-sm text-muted italic">Génération impossible : aucune inscription enregistrée.</p>
+            )}
+          </Section>
+
+          {/* 5ter — Diplômes & attestations */}
+          <Section icon={FileCheck2} title="Diplômes & attestations">
+            <div className="flex flex-wrap items-center gap-2 mb-4 print:hidden">
+              <button
+                onClick={() => handleIssueDiploma("attestation")}
+                disabled={!!issuing}
+                className="inline-flex items-center gap-2 border-2 border-cama px-4 py-2 text-xs font-semibold uppercase tracking-wide text-cama hover:bg-cama-50 transition-colors disabled:opacity-50"
+              >
+                {issuing === "attestation" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileCheck2 className="w-3.5 h-3.5" />}
+                Émettre une attestation de scolarité
+              </button>
+              <button
+                onClick={() => handleIssueDiploma("releve")}
+                disabled={!!issuing}
+                className="inline-flex items-center gap-2 bg-cama px-4 py-2 text-xs font-semibold uppercase tracking-wide text-white hover:bg-cama-700 transition-colors disabled:opacity-50"
+              >
+                {issuing === "releve" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileText className="w-3.5 h-3.5" />}
+                Émettre un relevé
+              </button>
+            </div>
+            {diplomas.length ? (
+              <ul className="divide-y divide-border/60">
+                {diplomas.map((d) => (
+                  <li key={d.id} className="flex items-center gap-3 py-2.5">
+                    <div className="flex-1 min-w-0">
+                      <p className={`text-sm ${d.revoked ? "text-muted line-through" : "text-ink"}`}>
+                        {DIPLOMA_KIND_LABEL[d.kind]}
+                      </p>
+                      <p className="text-xs text-muted">
+                        <span className="font-mono">{d.code}</span>
+                        {d.average != null ? ` · moyenne ${d.average}/20` : ""}
+                        {d.mention ? ` · ${d.mention}` : ""} · émis le {fmtDate(d.issued_at)}
+                      </p>
+                    </div>
+                    {d.revoked ? (
+                      <span className="inline-block rounded-full border px-2.5 py-0.5 text-xs font-semibold bg-red-50 text-red-600 border-red-200">
+                        Révoqué
+                      </span>
+                    ) : (
+                      <span className="inline-block rounded-full border px-2.5 py-0.5 text-xs font-semibold bg-green-50 text-green-700 border-green-200">
+                        Valide
+                      </span>
+                    )}
+                    <Link
+                      href={`/verifier/${d.code}`}
+                      target="_blank"
+                      className="inline-flex items-center gap-1 text-xs font-medium text-cama hover:underline print:hidden"
+                      title="Ouvrir la vérification publique"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" /> Vérifier
+                    </Link>
+                    {!d.revoked && (
+                      <button
+                        onClick={() => handleRevokeDiploma(d)}
+                        disabled={revoking === d.id}
+                        className="inline-flex items-center gap-1 text-xs font-medium text-red-600 hover:underline print:hidden disabled:opacity-50"
+                        title="Révoquer ce document"
+                      >
+                        {revoking === d.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Ban className="w-3.5 h-3.5" />} Révoquer
+                      </button>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-sm text-muted italic">Aucun diplôme ou attestation émis pour cet étudiant.</p>
             )}
           </Section>
 

@@ -7,7 +7,7 @@ import {
   Grid3x3, Search, ChevronDown, Globe, HelpCircle,
   Bell, LogOut, User, Settings, Megaphone, X, FileText,
   CalendarDays, CalendarClock, Sparkles, Award, ClipboardList, BookOpen, ShieldCheck, Newspaper,
-  Library, BarChart2, GraduationCap, MessagesSquare,
+  Library, BarChart2, GraduationCap, MessagesSquare, Users,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import PersonalCalendarDrawer from "@/components/PersonalCalendarDrawer";
@@ -174,6 +174,7 @@ export default function DashNav({ activeTab, onTab, tabs }: DashNavProps) {
                             { href: "/admin/annees",  icon: ClipboardList, label: "Années & semestres", sub: "Structure" },
                             { href: "/admin/salles",  icon: CalendarClock, label: "Salles & créneaux",  sub: "Réservations" },
                             { href: "/presences",     icon: ClipboardList, label: "Présences",          sub: "Assiduité" },
+                            { href: "/admin/promotions", icon: Users,       label: "Promotions",        sub: "Cohortes" },
                           ]},
                           { cat: "Scolarité & Jury", items: [
                             { href: "/jury/deliberations", icon: Award,       label: "Délibérations",    sub: "Par cours" },
