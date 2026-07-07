@@ -7,7 +7,7 @@ import {
   Grid3x3, Search, ChevronDown, Globe, HelpCircle,
   Bell, LogOut, User, Settings, Megaphone, X, FileText,
   CalendarDays, CalendarClock, Sparkles, Award, ClipboardList, BookOpen, ShieldCheck, Newspaper,
-  Library, BarChart2, GraduationCap,
+  Library, BarChart2, GraduationCap, MessagesSquare,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import PersonalCalendarDrawer from "@/components/PersonalCalendarDrawer";
@@ -269,6 +269,8 @@ export default function DashNav({ activeTab, onTab, tabs }: DashNavProps) {
                         { href: "/etudiant/parascolaire",  icon: Sparkles,      label: "Parascolaire" },
                         { href: "/etudiant/dossier",       icon: ClipboardList, label: "Mon dossier" },
                         { href: "/etudiant/bulletins",     icon: FileText,      label: "Mes bulletins" },
+                        { href: "/messagerie",             icon: Megaphone,     label: "Messagerie" },
+                        { href: "/forum",                  icon: MessagesSquare, label: "Forum & Communauté" },
                       ].map((l) => (
                         <Link key={l.href} href={l.href} onClick={() => setMoreOpen(false)}
                           className="flex items-center gap-3 px-4 py-3 text-sm text-ink hover:bg-surface transition-colors">
