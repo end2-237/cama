@@ -59,6 +59,22 @@ export function webPermissionState(): "default" | "granted" | "denied" | "unsupp
   return Notification.permission;
 }
 
+/* ── Service worker (web) ─────────────────────────────────── */
+
+let swReg: ServiceWorkerRegistration | null = null;
+
+/** Enregistre le service worker CAMA (web). Idempotent. */
+export async function registerServiceWorker(): Promise<ServiceWorkerRegistration | null> {
+  if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) return null;
+  if (swReg) return swReg;
+  try {
+    swReg = await navigator.serviceWorker.register("/sw.js");
+    return swReg;
+  } catch {
+    return null;
+  }
+}
+
 /* ── Affichage d'une notification locale ─────────────────── */
 
 export async function showLocalNotification(opts: {
@@ -84,6 +100,22 @@ export async function showLocalNotification(opts: {
   // Web
   if (typeof window === "undefined" || !("Notification" in window)) return;
   if (Notification.permission !== "granted") return;
+
+  // Préférence : afficher via le service worker (fiable, cliquable, compatible
+  // Chrome Android). Repli sur l'API Notification classique si indisponible.
+  const reg = swReg ?? (await registerServiceWorker());
+  if (reg) {
+    try {
+      await reg.showNotification(opts.title, {
+        body: opts.body ?? "",
+        icon: "/icon-192.png",
+        badge: "/icon-192.png",
+        tag: opts.tag,
+        data: { link: opts.link ?? "/dashboard" },
+      });
+      return;
+    } catch { /* repli ci-dessous */ }
+  }
   try {
     const n = new Notification(opts.title, {
       body: opts.body ?? "",
@@ -120,9 +152,11 @@ async function savePushToken(userId: string, token: string, platform: string) {
  * Renvoie une fonction de nettoyage.
  */
 export async function initNotifications(userId: string): Promise<() => void> {
-  // Web : rien de plus à faire, l'affichage passe par showLocalNotification.
+  // Web : enregistre le service worker (affichage fiable des notifications).
   if (!(await isNative())) {
-    await requestNotificationPermission();
+    await registerServiceWorker();
+    // On ne force pas la permission au chargement (bonne pratique) : elle est
+    // demandée par le bouton « Activer les notifications ». Si déjà accordée, RAS.
     return () => {};
   }
 

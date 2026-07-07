@@ -1,0 +1,91 @@
+name: Build Android APK
+
+# Construit l'APK Android de l'app CAMA (wrapper Capacitor du site).
+# • Déclenchement manuel (workflow_dispatch) ou sur tag « v* ».
+# • L'APK est conservé comme ARTIFACT du run (téléchargeable 90 jours)
+#   et, sur un tag « v* », attaché à une Release GitHub.
+#
+# Le dossier android/ n'est PAS versionné : il est régénéré par
+# « npx cap add android » à chaque exécution (source de vérité = capacitor.config.ts).
+
+on:
+  workflow_dispatch:
+    inputs:
+      release:
+        description: "Créer aussi une Release GitHub avec l'APK"
+        type: boolean
+        default: false
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Setup Java (JDK 21)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Add Android platform (Capacitor)
+        run: npx cap add android
+
+      - name: Inject google-services.json (FCM, optionnel)
+        run: |
+          if [ -n "$GOOGLE_SERVICES_JSON" ]; then
+            echo "$GOOGLE_SERVICES_JSON" > android/app/google-services.json
+            echo "google-services.json injecté."
+          else
+            echo "Aucun secret GOOGLE_SERVICES_JSON — build sans FCM natif."
+          fi
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+
+      - name: Capacitor sync
+        run: npx cap sync android
+
+      - name: Build debug APK
+        run: |
+          cd android
+          chmod +x ./gradlew
+          ./gradlew assembleDebug --no-daemon
+
+      - name: Rename APK
+        run: |
+          mkdir -p dist
+          cp android/app/build/outputs/apk/debug/app-debug.apk dist/cama-${{ github.ref_name }}.apk
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cama-android-apk
+          path: dist/*.apk
+          retention-days: 90
+
+      - name: Attach APK to Release
+        if: startsWith(github.ref, 'refs/tags/v') || inputs.release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.apk
+          tag_name: ${{ github.ref_name }}
+          generate_release_notes: true

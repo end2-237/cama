@@ -9,6 +9,9 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import type { CycleMode } from "@/lib/supabase";
+import {
+  requestNotificationPermission, webPermissionState, showLocalNotification,
+} from "@/lib/pushNotifications";
 
 const DAYS = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 const CYCLE_MODES: { id: CycleMode; label: string; color: string; desc: string }[] = [
@@ -35,6 +38,22 @@ export default function SettingsPage() {
   const [ue, setUe] = useState("");
   const [note, setNote] = useState("");
   const [prefs, setPrefs] = useState({ liveReminder: true, weeklyDigest: true, lowData: true });
+
+  // État d'autorisation des notifications navigateur
+  const [notifPerm, setNotifPerm] = useState<"default" | "granted" | "denied" | "unsupported">("default");
+  useEffect(() => { setNotifPerm(webPermissionState()); }, []);
+
+  const enableNotifications = async () => {
+    const ok = await requestNotificationPermission();
+    setNotifPerm(webPermissionState());
+    if (ok) {
+      await showLocalNotification({
+        title: "Notifications activées ✅",
+        body: "Vous recevrez désormais les alertes CAMA sur ce site.",
+        link: "/dashboard",
+      });
+    }
+  };
 
   useEffect(() => {
     if (!loading && !user) router.replace("/auth/login");
@@ -221,6 +240,29 @@ export default function SettingsPage() {
             <h2 className="text-sm font-bold text-ink">Préférences</h2>
           </div>
           <div className="divide-y divide-border">
+            {/* Autorisation des notifications navigateur (site) */}
+            <div className="px-5 py-3 flex items-center gap-3">
+              <Bell className="w-4 h-4 text-cama flex-shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-ink">Notifications du site</p>
+                <p className="text-[11px] text-muted leading-snug">
+                  {notifPerm === "granted" ? "Activées — vous recevez les alertes CAMA sur cet appareil."
+                    : notifPerm === "denied" ? "Bloquées par le navigateur. Autorisez-les dans les réglages du site."
+                    : notifPerm === "unsupported" ? "Non supportées par ce navigateur."
+                    : "Recevez les alertes (résultats, messages, lives) même hors de la page."}
+                </p>
+              </div>
+              {notifPerm === "granted" ? (
+                <span className="inline-flex items-center gap-1 text-[11px] font-black uppercase tracking-widest text-green-700 flex-shrink-0">
+                  <Check className="w-3.5 h-3.5" /> Activé
+                </span>
+              ) : (
+                <button onClick={enableNotifications} disabled={notifPerm === "denied" || notifPerm === "unsupported"}
+                  className="text-[11px] font-black uppercase tracking-widest bg-cama text-white px-3 py-2 hover:bg-cama-700 transition-colors disabled:opacity-40 flex-shrink-0">
+                  Activer
+                </button>
+              )}
+            </div>
             {([
               { k: "liveReminder", icon: Bell, label: "Rappels de live", desc: "Notification avant le démarrage d'une classe virtuelle." },
               { k: "weeklyDigest", icon: CalendarClock, label: "Récapitulatif hebdomadaire", desc: "Un résumé de votre semaine chaque dimanche soir." },

@@ -38,3 +38,8 @@ next-env.d.ts
 
 /src/generated/prisma
 .env.production
+
+# Capacitor (plateformes natives régénérées en CI)
+/android/
+/ios/
+/dist/
