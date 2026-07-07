@@ -1,7 +1,18 @@
 "use client";
 
 import { type ComponentType, type ReactNode } from "react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { ChevronRight, LayoutDashboard } from "lucide-react";
 import DashNav from "@/components/dashboard/DashNav";
+
+/* Libellés des groupes (1er segment de l'URL) pour le fil d'Ariane */
+const GROUP_LABELS: Record<string, string> = {
+  admin:      "Administration",
+  etudiant:   "Espace étudiant",
+  enseignant: "Espace enseignant",
+  jury:       "Jury",
+};
 
 /* ────────────────────────────────────────────────────────────
    PageShell — coquille commune à toutes les pages du dashboard.
@@ -47,18 +58,39 @@ export default function PageShell({
   children: ReactNode;
   maxWidth?: string;
 }) {
+  const pathname = usePathname() ?? "";
+  const seg = pathname.split("/").filter(Boolean);
+  const groupLabel = GROUP_LABELS[seg[0] ?? ""];
+  // Fil d'Ariane : Dashboard › [Groupe] › Page courante (façon explorateur)
+  const trail: { label: ReactNode; href?: string }[] = [{ label: "Dashboard", href: "/dashboard" }];
+  if (groupLabel) trail.push({ label: groupLabel });
+  trail.push({ label: breadcrumb ?? title });
+
   return (
     <>
-      {/* Bandeau supérieur fin — breadcrumb + contexte */}
+      {/* Bandeau supérieur fin — fil d'Ariane cliquable + contexte */}
       <div className="fixed top-0 inset-x-0 h-12 z-50 text-white"
         style={{ background: "linear-gradient(135deg, #1E1B4B 0%, #3730A3 55%, #4F46E5 100%)" }}>
         <div className={`${maxWidth} mx-auto h-full px-4 sm:px-6 lg:px-8 flex items-center justify-between`}>
-          <div className="flex items-center gap-2 text-[11px] font-semibold text-white/85 truncate">
-            <span className="font-black tracking-tight">CA<span className="text-gold">MA</span></span>
-            <span className="text-white/40">/</span>
-            <span className="truncate">{breadcrumb ?? title}</span>
-          </div>
-          <div className="hidden sm:flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-white/60">
+          <nav className="flex items-center gap-1 text-[11px] font-semibold min-w-0" aria-label="Fil d'Ariane">
+            {trail.map((c, i) => {
+              const last = i === trail.length - 1;
+              return (
+                <span key={i} className="flex items-center gap-1 min-w-0">
+                  {i > 0 && <ChevronRight className="w-3 h-3 text-white/40 flex-shrink-0" />}
+                  {c.href && !last ? (
+                    <Link href={c.href} className="flex items-center gap-1 text-white/70 hover:text-white hover:underline transition-colors flex-shrink-0">
+                      {i === 0 && <LayoutDashboard className="w-3.5 h-3.5" />}
+                      {c.label}
+                    </Link>
+                  ) : (
+                    <span className={`truncate ${last ? "text-white font-bold" : "text-white/70"}`}>{c.label}</span>
+                  )}
+                </span>
+              );
+            })}
+          </nav>
+          <div className="hidden sm:flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-white/60 flex-shrink-0 ml-3">
             {context ?? "Institut JFN · Cameroun"}
           </div>
         </div>
