@@ -10,6 +10,7 @@ import {
   Trash2, X, CalendarClock, Edit3 as EditIcon, Printer, FileCheck,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import CollapsibleAside from "@/components/dashboard/CollapsibleAside";
 import { fetchTeacherCourses, fetchChapters } from "@/lib/program";
 import {
   fetchExamsForCourses, fetchAttemptsForExam, fetchQuestions,
@@ -143,7 +144,9 @@ function TeacherFeed({ articles }: { articles: TArticle[] }) {
 function TeacherShell({ children, right, articles }: { children: React.ReactNode; right: React.ReactNode; articles: TArticle[] }) {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-[290px_1fr_250px] items-start">
-      <TeacherFeed articles={articles} />
+      <CollapsibleAside storageKey="teacher-feed" title="Fil enseignant">
+        <TeacherFeed articles={articles} />
+      </CollapsibleAside>
       <div className="px-4 py-3 border-r border-border min-h-full">{children}</div>
       <div className="bg-white min-h-full border-l border-border lg:border-l-0">{right}</div>
     </div>

@@ -10,6 +10,7 @@ import {
   Newspaper, ExternalLink, BookMarked,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import CollapsibleAside from "@/components/dashboard/CollapsibleAside";
 import { fetchStudentProgram, fetchChapters, fetchProgress } from "@/lib/program";
 import { fetchDeliberations } from "@/lib/exams";
 import { fetchLivesForCourses, subscribeLives } from "@/lib/lives";
@@ -348,8 +349,10 @@ function CoursesTab() {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-[290px_1fr_250px] items-start">
 
-      {/* ── COL GAUCHE : Journal campus — collé à la nav ── */}
-      <NewsFeed articles={articles} />
+      {/* ── COL GAUCHE : Journal campus — collé à la nav (rétractable en mobile) ── */}
+      <CollapsibleAside storageKey="student-news" title="Journal du campus">
+        <NewsFeed articles={articles} />
+      </CollapsibleAside>
 
       {/* ── COL CENTRE : Cours ── */}
       <div className="px-4 py-3 border-r border-border min-h-full">
@@ -564,8 +567,10 @@ function ResultsTab() {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-[290px_1fr_250px] items-start">
 
-      {/* ── COL GAUCHE : Journal campus ── */}
-      <NewsFeed articles={articles} />
+      {/* ── COL GAUCHE : Journal campus (rétractable en mobile) ── */}
+      <CollapsibleAside storageKey="student-news" title="Journal du campus">
+        <NewsFeed articles={articles} />
+      </CollapsibleAside>
 
       {/* ── COL CENTRE : Résultats ── */}
       <div className="px-4 py-3 border-r border-border min-h-full">

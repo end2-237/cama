@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import CollapsibleAside from "@/components/dashboard/CollapsibleAside";
 import { getMaintenance, setMaintenance } from "@/lib/maintenance";
 import { CYCLE_MODES, SESSION_KINDS } from "@/lib/scheduling";
 import { fetchAdminStats, fetchUsers, fetchInscriptions, type InscriptionWithUser } from "@/lib/admin";
@@ -151,7 +152,9 @@ function SystemConsole() {
 function AdminShell({ children, right }: { children: React.ReactNode; right: React.ReactNode }) {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-[290px_1fr_250px] items-start">
-      <SystemConsole />
+      <CollapsibleAside storageKey="admin-console" title="Console système">
+        <SystemConsole />
+      </CollapsibleAside>
       <div className="px-4 py-3 border-r border-border min-h-full">{children}</div>
       <div className="bg-white min-h-full border-l border-border lg:border-l-0">{right}</div>
     </div>

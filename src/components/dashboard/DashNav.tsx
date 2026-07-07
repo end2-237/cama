@@ -7,7 +7,7 @@ import {
   Grid3x3, Search, ChevronDown, Globe, HelpCircle,
   Bell, LogOut, User, Settings, Megaphone, X, FileText,
   CalendarDays, CalendarClock, Sparkles, Award, ClipboardList, BookOpen, ShieldCheck, Newspaper,
-  Library, BarChart2, GraduationCap, MessagesSquare, Users, Wallet,
+  Library, BarChart2, GraduationCap, MessagesSquare, Users, Wallet, Menu, LayoutDashboard,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import PersonalCalendarDrawer from "@/components/PersonalCalendarDrawer";
@@ -29,6 +29,7 @@ export default function DashNav({ activeTab, onTab, tabs }: DashNavProps) {
   const [notifOpen, setNotifOpen] = useState(false);
   const [calOpen, setCalOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   // ── Notifications réelles (cloche) ──
   const [notifs, setNotifs] = useState<DBNotification[]>([]);
@@ -89,11 +90,64 @@ export default function DashNav({ activeTab, onTab, tabs }: DashNavProps) {
 
   if (!user) return null;
 
+  // Liens du menu mobile selon le rôle (réutilise les mêmes destinations que la nav desktop)
+  const mobileLinks: { href: string; icon: typeof BookOpen; label: string }[] =
+    user.role === "admin" ? [
+      { href: "/admin/programme",    icon: BookOpen,      label: "Programme" },
+      { href: "/admin/utilisateurs", icon: Users,         label: "Utilisateurs" },
+      { href: "/admin/statistiques", icon: BarChart2,     label: "Statistiques" },
+      { href: "/admin/suivi",        icon: BarChart2,     label: "Suivi & Qualité" },
+      { href: "/admin/audit",        icon: ShieldCheck,   label: "Rapports & Audit" },
+      { href: "/admin/finance",      icon: Wallet,        label: "Finances" },
+      { href: "/admin/annees",       icon: ClipboardList, label: "Années & semestres" },
+      { href: "/admin/salles",       icon: CalendarClock, label: "Salles & créneaux" },
+      { href: "/presences",          icon: ClipboardList, label: "Présences" },
+      { href: "/admin/promotions",   icon: Users,         label: "Promotions" },
+      { href: "/jury/deliberations", icon: Award,         label: "Délibérations" },
+      { href: "/jury/sessions",      icon: ShieldCheck,   label: "Sessions de jury" },
+      { href: "/admin/enseignants",  icon: GraduationCap, label: "Enseignants" },
+      { href: "/admin/roles",        icon: ShieldCheck,   label: "Niveaux d'admin" },
+      { href: "/admin/media",        icon: FileText,      label: "Ressources média" },
+      { href: "/admin/journal",      icon: Newspaper,     label: "Journal JFN" },
+      { href: "/admin/hors-cursus",  icon: Sparkles,      label: "Hors-cursus" },
+      { href: "/admin/certifications", icon: Award,       label: "Certifications" },
+      { href: "/messagerie",         icon: Megaphone,     label: "Messagerie" },
+    ] : user.role === "enseignant" ? [
+      { href: "/enseignant/cours", icon: BookOpen,      label: "Mes matières" },
+      { href: "/enseignant/examens", icon: BookOpen,    label: "Évaluations" },
+      { href: "/bibliotheque",     icon: Library,       label: "Ma bibliothèque" },
+      { href: "/presences",        icon: ClipboardList, label: "Présences" },
+      { href: "/messagerie",       icon: Megaphone,     label: "Messagerie" },
+    ] : user.role === "jury" ? [
+      { href: "/jury/deliberations", icon: Award,       label: "Délibérations" },
+      { href: "/jury/sessions",      icon: ShieldCheck, label: "Sessions de jury" },
+      { href: "/messagerie",         icon: Megaphone,   label: "Messagerie" },
+    ] : [
+      { href: "/etudiant/programme",  icon: BookOpen,       label: "Mon programme" },
+      { href: "/etudiant/examens",    icon: BookOpen,       label: "Examens" },
+      { href: "/tp",                  icon: ClipboardList,  label: "TP & Machines" },
+      { href: "/bibliotheque",        icon: Library,        label: "Bibliothèque" },
+      { href: "/etudiant/parascolaire", icon: Sparkles,     label: "Parascolaire" },
+      { href: "/etudiant/dossier",    icon: ClipboardList,  label: "Mon dossier" },
+      { href: "/etudiant/bulletins",  icon: FileText,       label: "Mes bulletins" },
+      { href: "/etudiant/finance",    icon: Wallet,         label: "Ma scolarité" },
+      { href: "/messagerie",          icon: Megaphone,      label: "Messagerie" },
+      { href: "/forum",               icon: MessagesSquare, label: "Forum & Communauté" },
+    ];
+
   return (
     <>
     <header className="fixed top-[48px] inset-x-0 z-50 bg-white border-b border-border shadow-sm">
       <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center h-16 gap-2">
+
+          {/* Hamburger — mobile uniquement */}
+          <button
+            onClick={() => setMobileOpen(true)}
+            className="md:hidden p-2 -ml-1 text-ink hover:bg-surface rounded-lg transition-colors"
+            aria-label="Ouvrir le menu">
+            <Menu className="w-6 h-6" />
+          </button>
 
           {/* Logo */}
           <Link href="/" className="flex-shrink-0 mr-2 flex items-center gap-3">
@@ -462,6 +516,88 @@ export default function DashNav({ activeTab, onTab, tabs }: DashNavProps) {
         </div>
       </div>
     </header>
+
+    {/* ── TIROIR MOBILE (hamburger) ── */}
+    {mobileOpen && (
+      <div className="fixed inset-0 z-[60] md:hidden" role="dialog" aria-modal="true">
+        <div className="absolute inset-0 bg-ink/50 animate-fade-in" onClick={() => setMobileOpen(false)} />
+        <div className="absolute inset-y-0 left-0 w-[86%] max-w-[340px] bg-white shadow-2xl flex flex-col animate-slide-in-left">
+          {/* En-tête */}
+          <div className="px-4 py-4 flex items-center justify-between text-white flex-shrink-0"
+            style={{ background: "linear-gradient(135deg, #1E1B4B 0%, #4F46E5 100%)" }}>
+            <div className="flex items-center gap-3 min-w-0">
+              <div className={`w-10 h-10 rounded-full ${user.avatarColor} flex items-center justify-center text-white text-sm font-bold border-2 border-white/30 flex-shrink-0`}>
+                {user.initials}
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-bold leading-tight truncate">{user.name}</p>
+                <p className="text-white/60 text-[11px] truncate">{user.roleLabel}</p>
+              </div>
+            </div>
+            <button onClick={() => setMobileOpen(false)} className="p-1.5 hover:bg-white/15 rounded-lg transition-colors flex-shrink-0">
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          {/* Recherche */}
+          <div className="p-3 border-b border-border flex-shrink-0">
+            <button onClick={() => { setMobileOpen(false); router.push("/recherche"); }}
+              className="w-full flex items-center gap-2 bg-surface border border-border rounded-lg px-3 py-2.5 text-left text-sm text-subtle">
+              <Search className="w-4 h-4 text-cama" /> Rechercher sur CAMA…
+            </button>
+          </div>
+
+          {/* Liens */}
+          <nav className="flex-1 overflow-y-auto py-2">
+            <Link href="/dashboard" onClick={() => setMobileOpen(false)}
+              className="flex items-center gap-3 px-4 py-3 text-sm font-bold text-ink hover:bg-surface transition-colors border-b border-border">
+              <LayoutDashboard className="w-4 h-4 text-cama" /> Tableau de bord
+            </Link>
+            {/* Onglets de la page */}
+            {tabs.length > 0 && (
+              <div className="px-4 pt-3 pb-1 text-[10px] font-black uppercase tracking-widest text-subtle">Onglets</div>
+            )}
+            {tabs.map((t) => (
+              <button key={t} onClick={() => { onTab(t); setMobileOpen(false); }}
+                className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm text-left transition-colors ${
+                  activeTab === t ? "text-cama font-bold bg-cama-50" : "text-ink hover:bg-surface"}`}>
+                <span className="w-1.5 h-1.5 rounded-full bg-cama" /> {t}
+              </button>
+            ))}
+            {/* Navigation du rôle */}
+            <div className="px-4 pt-3 pb-1 text-[10px] font-black uppercase tracking-widest text-subtle">Navigation</div>
+            {mobileLinks.map((l) => (
+              <Link key={l.href} href={l.href} onClick={() => setMobileOpen(false)}
+                className="flex items-center gap-3 px-4 py-2.5 text-sm text-ink hover:bg-surface transition-colors">
+                <l.icon className="w-4 h-4 text-cama" /> {l.label}
+              </Link>
+            ))}
+            {/* Utilitaires */}
+            <div className="px-4 pt-3 pb-1 text-[10px] font-black uppercase tracking-widest text-subtle">Outils</div>
+            <Link href="/calendrier" onClick={() => setMobileOpen(false)} className="flex items-center gap-3 px-4 py-2.5 text-sm text-ink hover:bg-surface transition-colors">
+              <CalendarDays className="w-4 h-4 text-cama" /> Calendrier
+            </Link>
+            <Link href="/guide" onClick={() => setMobileOpen(false)} className="flex items-center gap-3 px-4 py-2.5 text-sm text-ink hover:bg-surface transition-colors">
+              <HelpCircle className="w-4 h-4 text-cama" /> Guide CAMA
+            </Link>
+            <Link href="/profil" onClick={() => setMobileOpen(false)} className="flex items-center gap-3 px-4 py-2.5 text-sm text-ink hover:bg-surface transition-colors">
+              <User className="w-4 h-4 text-cama" /> Mon profil
+            </Link>
+            <Link href="/parametres" onClick={() => setMobileOpen(false)} className="flex items-center gap-3 px-4 py-2.5 text-sm text-ink hover:bg-surface transition-colors">
+              <Settings className="w-4 h-4 text-cama" /> Paramètres
+            </Link>
+          </nav>
+
+          {/* Déconnexion */}
+          <div className="p-3 border-t border-border flex-shrink-0">
+            <button onClick={() => { setMobileOpen(false); handleLogout(); }}
+              className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg bg-red-50 text-red-600 text-sm font-bold hover:bg-red-100 transition-colors">
+              <LogOut className="w-4 h-4" /> Se déconnecter
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
 
     <PersonalCalendarDrawer open={calOpen} onClose={() => setCalOpen(false)} />
     </>

@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/context/AuthContext";
 import StudentGate from "@/components/StudentGate";
+import NotificationsBridge from "@/components/NotificationsBridge";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -17,6 +18,14 @@ export const metadata: Metadata = {
   description:
     "Plateforme LMS sécurisée et optimisée bas-débit pour la gestion complète du parcours académique de l'Institut JFN.",
   keywords: ["LMS", "JFN", "académique", "Cameroun", "cours", "examens"],
+  manifest: "/manifest.json",
+};
+
+export const viewport = {
+  themeColor: "#4F46E5",
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover" as const,
 };
 
 export default function RootLayout({
@@ -27,6 +36,7 @@ export default function RootLayout({
       <body className="font-sans text-slate-900 bg-white antialiased">
         <AuthProvider>
           <StudentGate />
+          <NotificationsBridge />
           {children}
         </AuthProvider>
       </body>
