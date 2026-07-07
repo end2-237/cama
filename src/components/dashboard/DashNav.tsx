@@ -7,7 +7,7 @@ import {
   Grid3x3, Search, ChevronDown, Globe, HelpCircle,
   Bell, LogOut, User, Settings, Megaphone, X, FileText,
   CalendarDays, CalendarClock, Sparkles, Award, ClipboardList, BookOpen, ShieldCheck, Newspaper,
-  Library, BarChart2, GraduationCap, MessagesSquare, Users,
+  Library, BarChart2, GraduationCap, MessagesSquare, Users, Wallet,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import PersonalCalendarDrawer from "@/components/PersonalCalendarDrawer";
@@ -169,6 +169,7 @@ export default function DashNav({ activeTab, onTab, tabs }: DashNavProps) {
                             { href: "/admin/statistiques", icon: BarChart2,   label: "Statistiques",     sub: "Vue d'ensemble" },
                             { href: "/admin/suivi",        icon: BarChart2,   label: "Suivi & Qualité",  sub: "Progression" },
                             { href: "/admin/audit",        icon: ShieldCheck, label: "Rapports & Audit", sub: "Journal & exports" },
+                            { href: "/admin/finance",      icon: Wallet,      label: "Finances",         sub: "Scolarité & reçus" },
                           ]},
                           { cat: "Académique", items: [
                             { href: "/admin/annees",  icon: ClipboardList, label: "Années & semestres", sub: "Structure" },
@@ -270,6 +271,7 @@ export default function DashNav({ activeTab, onTab, tabs }: DashNavProps) {
                         { href: "/etudiant/parascolaire",  icon: Sparkles,      label: "Parascolaire" },
                         { href: "/etudiant/dossier",       icon: ClipboardList, label: "Mon dossier" },
                         { href: "/etudiant/bulletins",     icon: FileText,      label: "Mes bulletins" },
+                        { href: "/etudiant/finance",       icon: Wallet,        label: "Ma scolarité" },
                         { href: "/messagerie",             icon: Megaphone,     label: "Messagerie" },
                         { href: "/forum",                  icon: MessagesSquare, label: "Forum & Communauté" },
                       ].map((l) => (
