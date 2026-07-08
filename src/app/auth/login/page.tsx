@@ -60,13 +60,42 @@ export default function LoginPage() {
     }
 
     // 2. Envoie le code (jamais de création de compte via ce canal)
-    const { error: err } = await supabase.auth.signInWithOtp({
+    let { error: err } = await supabase.auth.signInWithOtp({
       email: mail,
       options: { shouldCreateUser: false },
     });
+
+    // 2 bis. Échec 422 « signups not allowed » : le profil existe mais le compte
+    // Auth est peut-être absent. On tente une réparation serveur, puis on renvoie.
+    if (err && (err.status === 422 || /signup|not allowed/i.test(err.message || ""))) {
+      try {
+        const res = await fetch("/api/auth/ensure-teacher", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: mail }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok && data.repaired) {
+          ({ error: err } = await supabase.auth.signInWithOtp({
+            email: mail, options: { shouldCreateUser: false },
+          }));
+        }
+      } catch { /* on retombe sur la gestion d'erreur ci-dessous */ }
+    }
+
     setOtpLoading(false);
     if (err) {
-      setOtpErr("Impossible d'envoyer le code pour le moment. Réessayez.");
+      const msg = (err.message || "").toLowerCase();
+      if (msg.includes("signup") || msg.includes("not allowed") || err.status === 422) {
+        setOtpErr(
+          "La connexion par code e-mail n'est pas activée côté serveur (OTP e-mail). " +
+          "Contactez l'administration pour l'activer, puis réessayez.",
+        );
+      } else if (msg.includes("rate") || err.status === 429) {
+        setOtpErr("Trop de tentatives. Patientez une minute avant de redemander un code.");
+      } else {
+        setOtpErr(`Impossible d'envoyer le code : ${err.message || "erreur inconnue"}.`);
+      }
       return;
     }
     setCode(["", "", "", "", "", ""]);
