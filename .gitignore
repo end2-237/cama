@@ -47,3 +47,4 @@ next-env.d.ts
 # Livrables de rapport (générés, envoyés hors dépôt)
 /CAMA_rapport.docx
 /CAMA_annexes_SQL_diagrammes.md
+/CAMA_modele_complet_UML.md
