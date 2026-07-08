@@ -22,7 +22,7 @@ interface Body { taskId?: string; requesterId?: string }
 interface Step {
   id: string;
   label: string;
-  action: "valider_inscription" | "relance_documents";
+  action: "valider_inscription" | "relance_documents" | "relance_paiement";
   target_id: string;
   params: Record<string, unknown>;
   selected: boolean;
@@ -58,6 +58,18 @@ async function runStep(admin: SupabaseClient, step: Step): Promise<Step> {
           "/onboarding");
       }
       return { ...step, status: "ok", result: `Relance envoyée (${missing.length} pièce(s)).` };
+    }
+
+    if (step.action === "relance_paiement") {
+      const userId = String(step.params.user_id ?? "");
+      const label = String(step.params.label ?? "Scolarité");
+      const montant = String(step.params.montant ?? "");
+      if (userId) {
+        await notify(admin, userId, "paiement", "Rappel de paiement",
+          `Votre paiement « ${label} » (${montant} FCFA) est en attente. Merci de régulariser votre situation.`,
+          "/etudiant/paiements");
+      }
+      return { ...step, status: "ok", result: `Relance de paiement envoyée (${montant} FCFA).` };
     }
 
     return { ...step, status: "ignore", result: "Action inconnue." };

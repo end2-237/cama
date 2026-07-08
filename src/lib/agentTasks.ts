@@ -11,8 +11,12 @@
 ════════════════════════════════════════════════════════════ */
 import { supabase } from "@/lib/supabase";
 import { fetchInscriptions } from "@/lib/admin";
+import { fetchAllInvoices } from "@/lib/finance";
 
-export type StepAction = "valider_inscription" | "relance_documents";
+export type StepAction =
+  | "valider_inscription"
+  | "relance_documents"
+  | "relance_paiement";
 export type StepStatus = "attente" | "ok" | "echec" | "ignore";
 export type TaskStatus = "planifie" | "en_cours" | "termine" | "echoue" | "annule";
 
@@ -53,7 +57,8 @@ export interface PlanPreview {
   title: string;
   kind: string;
   steps: AgentStep[];
-  stats: { complets: number; incomplets: number; total: number };
+  /** Ligne descriptive des compteurs, propre à chaque flux. */
+  note: string;
 }
 
 /**
@@ -124,7 +129,47 @@ export async function planRentreeInscriptions(): Promise<PlanPreview> {
     title: "Traitement des dossiers de rentrée",
     kind: "rentree_inscriptions",
     steps,
-    stats: { complets, incomplets, total: pending.length },
+    note: `${pending.length} dossier(s) en attente · ${complets} complet(s) à valider · ${incomplets} à relancer. Décochez ce que vous ne voulez pas exécuter.`,
+  };
+}
+
+/**
+ * FLUX 1 — Relance des impayés.
+ * Analyse les factures dues/partielles échues et propose une relance
+ * personnalisée (montant, échéance) à chaque étudiant concerné. Lecture seule.
+ */
+export async function planRelanceImpayes(): Promise<PlanPreview> {
+  const invoices = await fetchAllInvoices();
+  const now = Date.now();
+  const unpaid = invoices.filter((i) => i.status === "du" || i.status === "partiel");
+
+  const steps: AgentStep[] = [];
+  let echues = 0;
+  for (const inv of unpaid) {
+    const overdue = inv.due_date ? new Date(inv.due_date).getTime() < now : false;
+    if (overdue) echues++;
+    const montant = Number(inv.amount_fcfa ?? 0).toLocaleString("fr-FR");
+    steps.push({
+      id: inv.id,
+      label: `Relancer le paiement « ${inv.label ?? "Scolarité"} » — ${montant} FCFA${overdue ? " (échu)" : ""}`,
+      action: "relance_paiement",
+      target_id: inv.id,
+      params: {
+        user_id: inv.student_id,
+        label: inv.label ?? "Scolarité",
+        montant,
+        due_date: inv.due_date,
+      },
+      selected: overdue, // pré-cochées : seulement les factures échues
+      status: "attente",
+    });
+  }
+
+  return {
+    title: "Relance des impayés",
+    kind: "relance_impayes",
+    steps,
+    note: `${unpaid.length} facture(s) non soldée(s) · ${echues} échue(s) (pré-cochées). Décochez ce que vous ne voulez pas relancer.`,
   };
 }
 

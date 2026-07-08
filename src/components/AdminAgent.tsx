@@ -22,7 +22,8 @@ import { useAuth } from "@/context/AuthContext";
 import { useAdminAgentEnabled } from "@/hooks/useAdminAgentEnabled";
 import { buildAdminContext, askAdminAgent, type AgentTurn } from "@/lib/adminAgent";
 import {
-  planRentreeInscriptions, createTask, fetchTasks, subscribeTasks,
+  planRentreeInscriptions, planRelanceImpayes,
+  createTask, fetchTasks, subscribeTasks,
   type PlanPreview, type AgentTask, type AgentStep,
 } from "@/lib/agentTasks";
 
@@ -30,6 +31,23 @@ const SUGGESTIONS = [
   "Combien de dossiers sont en attente ?",
   "Quel est le montant des impayés ?",
   "Que dois-je traiter en priorité ?",
+];
+
+/* Libellé court par type d'action (badge du plan). */
+const ACTION_LABEL: Record<string, string> = {
+  valider_inscription: "Validation",
+  relance_documents: "Relance",
+  relance_paiement: "Relance paiement",
+  relance_saisie_notes: "Relance notes",
+  signaler_conflit_salle: "Conflit salle",
+  preparer_deliberation: "Délibération",
+  notifier_passage: "Passage",
+};
+
+/* Catalogue des tâches automatisées (flux semi-autonomes). */
+const FLOWS: { id: string; label: string; desc: string; planner: () => Promise<PlanPreview> }[] = [
+  { id: "rentree", label: "Traitement des dossiers de rentrée", desc: "Valider les dossiers complets, relancer les incomplets", planner: planRentreeInscriptions },
+  { id: "impayes", label: "Relance des impayés", desc: "Rappeler les factures échues aux étudiants concernés", planner: planRelanceImpayes },
 ];
 
 function renderMarkdownLite(text: string) {
@@ -60,7 +78,7 @@ export default function AdminAgent() {
   const [busy, setBusy] = useState(false);
 
   const [plan, setPlan] = useState<PlanPreview | null>(null);
-  const [planning, setPlanning] = useState(false);
+  const [planning, setPlanning] = useState<string | null>(null);
   const [tasks, setTasks] = useState<AgentTask[]>([]);
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -101,15 +119,16 @@ export default function AdminAgent() {
     } finally { setBusy(false); }
   }
 
-  // ── Flux semi-autonome : construire le plan de rentrée ──
-  async function startRentreePlan() {
-    setPlanning(true); setView("chat"); setTurns([]);
+  // ── Flux semi-autonome : construire un plan ──
+  async function startFlow(flowId: string) {
+    const flow = FLOWS.find((f) => f.id === flowId);
+    if (!flow) return;
+    setPlanning(flowId); setView("chat"); setTurns([]);
     try {
-      const p = await planRentreeInscriptions();
-      setPlan(p);
+      setPlan(await flow.planner());
     } catch {
       setTurns((t) => [...t, { role: "assistant", content: "Impossible de construire le plan (données inaccessibles)." }]);
-    } finally { setPlanning(false); }
+    } finally { setPlanning(null); }
   }
 
   function toggleStep(id: string) {
@@ -236,10 +255,7 @@ export default function AdminAgent() {
                   <p className="text-sm font-bold text-ink flex items-center gap-1.5">
                     <Zap className="w-4 h-4 text-cama" /> {plan.title}
                   </p>
-                  <p className="text-[11px] text-text-muted mt-1">
-                    {plan.stats.total} dossier(s) en attente · {plan.stats.complets} complet(s) à valider ·
-                    {" "}{plan.stats.incomplets} à relancer. Décochez ce que vous ne voulez pas exécuter.
-                  </p>
+                  <p className="text-[11px] text-text-muted mt-1">{plan.note}</p>
                 </div>
                 {plan.steps.length === 0 ? (
                   <p className="text-xs text-text-subtle text-center mt-8">Aucun dossier en attente. Rien à faire 🎉</p>
@@ -253,7 +269,7 @@ export default function AdminAgent() {
                           <div className="min-w-0">
                             <p className="text-xs text-ink">{s.label}</p>
                             <span className={`text-[10px] font-semibold ${s.action === "valider_inscription" ? "text-green-700" : "text-gold-dark"}`}>
-                              {s.action === "valider_inscription" ? "Validation" : "Relance"}
+                              {ACTION_LABEL[s.action] ?? "Action"}
                             </span>
                           </div>
                         </label>
@@ -285,15 +301,19 @@ export default function AdminAgent() {
                       Interrogez vos données, ou lancez une tâche automatisée que vous validez avant exécution.
                     </p>
 
-                    {/* Tâche automatisée phare : rentrée */}
-                    <button onClick={startRentreePlan} disabled={planning}
-                      className="mt-4 w-full max-w-[320px] text-left px-3 py-3 rounded-xl border border-cama/30 bg-cama-50 hover:bg-cama-50/70 flex items-center gap-2.5 transition-colors">
-                      {planning ? <Loader2 className="w-5 h-5 text-cama animate-spin flex-shrink-0" /> : <Zap className="w-5 h-5 text-cama flex-shrink-0" />}
-                      <span className="min-w-0">
-                        <span className="block text-xs font-bold text-ink">Traitement des dossiers de rentrée</span>
-                        <span className="block text-[10px] text-text-muted">Valider les dossiers complets, relancer les incomplets</span>
-                      </span>
-                    </button>
+                    {/* Tâches automatisées (flux semi-autonomes) */}
+                    <div className="mt-4 w-full max-w-[320px] space-y-1.5">
+                      {FLOWS.map((f) => (
+                        <button key={f.id} onClick={() => startFlow(f.id)} disabled={planning !== null}
+                          className="w-full text-left px-3 py-3 rounded-xl border border-cama/30 bg-cama-50 hover:bg-cama-50/70 disabled:opacity-50 flex items-center gap-2.5 transition-colors">
+                          {planning === f.id ? <Loader2 className="w-5 h-5 text-cama animate-spin flex-shrink-0" /> : <Zap className="w-5 h-5 text-cama flex-shrink-0" />}
+                          <span className="min-w-0">
+                            <span className="block text-xs font-bold text-ink">{f.label}</span>
+                            <span className="block text-[10px] text-text-muted">{f.desc}</span>
+                          </span>
+                        </button>
+                      ))}
+                    </div>
 
                     <div className="mt-4 grid gap-1.5 w-full max-w-[320px]">
                       {SUGGESTIONS.map((s) => (
