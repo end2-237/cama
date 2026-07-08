@@ -22,7 +22,8 @@ interface Body { taskId?: string; requesterId?: string }
 interface Step {
   id: string;
   label: string;
-  action: "valider_inscription" | "relance_documents" | "relance_paiement";
+  action: "valider_inscription" | "relance_documents" | "relance_paiement"
+    | "relance_saisie_notes" | "signaler_conflit_salle" | "preparer_deliberation" | "notifier_passage";
   target_id: string;
   params: Record<string, unknown>;
   selected: boolean;
@@ -70,6 +71,47 @@ async function runStep(admin: SupabaseClient, step: Step): Promise<Step> {
           "/etudiant/paiements");
       }
       return { ...step, status: "ok", result: `Relance de paiement envoyée (${montant} FCFA).` };
+    }
+
+    if (step.action === "relance_saisie_notes") {
+      const teacherId = String(step.params.teacher_id ?? "");
+      const course = String(step.params.course_title ?? "un cours");
+      if (teacherId) {
+        await notify(admin, teacherId, "notes", "Saisie de notes attendue",
+          `Les notes du cours « ${course} » n'ont pas encore été saisies. Merci de les renseigner avant la délibération.`,
+          "/dashboard");
+      }
+      return { ...step, status: "ok", result: "Relance enseignant envoyée." };
+    }
+
+    if (step.action === "signaler_conflit_salle") {
+      const ids = Array.isArray(step.params.booker_ids) ? (step.params.booker_ids as string[]) : [];
+      const detail = String(step.params.detail ?? "Conflit de salle détecté.");
+      for (const id of ids) {
+        if (id) await notify(admin, id, "planning", "Conflit de salle à résoudre", detail, "/admin/salles");
+      }
+      return { ...step, status: "ok", result: `Conflit signalé à ${ids.length} responsable(s).` };
+    }
+
+    if (step.action === "preparer_deliberation") {
+      const juryIds = Array.isArray(step.params.jury_ids) ? (step.params.jury_ids as string[]) : [];
+      const who = String(step.params.student_name ?? "un étudiant");
+      for (const id of juryIds) {
+        if (id) await notify(admin, id, "jury", "Dossier de délibération prêt",
+          `Le dossier de ${who} est prêt à être examiné en délibération.`, "/dashboard");
+      }
+      return { ...step, status: "ok", result: `Jury informé (${juryIds.length} membre(s)).` };
+    }
+
+    if (step.action === "notifier_passage") {
+      const userId = String(step.params.student_id ?? "");
+      const year = String(step.params.academic_year ?? "");
+      if (userId) {
+        await notify(admin, userId, "resultat", "Passage en niveau supérieur",
+          `Félicitations ! Vous êtes admis(e) au niveau supérieur${year ? ` (${year})` : ""}.`,
+          "/etudiant/programme");
+      }
+      return { ...step, status: "ok", result: "Étudiant notifié de son passage." };
     }
 
     return { ...step, status: "ignore", result: "Action inconnue." };

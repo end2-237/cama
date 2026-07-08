@@ -16,7 +16,11 @@ import { fetchAllInvoices } from "@/lib/finance";
 export type StepAction =
   | "valider_inscription"
   | "relance_documents"
-  | "relance_paiement";
+  | "relance_paiement"
+  | "relance_saisie_notes"
+  | "signaler_conflit_salle"
+  | "preparer_deliberation"
+  | "notifier_passage";
 export type StepStatus = "attente" | "ok" | "echec" | "ignore";
 export type TaskStatus = "planifie" | "en_cours" | "termine" | "echoue" | "annule";
 
@@ -170,6 +174,199 @@ export async function planRelanceImpayes(): Promise<PlanPreview> {
     kind: "relance_impayes",
     steps,
     note: `${unpaid.length} facture(s) non soldée(s) · ${echues} échue(s) (pré-cochées). Décochez ce que vous ne voulez pas relancer.`,
+  };
+}
+
+/**
+ * FLUX 2 — Relance de la saisie des notes.
+ * Repère les cours affectés à un enseignant qui n'ont encore aucune note
+ * saisie (aucune ligne de bulletin) et propose de relancer l'enseignant.
+ */
+export async function planRelanceSaisieNotes(): Promise<PlanPreview> {
+  const { data: courses } = await supabase
+    .from("program_courses")
+    .select("id,title,code,teacher_id,parcours_title")
+    .not("teacher_id", "is", null);
+  const list = (courses as { id: string; title: string; code: string; teacher_id: string; parcours_title: string }[]) ?? [];
+
+  const { data: lines } = await supabase.from("transcript_lines").select("program_course_id");
+  const withNotes = new Set(
+    ((lines as { program_course_id: string | null }[]) ?? [])
+      .map((l) => l.program_course_id).filter(Boolean) as string[],
+  );
+
+  // Noms des enseignants.
+  const teacherIds = Array.from(new Set(list.map((c) => c.teacher_id)));
+  const nameById = new Map<string, string>();
+  if (teacherIds.length) {
+    const { data: us } = await supabase.from("users").select("id,first_name,last_name").in("id", teacherIds);
+    for (const u of (us as { id: string; first_name: string; last_name: string }[]) ?? []) {
+      nameById.set(u.id, `${u.first_name ?? ""} ${u.last_name ?? ""}`.trim());
+    }
+  }
+
+  const steps: AgentStep[] = [];
+  for (const c of list) {
+    if (withNotes.has(c.id)) continue;
+    const prof = nameById.get(c.teacher_id) || "l'enseignant";
+    steps.push({
+      id: c.id,
+      label: `Relancer ${prof} — notes non saisies pour « ${c.title} » (${c.code})`,
+      action: "relance_saisie_notes",
+      target_id: c.id,
+      params: { teacher_id: c.teacher_id, course_title: c.title, course_code: c.code },
+      selected: true,
+      status: "attente",
+    });
+  }
+
+  return {
+    title: "Relance de la saisie des notes",
+    kind: "relance_saisie_notes",
+    steps,
+    note: `${list.length} cours affecté(s) · ${steps.length} sans notes saisies. Décochez ce que vous ne voulez pas relancer.`,
+  };
+}
+
+/**
+ * FLUX 3 — Détection des conflits de salles.
+ * Analyse les réservations hebdomadaires et signale les chevauchements
+ * (même salle, même jour, plages horaires qui se recoupent).
+ */
+export async function planConflitsSalles(): Promise<PlanPreview> {
+  const { data } = await supabase
+    .from("room_bookings")
+    .select("id,room_id,title,day,start_time,end_time,booked_by")
+    .not("start_time", "is", null);
+  const bookings = (data as {
+    id: string; room_id: string; title: string | null; day: number | null;
+    start_time: string | null; end_time: string | null; booked_by: string | null;
+  }[]) ?? [];
+
+  // Nom des salles.
+  const roomIds = Array.from(new Set(bookings.map((b) => b.room_id).filter(Boolean)));
+  const roomName = new Map<string, string>();
+  if (roomIds.length) {
+    const { data: rs } = await supabase.from("rooms").select("id,name").in("id", roomIds);
+    for (const r of (rs as { id: string; name: string }[]) ?? []) roomName.set(r.id, r.name);
+  }
+
+  const overlap = (a: typeof bookings[number], b: typeof bookings[number]) =>
+    a.room_id === b.room_id && a.day === b.day &&
+    !!a.start_time && !!a.end_time && !!b.start_time && !!b.end_time &&
+    a.start_time < b.end_time! && b.start_time! < a.end_time!;
+
+  const steps: AgentStep[] = [];
+  const seen = new Set<string>();
+  for (let i = 0; i < bookings.length; i++) {
+    for (let j = i + 1; j < bookings.length; j++) {
+      const a = bookings[i], b = bookings[j];
+      if (!overlap(a, b)) continue;
+      const key = [a.id, b.id].sort().join("|");
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const salle = roomName.get(a.room_id) || "une salle";
+      const detail = `${salle} — « ${a.title ?? "cours"} » et « ${b.title ?? "cours"} » se chevauchent (${a.start_time}-${a.end_time}).`;
+      steps.push({
+        id: key,
+        label: `Conflit : ${detail}`,
+        action: "signaler_conflit_salle",
+        target_id: a.id,
+        params: { booker_ids: [a.booked_by, b.booked_by].filter(Boolean), detail },
+        selected: true,
+        status: "attente",
+      });
+    }
+  }
+
+  return {
+    title: "Détection des conflits de salles",
+    kind: "conflits_salles",
+    steps,
+    note: `${bookings.length} réservation(s) analysée(s) · ${steps.length} conflit(s) détecté(s). L'agent signalera chaque conflit aux responsables.`,
+  };
+}
+
+/**
+ * FLUX 4 — Préparation des dossiers de délibération.
+ * Liste les relevés sans décision et prépare le jury (notification aux
+ * membres). PRÉPARATION uniquement : la décision reste 100 % humaine.
+ */
+export async function planPreparationDeliberation(): Promise<PlanPreview> {
+  const { data } = await supabase
+    .from("transcripts")
+    .select("id,student_id,academic_year,semester,decision")
+    .is("decision", null);
+  const pend = (data as { id: string; student_id: string; academic_year: string; semester: number }[]) ?? [];
+
+  // Membres du jury (destinataires de la préparation).
+  const { data: jm } = await supabase.from("jury_members").select("user_id");
+  const juryIds = Array.from(new Set(((jm as { user_id: string | null }[]) ?? []).map((m) => m.user_id).filter(Boolean))) as string[];
+
+  // Noms étudiants.
+  const sids = Array.from(new Set(pend.map((t) => t.student_id)));
+  const sname = new Map<string, string>();
+  if (sids.length) {
+    const { data: us } = await supabase.from("users").select("id,first_name,last_name").in("id", sids);
+    for (const u of (us as { id: string; first_name: string; last_name: string }[]) ?? []) {
+      sname.set(u.id, `${u.first_name ?? ""} ${u.last_name ?? ""}`.trim());
+    }
+  }
+
+  const steps: AgentStep[] = pend.map((t) => ({
+    id: t.id,
+    label: `Préparer la délibération — ${sname.get(t.student_id) || "étudiant"} (${t.academic_year} S${t.semester})`,
+    action: "preparer_deliberation" as StepAction,
+    target_id: t.id,
+    params: { student_id: t.student_id, student_name: sname.get(t.student_id) || "un étudiant", jury_ids: juryIds },
+    selected: true,
+    status: "attente",
+  }));
+
+  return {
+    title: "Préparation des délibérations",
+    kind: "preparation_deliberation",
+    steps,
+    note: `${pend.length} relevé(s) sans décision · ${juryIds.length} membre(s) de jury à informer. Préparation uniquement — le jury décide.`,
+  };
+}
+
+/**
+ * FLUX 5 — Passage de niveau (notification).
+ * À partir des décisions « admis », notifie les étudiants de leur passage.
+ * SENSIBLE : étapes décochées par défaut (double validation de l'admin).
+ */
+export async function planPassageNiveau(): Promise<PlanPreview> {
+  const { data } = await supabase
+    .from("transcripts")
+    .select("id,student_id,academic_year,decision")
+    .eq("decision", "admis");
+  const admis = (data as { id: string; student_id: string; academic_year: string }[]) ?? [];
+
+  const sids = Array.from(new Set(admis.map((t) => t.student_id)));
+  const sname = new Map<string, string>();
+  if (sids.length) {
+    const { data: us } = await supabase.from("users").select("id,first_name,last_name").in("id", sids);
+    for (const u of (us as { id: string; first_name: string; last_name: string }[]) ?? []) {
+      sname.set(u.id, `${u.first_name ?? ""} ${u.last_name ?? ""}`.trim());
+    }
+  }
+
+  const steps: AgentStep[] = admis.map((t) => ({
+    id: t.id,
+    label: `Notifier le passage — ${sname.get(t.student_id) || "étudiant"} (${t.academic_year})`,
+    action: "notifier_passage" as StepAction,
+    target_id: t.id,
+    params: { student_id: t.student_id, academic_year: t.academic_year },
+    selected: false, // action sensible : décochée par défaut
+    status: "attente",
+  }));
+
+  return {
+    title: "Passage de niveau",
+    kind: "passage_niveau",
+    steps,
+    note: `${admis.length} étudiant(s) admis. Action sensible : cochez explicitement chaque passage à notifier.`,
   };
 }
 

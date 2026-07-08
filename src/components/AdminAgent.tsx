@@ -22,7 +22,8 @@ import { useAuth } from "@/context/AuthContext";
 import { useAdminAgentEnabled } from "@/hooks/useAdminAgentEnabled";
 import { buildAdminContext, askAdminAgent, type AgentTurn } from "@/lib/adminAgent";
 import {
-  planRentreeInscriptions, planRelanceImpayes,
+  planRentreeInscriptions, planRelanceImpayes, planRelanceSaisieNotes,
+  planConflitsSalles, planPreparationDeliberation, planPassageNiveau,
   createTask, fetchTasks, subscribeTasks,
   type PlanPreview, type AgentTask, type AgentStep,
 } from "@/lib/agentTasks";
@@ -48,6 +49,10 @@ const ACTION_LABEL: Record<string, string> = {
 const FLOWS: { id: string; label: string; desc: string; planner: () => Promise<PlanPreview> }[] = [
   { id: "rentree", label: "Traitement des dossiers de rentrée", desc: "Valider les dossiers complets, relancer les incomplets", planner: planRentreeInscriptions },
   { id: "impayes", label: "Relance des impayés", desc: "Rappeler les factures échues aux étudiants concernés", planner: planRelanceImpayes },
+  { id: "notes", label: "Relance de la saisie des notes", desc: "Relancer les enseignants dont les cours n'ont pas de notes", planner: planRelanceSaisieNotes },
+  { id: "salles", label: "Détection des conflits de salles", desc: "Repérer et signaler les chevauchements d'emploi du temps", planner: planConflitsSalles },
+  { id: "delib", label: "Préparation des délibérations", desc: "Préparer les dossiers du jury (préparation seule)", planner: planPreparationDeliberation },
+  { id: "passage", label: "Passage de niveau", desc: "Notifier les étudiants admis (action sensible)", planner: planPassageNiveau },
 ];
 
 function renderMarkdownLite(text: string) {
