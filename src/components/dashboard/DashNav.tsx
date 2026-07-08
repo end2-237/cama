@@ -214,10 +214,10 @@ export default function DashNav({ activeTab, onTab, tabs }: DashNavProps) {
                     Plus <ChevronDown className={`w-3 h-3 transition-transform ${moreOpen ? "rotate-180" : ""}`} />
                   </button>
                   {moreOpen && (
-                    <div className="absolute right-0 top-full mt-0 w-[620px] bg-white border border-border shadow-2xl z-50 animate-scale-in">
-                      {/* Filet dégradé signature */}
-                      <div className="h-0.5 w-full bg-gradient-to-r from-cama via-cama-400 to-gold" />
-                      <div className="grid grid-cols-3 gap-x-5 gap-y-5 p-5">
+                    <div className="absolute right-0 top-full mt-0 w-[620px] max-w-[calc(100vw-1rem)] bg-white border border-border shadow-2xl z-50 animate-scale-in flex flex-col max-h-[calc(100vh-80px)]">
+                      {/* Filet dégradé signature (fixe) */}
+                      <div className="h-0.5 w-full bg-gradient-to-r from-cama via-cama-400 to-gold flex-shrink-0" />
+                      <div className="grid grid-cols-3 gap-x-5 gap-y-5 p-5 overflow-y-auto overscroll-contain">
                         {[
                           { cat: "Pilotage", items: [
                             { href: "/admin/statistiques", icon: BarChart2,   label: "Statistiques",     sub: "Vue d'ensemble" },
