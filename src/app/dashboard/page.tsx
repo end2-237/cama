@@ -13,6 +13,7 @@ import Footer from "@/components/landing/Footer";
 import WelcomeModal from "@/components/WelcomeModal";
 import OnboardingTour from "@/components/OnboardingTour";
 import GlobalActions from "@/components/GlobalActions";
+import { CamaScreenLoader } from "@/components/CamaLoader";
 import { useMaintenance } from "@/hooks/useMaintenance";
 
 const tabsMap: Record<string, string[]> = {
@@ -69,11 +70,7 @@ export default function DashboardPage() {
     user?.role === "etudiant" && (user.dossier == null || user.dossier.status !== "validee");
 
   if (loading || !user || studentBlocked) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="w-8 h-8 rounded-full border-4 border-cama border-t-transparent animate-spin" />
-      </div>
-    );
+    return <CamaScreenLoader label="Préparation de votre espace" />;
   }
 
   return (
