@@ -5,9 +5,10 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft, Settings, Wifi, MapPin, Building2, Clock, Plus, Trash2,
-  Check, Bell, Globe, Send, CalendarClock, ShieldCheck, AlertTriangle, Info,
+  Check, Bell, Globe, Send, CalendarClock, ShieldCheck, AlertTriangle, Info, Sparkles,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { useAdminAgentEnabled } from "@/hooks/useAdminAgentEnabled";
 import type { CycleMode } from "@/lib/supabase";
 import {
   requestNotificationPermission, webPermissionState, showLocalNotification,
@@ -38,6 +39,9 @@ export default function SettingsPage() {
   const [ue, setUe] = useState("");
   const [note, setNote] = useState("");
   const [prefs, setPrefs] = useState({ liveReminder: true, weeklyDigest: true, lowData: true });
+
+  // Agent d'administration (admin uniquement)
+  const [agentEnabled, setAgentEnabled] = useAdminAgentEnabled();
 
   // État d'autorisation des notifications navigateur
   const [notifPerm, setNotifPerm] = useState<"default" | "granted" | "denied" | "unsupported">("default");
@@ -287,6 +291,33 @@ export default function SettingsPage() {
             </div>
           </div>
         </section>
+
+        {/* Agent d'administration — réservé aux administrateurs */}
+        {user?.role === "admin" && (
+          <section className="bg-white border border-border">
+            <div className="px-5 py-3 border-b border-border flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-cama" />
+              <h2 className="text-sm font-bold text-ink">Agent d'administration</h2>
+            </div>
+            <div className="px-5 py-3 flex items-center gap-3">
+              <Sparkles className="w-4 h-4 text-cama flex-shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-ink">Copilote de pilotage IA</p>
+                <p className="text-[11px] text-muted leading-snug">
+                  Interrogez vos données (effectifs, dossiers, impayés, priorités) en langage
+                  naturel. L'agent lit et propose ; il ne modifie rien sans votre validation.
+                  Une fois activé, un bouton « Agent » apparaît en bas de l'écran.
+                </p>
+              </div>
+              <button
+                onClick={() => setAgentEnabled(!agentEnabled)}
+                aria-pressed={agentEnabled}
+                className={`w-11 h-6 rounded-full relative transition-colors flex-shrink-0 ${agentEnabled ? "bg-cama" : "bg-border"}`}>
+                <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-all ${agentEnabled ? "left-[22px]" : "left-0.5"}`} />
+              </button>
+            </div>
+          </section>
+        )}
 
       </main>
     </div>

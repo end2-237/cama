@@ -5,6 +5,7 @@ import { useAuth } from "@/context/AuthContext";
 import AIAssistant from "@/components/AIAssistant";
 import DiscussionsDock from "@/components/DiscussionsDock";
 import SearchFab from "@/components/SearchFab";
+import AdminAgent from "@/components/AdminAgent";
 
 /* Boutons d'action flottants disponibles sur toutes les pages
    (sauf authentification et examen sécurisé). Tous déplaçables. */
@@ -20,6 +21,7 @@ export default function GlobalActions() {
       <AIAssistant />
       <SearchFab />
       {user.role === "etudiant" && <DiscussionsDock />}
+      {user.role === "admin" && <AdminAgent />}
     </>
   );
 }
