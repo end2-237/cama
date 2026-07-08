@@ -82,19 +82,30 @@ export async function POST(req: Request) {
     user_metadata: { first_name: firstName, last_name: lastName, role: "enseignant" },
   });
 
-  if (createErr || !created?.user) {
+  let userId = created?.user?.id ?? "";
+  let recovered = false;
+
+  if (createErr || !userId) {
     const msg = createErr?.message ?? "";
-    if (/already|exists|registered/i.test(msg)) {
-      return NextResponse.json({ error: "Un compte existe déjà avec cet email." }, { status: 400 });
+    // Le compte Auth existe déjà : on le récupère pour (ré)assurer son profil,
+    // plutôt que d'échouer — l'opération devient idempotente.
+    if (/already|exists|registered|duplicate/i.test(msg)) {
+      const { data: list } = await admin.auth.admin.listUsers();
+      const found = list?.users?.find((u) => (u.email ?? "").toLowerCase() === email);
+      if (found) { userId = found.id; recovered = true; }
     }
-    return NextResponse.json({ error: "Impossible de créer le compte enseignant." }, { status: 400 });
+    if (!userId) {
+      return NextResponse.json(
+        { error: "Impossible de créer le compte enseignant.", detail: msg.slice(0, 200) },
+        { status: 400 },
+      );
+    }
   }
 
-  const userId = created.user.id;
   const avatarColor = AVATAR_COLORS[Math.floor(Math.random() * AVATAR_COLORS.length)];
 
-  // 3. Profil dans public.users
-  const { error: profileErr } = await admin.from("users").insert({
+  // 3. Profil dans public.users (upsert : robuste si le compte préexistait)
+  const { error: profileErr } = await admin.from("users").upsert({
     id: userId,
     email,
     first_name: firstName,
@@ -104,13 +115,16 @@ export async function POST(req: Request) {
     school,
     phone,
     phone_prefix: phone ? "+237" : null,
-  });
+  }, { onConflict: "id" });
 
   if (profileErr) {
-    // Rollback du compte Auth pour éviter un compte orphelin
-    await admin.auth.admin.deleteUser(userId).catch(() => {});
-    return NextResponse.json({ error: "Erreur d'enregistrement du profil enseignant." }, { status: 500 });
+    // Rollback uniquement si l'on vient de créer le compte Auth (pas de récup).
+    if (!recovered) await admin.auth.admin.deleteUser(userId).catch(() => {});
+    return NextResponse.json(
+      { error: "Erreur d'enregistrement du profil enseignant.", detail: profileErr.message.slice(0, 200) },
+      { status: 500 },
+    );
   }
 
-  return NextResponse.json({ ok: true, id: userId });
+  return NextResponse.json({ ok: true, id: userId, recovered });
 }
