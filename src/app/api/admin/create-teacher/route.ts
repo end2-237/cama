@@ -90,9 +90,14 @@ export async function POST(req: Request) {
     // Le compte Auth existe déjà : on le récupère pour (ré)assurer son profil,
     // plutôt que d'échouer — l'opération devient idempotente.
     if (/already|exists|registered|duplicate/i.test(msg)) {
-      const { data: list } = await admin.auth.admin.listUsers();
-      const found = list?.users?.find((u) => (u.email ?? "").toLowerCase() === email);
-      if (found) { userId = found.id; recovered = true; }
+      // Recherche paginée : le compte peut être au-delà de la 1re page.
+      for (let page = 1; page <= 20 && !userId; page++) {
+        const { data: list } = await admin.auth.admin.listUsers({ page, perPage: 200 });
+        const users = list?.users ?? [];
+        const found = users.find((u) => (u.email ?? "").toLowerCase() === email);
+        if (found) { userId = found.id; recovered = true; break; }
+        if (users.length < 200) break; // dernière page atteinte
+      }
     }
     if (!userId) {
       return NextResponse.json(

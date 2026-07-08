@@ -59,7 +59,7 @@ export default function AdminEnseignantsPage() {
       });
       const data = await res.json();
       if (!res.ok || !data.ok) {
-        setError(data.error ?? "Erreur lors de la création.");
+        setError((data.error ?? "Erreur lors de la création.") + (data.detail ? ` (${data.detail})` : ""));
         setSaving(false);
         return;
       }
