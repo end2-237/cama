@@ -3,9 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  Loader2, BarChart3, Users, GraduationCap, BookOpen,
-  ClipboardList, Radio, FlaskConical, UserCheck, Layers, Bot, Clock,
-  Star, CheckCircle2, XCircle, AlertTriangle, TrendingUp, FileCheck,
+  Loader2, BarChart3, GraduationCap, BookOpen, Radio, FlaskConical,
+  Layers, FileCheck, Star, TrendingUp, TrendingDown, UserCheck,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import PageShell from "@/components/dashboard/PageShell";
@@ -59,13 +58,10 @@ export default function AdminStatistiquesPage() {
     let alive = true;
     (async () => {
       setFetching(true);
-      // 1er niveau : tout ce qui ne dépend que du catalogue
       const [users, inscriptions, stats, courses, feedback] = await Promise.all([
         fetchUsers(), fetchInscriptions(), fetchAdminStats(), fetchProgram(), fetchAllFeedback(),
       ]);
       const courseIds = courses.map((c) => c.id);
-
-      // 2e niveau : dépend des ids de cours
       const [chapterLists, exams, delibs, lives, tps] = await Promise.all([
         Promise.all(courses.map((c) => fetchChapters(c.id))),
         fetchExamsForCourses(courseIds),
@@ -74,20 +70,16 @@ export default function AdminStatistiquesPage() {
         fetchTpsForCourses(courseIds),
       ]);
       const chapterCount = chapterLists.reduce((a, l) => a + l.length, 0);
-
-      // 3e niveau : dépend des examens / lives / tp
       const [attemptLists, attendance, tpProgressLists] = await Promise.all([
         Promise.all(exams.map((e) => fetchAttemptsForExam(e.id))),
         fetchAttendanceForLives(lives.map((l) => l.id)),
         Promise.all(tps.map((t) => fetchTpProgress(t.id))),
       ]);
-      const attempts = attemptLists.flat();
-      const tpProgress = tpProgressLists.flat();
-
       if (!alive) return;
       setData({
         users, inscriptions, stats, courses, chapterCount,
-        exams, attempts, delibs, lives, attendance, feedback, tps, tpProgress,
+        exams, attempts: attemptLists.flat(), delibs, lives, attendance, feedback,
+        tps, tpProgress: tpProgressLists.flat(),
       });
       setFetching(false);
     })();
@@ -101,138 +93,135 @@ export default function AdminStatistiquesPage() {
   return (
     <PageShell
       title="Statistiques de la plateforme"
-      subtitle="Indicateurs de population, pédagogie, évaluations, assiduité et qualité perçue."
+      subtitle="Population, pédagogie, évaluations, assiduité et qualité perçue — en un coup d'œil."
       icon={BarChart3}
       breadcrumb="Statistiques"
       context={`au ${FR_DATE.format(new Date())}`}
       maxWidth="max-w-[1200px]"
-      stats={m ? [
-        { label: "Étudiants",    value: m.students,      accent: "cama" },
-        { label: "Enseignants",  value: m.teachers,      accent: "ink" },
-        { label: "Filières",     value: m.filieres,      accent: "gold" },
-        { label: "Cours",        value: m.courses,       accent: "ink" },
-        { label: "Inscriptions", value: m.inscriptions,  accent: "ink" },
-        { label: "Examens",      value: m.exams,         accent: "cama" },
-      ] : undefined}
     >
-      <div>
-        {fetching || !m ? (
-          <div className="py-24 text-center"><Loader2 className="w-7 h-7 animate-spin text-cama mx-auto" /></div>
-        ) : (
-          <div className="space-y-8">
+      {fetching || !m ? (
+        <div className="py-24 text-center"><Loader2 className="w-7 h-7 animate-spin text-cama mx-auto" /></div>
+      ) : (
+        <div className="space-y-5">
 
-            {/* 1 — Vue d'ensemble */}
-            <Section title="Vue d'ensemble">
-              <KpiGrid cols={4} items={[
-                { icon: Users, label: "Étudiants", value: m.students, color: "text-cama" },
-                { icon: UserCheck, label: "Enseignants", value: m.teachers, color: "text-ink" },
-                { icon: GraduationCap, label: "Filières", value: m.filieres, color: "text-gold-dark" },
-                { icon: BookOpen, label: "Cours", value: m.courses, color: "text-ink" },
-                { icon: ClipboardList, label: "Inscriptions", value: m.inscriptions, color: "text-ink",
-                  sub: `${m.insValidated} validées · ${m.insPending} en attente · ${m.insRejected} rejetées` },
-                { icon: FileCheck, label: "Examens", value: m.exams, color: "text-cama" },
-                { icon: Radio, label: "Lives tenus", value: m.livesHeld, color: "text-ink", sub: `${m.livesTotal} au total` },
-                { icon: FlaskConical, label: "TP programmés", value: m.tps, color: "text-gold-dark" },
-              ]} />
-            </Section>
-
-            {/* 2 — Population */}
-            <Section title="Population étudiante">
-              <div className="grid md:grid-cols-3 gap-px bg-border border border-border">
-                <BarCard title="Par filière" rows={m.byFiliere} accent="bg-cama" />
-                <BarCard title="Par niveau" rows={m.byNiveau} accent="bg-gold" />
-                <BarCard title="Par mode de cycle" rows={m.byMode} accent="bg-ink" />
+          {/* ── HÉRO + pilules clés ── */}
+          <div className="grid lg:grid-cols-[1.5fr_1fr] gap-4">
+            <div className="bg-white border border-border p-6">
+              <p className="text-[11px] font-black uppercase tracking-widest text-subtle">Population étudiante</p>
+              <div className="flex items-end gap-3 mt-2">
+                <span className="text-5xl font-black text-ink leading-none tabular-nums">{m.students}</span>
+                <TrendBadge value={m.insTrend} />
               </div>
-            </Section>
+              <p className="text-xs text-muted mt-2">
+                {m.insValidated} inscriptions validées · {m.insPending} en attente · {m.insRejected} rejetées
+              </p>
+              <SegmentBar rows={m.filiereBoard} total={m.insValidated} />
+            </div>
 
-            {/* 3 — Pédagogie */}
-            <Section title="Pédagogie & contenus">
-              <KpiGrid cols={5} items={[
-                { icon: CheckCircle2, label: "Cours publiés", value: m.published, color: "text-green-600" },
-                { icon: XCircle, label: "Brouillons", value: m.drafts, color: "text-muted" },
-                { icon: Layers, label: "Chapitres", value: m.chapterCount, color: "text-ink" },
-                { icon: Bot, label: "Cours avec Prof IA", value: m.profIa, color: "text-purple-600" },
-                { icon: Clock, label: "Volume horaire moyen", value: `${m.avgHours}h`, color: "text-gold-dark" },
-              ]} />
-            </Section>
+            <div className="grid grid-cols-2 gap-4">
+              <Pill label="Taux de réussite" value={`${m.successRate}%`} sub="examens notés" accent="cama" icon={TrendingUp} />
+              <DarkPill label="Note des cours" value={`${m.avgCourseRating.toFixed(1)}/5`} sub={`${m.feedbackCount} avis`} icon={Star} />
+              <Pill label="Présence live" value={`${m.avgPresence}%`} sub="assiduité moyenne" accent="gold" icon={UserCheck} />
+              <Pill label="Note moyenne" value={`${m.avgNote20.toFixed(1)}/20`} sub="toutes copies" accent="ink" icon={FileCheck} />
+            </div>
+          </div>
 
-            {/* 4 — Évaluations */}
-            <Section title="Évaluations">
-              <div className="grid md:grid-cols-2 gap-px bg-border border border-border">
-                <BarCard title="Examens par statut" rows={m.examsByStatus} accent="bg-cama" />
-                <div className="bg-white p-4 grid grid-cols-2 gap-4">
-                  <MiniStat label="Copies soumises" value={m.copiesSubmitted} color="text-ink" />
-                  <MiniStat label="Copies corrigées" value={m.copiesGraded} color="text-green-600" />
-                  <MiniStat label="Note moyenne /20" value={m.avgNote20.toFixed(1)} color="text-cama" />
-                  <MiniStat label="Taux de réussite" value={`${m.successRate}%`} color="text-gold-dark" icon={TrendingUp} />
+          {/* ── Bandeau compteurs compact ── */}
+          <StripKPIs items={[
+            { icon: UserCheck, label: "Enseignants", value: m.teachers },
+            { icon: GraduationCap, label: "Filières", value: m.filieres },
+            { icon: BookOpen, label: "Cours publiés", value: `${m.published}/${m.courses}` },
+            { icon: Layers, label: "Chapitres", value: m.chapterCount },
+            { icon: FileCheck, label: "Examens", value: m.exams },
+            { icon: Radio, label: "Lives tenus", value: `${m.livesHeld}/${m.livesTotal}` },
+            { icon: FlaskConical, label: "TP", value: m.tps },
+          ]} />
+
+          {/* ── Classement filières + répartitions ── */}
+          <div className="grid lg:grid-cols-[1.6fr_1fr] gap-4">
+            <FiliereBoard rows={m.filiereBoard} />
+            <div className="grid grid-rows-2 gap-4">
+              <ProgressCard title="Par niveau" rows={m.byNiveau} accent="bg-cama" />
+              <ProgressCard title="Par mode de cycle" rows={m.byMode} accent="bg-gold" />
+            </div>
+          </div>
+
+          {/* ── Dynamique (courbe) + qualité ── */}
+          <div className="grid lg:grid-cols-[1.6fr_1fr] gap-4">
+            <div className="bg-white border border-border p-5">
+              <div className="flex items-center justify-between mb-4">
+                <p className="text-[11px] font-black uppercase tracking-widest text-subtle">Dynamique des inscriptions</p>
+                <span className="text-[11px] text-muted">8 derniers mois</span>
+              </div>
+              <AreaChart data={m.monthly} />
+            </div>
+
+            <div className="bg-ink text-white p-5 flex flex-col">
+              <p className="text-[11px] font-black uppercase tracking-widest text-white/50">Qualité perçue</p>
+              <div className="flex items-end gap-2 mt-2">
+                <span className="text-4xl font-black leading-none">{m.avgCourseRating.toFixed(1)}</span>
+                <span className="text-white/50 mb-1 text-sm">/5</span>
+                <Star className="w-5 h-5 text-gold mb-1 ml-auto" />
+              </div>
+              <p className="text-[11px] text-white/50 mt-1">{m.feedbackCount} avis étudiants</p>
+              <div className="mt-4 pt-4 border-t border-white/10 flex-1">
+                <p className="text-[10px] font-black uppercase tracking-widest text-white/40 mb-2">Cours les mieux notés</p>
+                <div className="space-y-2">
+                  {m.topCourses.slice(0, 3).map((c) => (
+                    <div key={c.label} className="flex items-center justify-between gap-2">
+                      <span className="text-xs text-white/80 truncate">{c.label}</span>
+                      <span className="text-xs font-bold text-gold flex items-center gap-0.5 flex-shrink-0">
+                        <Star className="w-3 h-3" /> {c.value.toFixed(1)}
+                      </span>
+                    </div>
+                  ))}
+                  {m.topCourses.length === 0 && <p className="text-xs text-white/40 italic">Aucun avis pour le moment.</p>}
                 </div>
               </div>
-            </Section>
+            </div>
+          </div>
 
-            {/* 5 — Assiduité */}
-            <Section title="Assiduité (cours live)">
-              <KpiGrid cols={4} items={[
-                { icon: UserCheck, label: "Présence moyenne", value: `${m.avgPresence}%`, color: "text-green-600" },
-                { icon: AlertTriangle, label: "Absences auto", value: m.autoAbsences, color: "text-red-500" },
-                { icon: Radio, label: "Lives sans enseignant", value: m.livesNoTeacher, color: "text-gold-dark" },
-                { icon: Users, label: "Connexions enregistrées", value: m.attendanceRows, color: "text-ink" },
-              ]} />
-            </Section>
-
-            {/* 6 — Qualité */}
-            <Section title="Qualité perçue (retours étudiants)">
-              <div className="grid md:grid-cols-3 gap-px bg-border border border-border">
-                <div className="bg-white p-4 flex flex-col items-center justify-center">
-                  <Star className="w-5 h-5 text-gold-dark mb-1" />
-                  <p className="text-3xl font-bold text-ink leading-none">{m.avgCourseRating.toFixed(1)}<span className="text-base text-muted">/5</span></p>
-                  <p className="text-[10px] text-muted mt-1.5 text-center">Note moyenne des cours · {m.feedbackCount} avis</p>
-                </div>
-                <RatingList title="Top 5 des cours" rows={m.topCourses} good />
-                <RatingList title="5 cours à améliorer" rows={m.bottomCourses} good={false} />
-              </div>
-            </Section>
-
-            {/* 7 — Inscriptions récentes */}
-            <Section title="Inscriptions récentes">
-              <div className="bg-white border border-border overflow-x-auto">
-                <table className="w-full text-sm min-w-[640px]">
+          {/* ── Cours à améliorer + inscriptions récentes ── */}
+          <div className="grid lg:grid-cols-[1fr_1.6fr] gap-4">
+            <RatingList title="Cours à améliorer" rows={m.bottomCourses} />
+            <div className="bg-white border border-border">
+              <p className="text-[11px] font-black uppercase tracking-widest text-subtle px-4 pt-4 pb-2">Inscriptions récentes</p>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm min-w-[560px]">
                   <thead>
-                    <tr className="text-[10px] font-black uppercase tracking-widest text-subtle border-b border-border">
-                      <th className="text-left px-3 py-2">Étudiant</th>
-                      <th className="text-left px-3 py-2">Filière</th>
-                      <th className="text-left px-3 py-2">Niveau</th>
-                      <th className="text-left px-3 py-2">Mode</th>
-                      <th className="text-left px-3 py-2">Statut</th>
-                      <th className="text-left px-3 py-2">Date</th>
+                    <tr className="text-[10px] font-black uppercase tracking-widest text-subtle border-y border-border bg-surface/50">
+                      <th className="text-left px-4 py-2">Étudiant</th>
+                      <th className="text-left px-4 py-2">Filière</th>
+                      <th className="text-left px-4 py-2">Niveau</th>
+                      <th className="text-left px-4 py-2">Statut</th>
+                      <th className="text-left px-4 py-2">Date</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
                     {m.recent.map((i) => (
                       <tr key={i.id} className="hover:bg-surface/60 transition-colors">
-                        <td className="px-3 py-2 font-semibold text-ink">
-                          {i.user ? `${i.user.first_name} ${i.user.last_name}` : i.matricule}
+                        <td className="px-4 py-2 font-semibold text-ink flex items-center gap-2">
+                          <Avatar name={i.user ? `${i.user.first_name} ${i.user.last_name}` : i.matricule} />
+                          <span className="truncate">{i.user ? `${i.user.first_name} ${i.user.last_name}` : i.matricule}</span>
                         </td>
-                        <td className="px-3 py-2 text-muted">{i.parcours_title}</td>
-                        <td className="px-3 py-2 text-muted">{i.level}</td>
-                        <td className="px-3 py-2 text-muted capitalize">{i.mode}</td>
-                        <td className="px-3 py-2"><StatusBadge status={i.status} /></td>
-                        <td className="px-3 py-2 text-subtle text-xs">
-                          {new Date(i.enrolled_at).toLocaleDateString("fr-FR")}
-                        </td>
+                        <td className="px-4 py-2 text-muted truncate max-w-[160px]">{i.parcours_title}</td>
+                        <td className="px-4 py-2 text-muted">{i.level}</td>
+                        <td className="px-4 py-2"><StatusBadge status={i.status} /></td>
+                        <td className="px-4 py-2 text-subtle text-xs">{new Date(i.enrolled_at).toLocaleDateString("fr-FR")}</td>
                       </tr>
                     ))}
                     {m.recent.length === 0 && (
-                      <tr><td colSpan={6} className="px-3 py-6 text-center text-muted text-xs">Aucune inscription.</td></tr>
+                      <tr><td colSpan={5} className="px-4 py-6 text-center text-muted text-xs">Aucune inscription.</td></tr>
                     )}
                   </tbody>
                 </table>
               </div>
-            </Section>
-
-            <p className="text-[11px] text-subtle pt-2">Données arrêtées au {FR_DATE.format(new Date())}.</p>
+            </div>
           </div>
-        )}
-      </div>
+
+          <p className="text-[11px] text-subtle pt-1">Données arrêtées au {FR_DATE.format(new Date())}.</p>
+        </div>
+      )}
     </PageShell>
   );
 }
@@ -242,6 +231,7 @@ export default function AdminStatistiquesPage() {
 // ════════════════════════════════════════════════════════════
 interface BarRow { label: string; value: number; }
 interface RatingRow { label: string; value: number; count: number; }
+interface FiliereRow { title: string; students: number; courses: number; pct: number; }
 
 function computeMetrics(d: Data) {
   const students = d.users.filter((u) => u.role === "etudiant").length;
@@ -252,7 +242,6 @@ function computeMetrics(d: Data) {
   const insPending = d.inscriptions.filter((i) => i.status === "en_attente").length;
   const insRejected = d.inscriptions.filter((i) => i.status === "rejetee").length;
 
-  // ── Population (basée sur inscriptions validées) ──
   const byFiliere = topBars(countBy(validated, (i) => i.parcours_title));
   const byNiveau: BarRow[] = NIVEAUX
     .map((n) => ({ label: n, value: validated.filter((i) => i.level === n).length }))
@@ -261,7 +250,6 @@ function computeMetrics(d: Data) {
     .map((mo) => ({ label: mo.label, value: validated.filter((i) => i.mode === mo.key).length }))
     .filter((r) => r.value > 0);
 
-  // ── Pédagogie ──
   const published = d.courses.filter((c) => c.published).length;
   const drafts = d.courses.length - published;
   const profIa = d.courses.filter((c) => c.prof_ia).length;
@@ -269,10 +257,6 @@ function computeMetrics(d: Data) {
     ? Math.round(d.courses.reduce((a, c) => a + c.hours, 0) / d.courses.length)
     : 0;
 
-  // ── Évaluations ──
-  const examsByStatus: BarRow[] = ([["planifie", "Planifiés"], ["ouvert", "Ouverts"], ["termine", "Terminés"]] as const)
-    .map(([k, lbl]) => ({ label: lbl, value: d.exams.filter((e) => e.status === k).length }))
-    .filter((r) => r.value > 0);
   const submitted = d.attempts.filter((a) => a.status === "soumis" || a.status === "corrige");
   const copiesSubmitted = submitted.length;
   const copiesGraded = d.attempts.filter((a) => a.status === "corrige").length;
@@ -283,39 +267,31 @@ function computeMetrics(d: Data) {
     ? Math.round((notes20.filter((n) => n >= 10).length / notes20.length) * 100)
     : 0;
 
-  // ── Assiduité ──
   const courseById = new Map(d.courses.map((c) => [c.id, c]));
   const rowsByLive = new Map<string, DBLiveAttendance[]>();
   d.attendance.forEach((r) => {
     const arr = rowsByLive.get(r.live_id) ?? [];
-    arr.push(r);
-    rowsByLive.set(r.live_id, arr);
+    arr.push(r); rowsByLive.set(r.live_id, arr);
   });
   const heldLives = d.lives.filter((l) => l.started_at);
-  let presentCount = 0, expectedCount = 0, autoAbsences = 0;
+  let presentCount = 0, expectedCount = 0;
   for (const l of heldLives) {
     const course = l.program_course_id ? courseById.get(l.program_course_id) : undefined;
     if (!course) continue;
-    const rows = rowsByLive.get(l.id) ?? [];
-    // Étudiants attendus = ceux qui ont une ligne de connexion (rôle étudiant)
-    const studentRows = rows.filter((r) => r.role === "etudiant");
+    const studentRows = (rowsByLive.get(l.id) ?? []).filter((r) => r.role === "etudiant");
     for (const r of studentRows) {
       expectedCount++;
       const st = autoStatus(l, course, r);
       if (st === "present" || st === "retard") presentCount++;
-      else autoAbsences++;
     }
   }
   const avgPresence = expectedCount ? Math.round((presentCount / expectedCount) * 100) : 0;
-  const livesNoTeacher = d.lives.filter((l) => !l.created_by).length;
 
-  // ── Qualité ──
   const avgCourseRating = averageRating(d.feedback);
   const fbByCourse = new Map<string, DBCourseFeedback[]>();
   d.feedback.forEach((f) => {
     const arr = fbByCourse.get(f.program_course_id) ?? [];
-    arr.push(f);
-    fbByCourse.set(f.program_course_id, arr);
+    arr.push(f); fbByCourse.set(f.program_course_id, arr);
   });
   const rated: RatingRow[] = [];
   fbByCourse.forEach((rows, courseId) => {
@@ -327,29 +303,52 @@ function computeMetrics(d: Data) {
   const topCourses = sorted.slice(0, 5);
   const bottomCourses = [...sorted].reverse().slice(0, 5);
 
+  // ── Série temporelle : inscriptions par mois (8 derniers) ──
+  const ref = new Date();
+  const monthKeys: { key: string; label: string }[] = [];
+  for (let i = 7; i >= 0; i--) {
+    const dt = new Date(ref.getFullYear(), ref.getMonth() - i, 1);
+    monthKeys.push({ key: `${dt.getFullYear()}-${dt.getMonth()}`, label: dt.toLocaleDateString("fr-FR", { month: "short" }) });
+  }
+  const monthCount: Record<string, number> = {};
+  d.inscriptions.forEach((i) => {
+    const dt = new Date(i.enrolled_at);
+    const k = `${dt.getFullYear()}-${dt.getMonth()}`;
+    monthCount[k] = (monthCount[k] ?? 0) + 1;
+  });
+  const monthly = monthKeys.map((mo) => ({ label: mo.label, value: monthCount[mo.key] ?? 0 }));
+  const lastM = monthly[monthly.length - 1]?.value ?? 0;
+  const prevM = monthly[monthly.length - 2]?.value ?? 0;
+  const insTrend = prevM > 0 ? Math.round(((lastM - prevM) / prevM) * 100) : (lastM > 0 ? 100 : 0);
+
+  // ── Classement par filière ──
+  const coursesByFil: Record<string, number> = {};
+  d.courses.forEach((c) => { coursesByFil[c.parcours_title] = (coursesByFil[c.parcours_title] ?? 0) + 1; });
+  const totalVal = validated.length || 1;
+  const filiereBoard: FiliereRow[] = byFiliere.slice(0, 8).map((f) => ({
+    title: f.label, students: f.value, courses: coursesByFil[f.label] ?? 0,
+    pct: Math.round((f.value / totalVal) * 100),
+  }));
+
   return {
     students, teachers, filieres, courses: d.courses.length,
-    inscriptions: d.inscriptions.length, insValidated: validated.length, insPending, insRejected,
+    insValidated: validated.length, insPending, insRejected,
     exams: d.exams.length, livesHeld: heldLives.length, livesTotal: d.lives.length, tps: d.tps.length,
-    byFiliere, byNiveau, byMode,
-    published, drafts, chapterCount: d.chapterCount, profIa, avgHours,
-    examsByStatus, copiesSubmitted, copiesGraded, avgNote20, successRate,
-    avgPresence, autoAbsences, livesNoTeacher, attendanceRows: d.attendance.length,
+    byNiveau, byMode, published, drafts, chapterCount: d.chapterCount, profIa, avgHours,
+    copiesSubmitted, copiesGraded, avgNote20, successRate, avgPresence,
     avgCourseRating, feedbackCount: d.feedback.length, topCourses, bottomCourses,
-    recent: d.inscriptions.slice(0, 10),
-    tpProgressCount: d.tpProgress.length,
+    recent: d.inscriptions.slice(0, 8),
+    monthly, insTrend, filiereBoard,
   };
 }
 
 function countBy<T>(rows: T[], key: (r: T) => string): Record<string, number> {
-  const m: Record<string, number> = {};
-  rows.forEach((r) => { const k = key(r); m[k] = (m[k] ?? 0) + 1; });
-  return m;
+  const acc: Record<string, number> = {};
+  rows.forEach((r) => { const k = key(r); acc[k] = (acc[k] ?? 0) + 1; });
+  return acc;
 }
 function topBars(counts: Record<string, number>): BarRow[] {
-  return Object.entries(counts)
-    .map(([label, value]) => ({ label, value }))
-    .sort((a, b) => b.value - a.value);
+  return Object.entries(counts).map(([label, value]) => ({ label, value })).sort((a, b) => b.value - a.value);
 }
 
 // ════════════════════════════════════════════════════════════
@@ -363,51 +362,147 @@ function Spinner() {
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function TrendBadge({ value }: { value: number }) {
+  const up = value >= 0;
   return (
-    <section>
-      <h2 className="text-[10px] font-black uppercase tracking-widest text-subtle mb-2">{title}</h2>
-      {children}
-    </section>
+    <span className={`mb-1 inline-flex items-center gap-1 text-xs font-bold px-2 py-1 rounded-full ${
+      up ? "bg-green-50 text-green-700" : "bg-red-50 text-red-600"
+    }`}>
+      {up ? <TrendingUp className="w-3.5 h-3.5" /> : <TrendingDown className="w-3.5 h-3.5" />}
+      {up ? "+" : ""}{value}% <span className="font-normal text-[10px] opacity-70">/ mois</span>
+    </span>
   );
 }
 
-interface KpiItem {
-  icon: React.ComponentType<{ className?: string }>;
-  label: string; value: React.ReactNode; color: string; sub?: string;
-}
-function KpiGrid({ items, cols }: { items: KpiItem[]; cols: number }) {
+const SEG = ["bg-cama", "bg-gold", "bg-ink", "bg-cama-300", "bg-gold-dark", "bg-purple-500", "bg-teal-500", "bg-rose-400"];
+
+function SegmentBar({ rows, total }: { rows: FiliereRow[]; total: number }) {
+  if (!rows.length) return <p className="text-xs text-muted italic mt-5">Aucune inscription validée.</p>;
   return (
-    <div className={`grid grid-cols-2 ${cols === 5 ? "md:grid-cols-5" : "md:grid-cols-4"} gap-px bg-border border border-border`}>
+    <div className="mt-5">
+      <div className="flex h-3 w-full overflow-hidden rounded-full bg-surface">
+        {rows.map((r, i) => (
+          <div key={r.title} className={SEG[i % SEG.length]} style={{ width: `${(r.students / (total || 1)) * 100}%` }} title={`${r.title} : ${r.students}`} />
+        ))}
+      </div>
+      <div className="flex flex-wrap gap-x-4 gap-y-1 mt-3">
+        {rows.slice(0, 5).map((r, i) => (
+          <span key={r.title} className="inline-flex items-center gap-1.5 text-[11px] text-muted">
+            <span className={`w-2 h-2 rounded-full ${SEG[i % SEG.length]}`} />
+            {r.title} <b className="text-ink">{r.pct}%</b>
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function Pill({ label, value, sub, accent, icon: Icon }: {
+  label: string; value: React.ReactNode; sub?: string;
+  accent: "cama" | "gold" | "ink"; icon: React.ComponentType<{ className?: string }>;
+}) {
+  const color = accent === "cama" ? "text-cama" : accent === "gold" ? "text-gold-dark" : "text-ink";
+  return (
+    <div className="bg-white border border-border p-4 flex flex-col justify-between">
+      <div className="flex items-center justify-between">
+        <p className="text-[10px] font-black uppercase tracking-widest text-subtle">{label}</p>
+        <Icon className={`w-4 h-4 ${color}`} />
+      </div>
+      <p className={`text-3xl font-black leading-none mt-3 ${color} tabular-nums`}>{value}</p>
+      {sub && <p className="text-[10px] text-muted mt-1">{sub}</p>}
+    </div>
+  );
+}
+
+function DarkPill({ label, value, sub, icon: Icon }: {
+  label: string; value: React.ReactNode; sub?: string;
+  icon: React.ComponentType<{ className?: string }>;
+}) {
+  return (
+    <div className="bg-ink text-white p-4 flex flex-col justify-between">
+      <div className="flex items-center justify-between">
+        <p className="text-[10px] font-black uppercase tracking-widest text-white/50">{label}</p>
+        <Icon className="w-4 h-4 text-gold" />
+      </div>
+      <p className="text-3xl font-black leading-none mt-3 tabular-nums">{value}</p>
+      {sub && <p className="text-[10px] text-white/50 mt-1">{sub}</p>}
+    </div>
+  );
+}
+
+function StripKPIs({ items }: { items: { icon: React.ComponentType<{ className?: string }>; label: string; value: React.ReactNode }[] }) {
+  return (
+    <div className="bg-white border border-border grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 divide-x divide-y lg:divide-y-0 divide-border">
       {items.map((k) => (
-        <div key={k.label} className="bg-white p-3">
-          <k.icon className={`w-4 h-4 mb-1.5 ${k.color}`} />
-          <p className={`text-2xl font-bold leading-none ${k.color}`}>{k.value}</p>
-          <p className="text-[11px] text-muted mt-1 font-semibold">{k.label}</p>
-          {k.sub && <p className="text-[10px] text-subtle mt-0.5">{k.sub}</p>}
+        <div key={k.label} className="p-4">
+          <k.icon className="w-4 h-4 text-muted mb-2" />
+          <p className="text-xl font-black text-ink leading-none tabular-nums">{k.value}</p>
+          <p className="text-[10px] text-muted mt-1 font-semibold">{k.label}</p>
         </div>
       ))}
     </div>
   );
 }
 
-function BarCard({ title, rows, accent }: { title: string; rows: BarRow[]; accent: string }) {
+function Avatar({ name }: { name: string }) {
+  const initials = name.split(" ").map((w) => w[0]).filter(Boolean).slice(0, 2).join("").toUpperCase();
+  return (
+    <span className="w-7 h-7 rounded-full bg-cama-50 text-cama text-[10px] font-black flex items-center justify-center flex-shrink-0">
+      {initials || "?"}
+    </span>
+  );
+}
+
+function FiliereBoard({ rows }: { rows: FiliereRow[] }) {
+  const max = Math.max(1, ...rows.map((r) => r.students));
+  return (
+    <div className="bg-white border border-border">
+      <div className="flex items-center justify-between px-4 pt-4 pb-2">
+        <p className="text-[11px] font-black uppercase tracking-widest text-subtle">Classement des filières</p>
+        <span className="text-[11px] text-muted">{rows.length} filières</span>
+      </div>
+      <div className="divide-y divide-border">
+        {rows.length === 0 && <p className="px-4 py-6 text-center text-xs text-muted">Aucune donnée.</p>}
+        {rows.map((r, i) => (
+          <div key={r.title} className="px-4 py-3 flex items-center gap-3">
+            <span className="w-6 text-center text-sm font-black text-subtle">{i + 1}</span>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-sm font-semibold text-ink truncate">{r.title}</span>
+                <span className="text-xs text-muted flex-shrink-0">{r.courses} cours</span>
+              </div>
+              <div className="h-1.5 bg-surface mt-1.5 overflow-hidden rounded-full">
+                <div className={SEG[i % SEG.length]} style={{ width: `${(r.students / max) * 100}%`, height: "100%" }} />
+              </div>
+            </div>
+            <div className="text-right flex-shrink-0 w-14">
+              <p className="text-sm font-black text-ink tabular-nums">{r.students}</p>
+              <p className="text-[10px] text-muted">{r.pct}%</p>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ProgressCard({ title, rows, accent }: { title: string; rows: BarRow[]; accent: string }) {
   const max = Math.max(1, ...rows.map((r) => r.value));
   return (
-    <div className="bg-white p-4">
-      <p className="text-[10px] font-black uppercase tracking-widest text-subtle mb-3">{title}</p>
+    <div className="bg-white border border-border p-4">
+      <p className="text-[11px] font-black uppercase tracking-widest text-subtle mb-3">{title}</p>
       {rows.length === 0 ? (
         <p className="text-xs text-muted italic">Aucune donnée.</p>
       ) : (
-        <div className="space-y-2">
+        <div className="space-y-2.5">
           {rows.map((r) => (
             <div key={r.label}>
-              <div className="flex items-center justify-between mb-0.5">
-                <span className="text-[11px] font-semibold text-ink truncate pr-2">{r.label}</span>
-                <span className="text-[11px] font-bold text-muted flex-shrink-0">{r.value}</span>
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-xs font-semibold text-ink">{r.label}</span>
+                <span className="text-xs font-bold text-muted tabular-nums">{r.value}</span>
               </div>
-              <div className="h-2 bg-surface overflow-hidden">
-                <div className={`h-full ${accent}`} style={{ width: `${(r.value / max) * 100}%` }} />
+              <div className="h-2 bg-surface overflow-hidden rounded-full">
+                <div className={accent} style={{ width: `${(r.value / max) * 100}%`, height: "100%" }} />
               </div>
             </div>
           ))}
@@ -417,31 +512,51 @@ function BarCard({ title, rows, accent }: { title: string; rows: BarRow[]; accen
   );
 }
 
-function MiniStat({ label, value, color, icon: Icon }: {
-  label: string; value: React.ReactNode; color: string;
-  icon?: React.ComponentType<{ className?: string }>;
-}) {
+function AreaChart({ data }: { data: BarRow[] }) {
+  const W = 100, H = 42;
+  const max = Math.max(1, ...data.map((d) => d.value));
+  const step = data.length > 1 ? W / (data.length - 1) : W;
+  const pts = data.map((d, i) => [i * step, H - (d.value / max) * (H - 6) - 3] as const);
+  const line = pts.map((p) => `${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(" ");
+  const area = `0,${H} ${line} ${W},${H}`;
   return (
     <div>
-      {Icon && <Icon className={`w-4 h-4 mb-1 ${color}`} />}
-      <p className={`text-2xl font-bold leading-none ${color}`}>{value}</p>
-      <p className="text-[11px] text-muted mt-1 font-semibold">{label}</p>
+      <div className="relative w-full" style={{ aspectRatio: "100 / 42" }}>
+        <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="w-full h-full">
+          <defs>
+            <linearGradient id="camaFill" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#4F46E5" stopOpacity="0.25" />
+              <stop offset="100%" stopColor="#4F46E5" stopOpacity="0" />
+            </linearGradient>
+          </defs>
+          <polygon points={area} fill="url(#camaFill)" />
+          <polyline points={line} fill="none" stroke="#4F46E5" strokeWidth="1.2" strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
+          {pts.map((p, i) => (
+            <circle key={i} cx={p[0]} cy={p[1]} r="1.4" fill="#4F46E5" vectorEffect="non-scaling-stroke" />
+          ))}
+        </svg>
+      </div>
+      <div className="flex justify-between mt-2">
+        {data.map((d) => (
+          <span key={d.label} className="text-[10px] text-subtle capitalize">{d.label}</span>
+        ))}
+      </div>
     </div>
   );
 }
 
-function RatingList({ title, rows, good }: { title: string; rows: RatingRow[]; good: boolean }) {
+function RatingList({ title, rows }: { title: string; rows: RatingRow[] }) {
   return (
-    <div className="bg-white p-4">
-      <p className="text-[10px] font-black uppercase tracking-widest text-subtle mb-3">{title}</p>
+    <div className="bg-white border border-border p-4">
+      <p className="text-[11px] font-black uppercase tracking-widest text-subtle mb-3">{title}</p>
       {rows.length === 0 ? (
         <p className="text-xs text-muted italic">Aucun avis.</p>
       ) : (
-        <div className="space-y-2">
+        <div className="space-y-2.5">
           {rows.map((r) => (
             <div key={r.label} className="flex items-center justify-between gap-2">
-              <span className="text-[11px] font-semibold text-ink truncate">{r.label}</span>
-              <span className={`text-[11px] font-bold flex items-center gap-0.5 flex-shrink-0 ${good ? "text-green-600" : "text-gold-dark"}`}>
+              <span className="text-xs font-semibold text-ink truncate">{r.label}</span>
+              <span className="text-xs font-bold flex items-center gap-0.5 flex-shrink-0 text-gold-dark">
                 <Star className="w-3 h-3" /> {r.value.toFixed(1)}
                 <span className="text-subtle font-normal ml-1">({r.count})</span>
               </span>
@@ -460,5 +575,5 @@ function StatusBadge({ status }: { status: InscriptionWithUser["status"] }) {
     rejetee: { cls: "bg-red-50 text-red-600 border-red-200", label: "Rejetée" },
   };
   const s = map[status] ?? { cls: "bg-surface text-muted border-border", label: status };
-  return <span className={`text-[10px] font-bold px-2 py-0.5 border ${s.cls}`}>{s.label}</span>;
+  return <span className={`text-[10px] font-bold px-2 py-0.5 border rounded-full ${s.cls}`}>{s.label}</span>;
 }
