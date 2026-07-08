@@ -43,3 +43,7 @@ next-env.d.ts
 /android/
 /ios/
 /dist/
+
+# Livrables de rapport (générés, envoyés hors dépôt)
+/CAMA_rapport.docx
+/CAMA_annexes_SQL_diagrammes.md
