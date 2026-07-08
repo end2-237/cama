@@ -2,10 +2,11 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   Loader2, BarChart3, GraduationCap, BookOpen, Radio, FlaskConical,
   Layers, FileCheck, Star, TrendingUp, TrendingDown, UserCheck, Bot,
-  AlertTriangle, ClipboardList, PenLine,
+  AlertTriangle, ClipboardList, PenLine, ArrowRight, Download, Wallet,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import PageShell from "@/components/dashboard/PageShell";
@@ -116,6 +117,18 @@ export default function AdminStatistiquesPage() {
           {/* ══════════ COLONNE PRINCIPALE ══════════ */}
           <div className="space-y-3 min-w-0">
 
+            {/* Barre d'actions rapides */}
+            <Fade className="flex flex-wrap items-center gap-2">
+              <QuickAction href="/admin/suivi" icon={ClipboardList} label="Valider les dossiers" badge={m.insPending} />
+              <QuickAction href="/admin/programme" icon={BookOpen} label="Programme" badge={m.drafts} badgeTone="warn" />
+              <QuickAction href="/admin/enseignants" icon={UserCheck} label="Enseignants" />
+              <QuickAction href="/admin/finance" icon={Wallet} label="Finance" />
+              <button onClick={() => exportCsv(m)}
+                className="ml-auto inline-flex items-center gap-1.5 text-xs font-bold px-3 py-2 border border-border bg-white text-ink hover:bg-surface transition-colors">
+                <Download className="w-3.5 h-3.5" /> Exporter (CSV)
+              </button>
+            </Fade>
+
             {/* HÉRO + pilules */}
             <div className="grid lg:grid-cols-[1.5fr_1fr] gap-3">
               <Fade className="bg-white border border-border p-5">
@@ -210,9 +223,12 @@ export default function AdminStatistiquesPage() {
                   <tbody className="divide-y divide-border">
                     {m.recent.map((i) => (
                       <tr key={i.id} className="hover:bg-surface/60 transition-colors">
-                        <td className="px-4 py-2 font-semibold text-ink flex items-center gap-2">
-                          <Avatar name={i.user ? `${i.user.first_name} ${i.user.last_name}` : i.matricule} />
-                          <span className="truncate">{i.user ? `${i.user.first_name} ${i.user.last_name}` : i.matricule}</span>
+                        <td className="px-4 py-2">
+                          <Link href={`/admin/etudiant/${i.user_id}`} className="font-semibold text-ink flex items-center gap-2 hover:text-cama transition-colors group">
+                            <Avatar name={i.user ? `${i.user.first_name} ${i.user.last_name}` : i.matricule} />
+                            <span className="truncate">{i.user ? `${i.user.first_name} ${i.user.last_name}` : i.matricule}</span>
+                            <ArrowRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                          </Link>
                         </td>
                         <td className="px-4 py-2 text-muted truncate max-w-[150px]">{i.parcours_title}</td>
                         <td className="px-4 py-2 text-muted">{i.level}</td>
@@ -245,11 +261,11 @@ export default function AdminStatistiquesPage() {
             {/* Alertes */}
             <Fade delay={100} className="bg-white border border-border p-4">
               <p className="text-[11px] font-black uppercase tracking-widest text-subtle mb-3">Points d&apos;attention</p>
-              <div className="space-y-1.5">
-                <AlertRow icon={ClipboardList} label="Dossiers en attente" value={m.insPending} tone={m.insPending ? "warn" : "ok"} />
-                <AlertRow icon={PenLine} label="Copies à corriger" value={m.toCorrect} tone={m.toCorrect ? "warn" : "ok"} />
-                <AlertRow icon={AlertTriangle} label="Cours en brouillon" value={m.drafts} tone={m.drafts ? "warn" : "ok"} />
-                <AlertRow icon={FileCheck} label="Inscriptions rejetées" value={m.insRejected} tone={m.insRejected ? "bad" : "ok"} />
+              <div className="space-y-0.5">
+                <AlertRow icon={ClipboardList} label="Dossiers en attente" value={m.insPending} tone={m.insPending ? "warn" : "ok"} href="/admin/suivi" cta="Traiter" />
+                <AlertRow icon={PenLine} label="Copies à corriger" value={m.toCorrect} tone={m.toCorrect ? "warn" : "ok"} href="/admin/suivi" cta="Voir" />
+                <AlertRow icon={AlertTriangle} label="Cours en brouillon" value={m.drafts} tone={m.drafts ? "warn" : "ok"} href="/admin/programme" cta="Publier" />
+                <AlertRow icon={FileCheck} label="Inscriptions rejetées" value={m.insRejected} tone={m.insRejected ? "bad" : "ok"} href="/admin/suivi" cta="Revoir" />
               </div>
             </Fade>
 
@@ -263,18 +279,18 @@ export default function AdminStatistiquesPage() {
                   {m.teacherBoard.map((t, i) => {
                     const max = Math.max(1, ...m.teacherBoard.map((x) => x.courses));
                     return (
-                      <div key={t.name + i} className="flex items-center gap-2">
+                      <Link key={t.name + i} href="/admin/enseignants" className="flex items-center gap-2 group">
                         <Avatar name={t.name} />
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between gap-2">
-                            <span className="text-xs font-semibold text-ink truncate">{t.name}</span>
+                            <span className="text-xs font-semibold text-ink truncate group-hover:text-cama transition-colors">{t.name}</span>
                             <span className="text-xs font-bold text-muted flex-shrink-0">{t.courses}</span>
                           </div>
                           <div className="h-1.5 bg-surface mt-1 overflow-hidden rounded-full">
                             <div className="h-full bg-cama transition-[width] duration-700 ease-out" style={{ width: run ? `${(t.courses / max) * 100}%` : "0%" }} />
                           </div>
                         </div>
-                      </div>
+                      </Link>
                     );
                   })}
                 </div>
@@ -541,11 +557,12 @@ function FiliereBoard({ rows, run }: { rows: FiliereRow[]; run: boolean }) {
       <div className="divide-y divide-border">
         {rows.length === 0 && <p className="px-4 py-6 text-center text-xs text-muted">Aucune donnée.</p>}
         {rows.map((r, i) => (
-          <div key={r.title} className="px-4 py-2.5 flex items-center gap-3">
+          <Link key={r.title} href={`/admin/programme?parcours=${encodeURIComponent(r.title)}`}
+            className="px-4 py-2.5 flex items-center gap-3 hover:bg-surface/60 transition-colors group">
             <span className="w-5 text-center text-sm font-black text-subtle">{i + 1}</span>
             <div className="flex-1 min-w-0">
               <div className="flex items-center justify-between gap-2">
-                <span className="text-sm font-semibold text-ink truncate">{r.title}</span>
+                <span className="text-sm font-semibold text-ink truncate group-hover:text-cama transition-colors">{r.title}</span>
                 <span className="text-xs text-muted flex-shrink-0">{r.courses} cours</span>
               </div>
               <div className="h-1.5 bg-surface mt-1.5 overflow-hidden rounded-full">
@@ -556,7 +573,8 @@ function FiliereBoard({ rows, run }: { rows: FiliereRow[]; run: boolean }) {
               <p className="text-sm font-black text-ink tabular-nums">{r.students}</p>
               <p className="text-[10px] text-muted">{r.pct}%</p>
             </div>
-          </div>
+            <ArrowRight className="w-3.5 h-3.5 text-subtle opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+          </Link>
         ))}
       </div>
     </div>
@@ -641,17 +659,71 @@ function Donut({ label, value, total, run, color, suffix }: { label: string; val
   );
 }
 
-function AlertRow({ icon: Icon, label, value, tone }: { icon: React.ComponentType<{ className?: string }>; label: string; value: number; tone: "ok" | "warn" | "bad" }) {
+function AlertRow({ icon: Icon, label, value, tone, href, cta }: {
+  icon: React.ComponentType<{ className?: string }>; label: string; value: number;
+  tone: "ok" | "warn" | "bad"; href: string; cta: string;
+}) {
   const dot = tone === "bad" ? "bg-red-500" : tone === "warn" ? "bg-gold" : "bg-green-500";
   const badge = tone === "bad" ? "bg-red-50 text-red-600" : tone === "warn" ? "bg-gold/10 text-gold-dark" : "bg-green-50 text-green-700";
   return (
-    <div className="flex items-center gap-2.5 py-1">
+    <Link href={href} className="flex items-center gap-2.5 py-2 px-1.5 -mx-1.5 rounded hover:bg-surface transition-colors group">
       <span className={`w-1.5 h-1.5 rounded-full ${dot}`} />
       <Icon className="w-4 h-4 text-muted" />
       <span className="text-xs text-ink flex-1 truncate">{label}</span>
       <span className={`text-xs font-black px-2 py-0.5 rounded-full ${badge}`}>{value}</span>
-    </div>
+      <span className="text-[10px] font-bold text-cama inline-flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity w-0 group-hover:w-auto overflow-hidden">
+        {cta}<ArrowRight className="w-3 h-3" />
+      </span>
+    </Link>
   );
+}
+
+function QuickAction({ href, icon: Icon, label, badge, badgeTone = "info" }: {
+  href: string; icon: React.ComponentType<{ className?: string }>; label: string; badge?: number; badgeTone?: "info" | "warn";
+}) {
+  const bt = badgeTone === "warn" ? "bg-gold text-white" : "bg-cama text-white";
+  return (
+    <Link href={href} className="inline-flex items-center gap-2 text-xs font-bold px-3 py-2 border border-border bg-white text-ink hover:border-cama hover:text-cama transition-colors">
+      <Icon className="w-3.5 h-3.5" /> {label}
+      {badge != null && badge > 0 && <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-full ${bt}`}>{badge}</span>}
+    </Link>
+  );
+}
+
+function exportCsv(m: ReturnType<typeof computeMetrics>) {
+  const rows: [string, string | number][] = [
+    ["Indicateur", "Valeur"],
+    ["Étudiants", m.students],
+    ["Enseignants", m.teachers],
+    ["Filières", m.filieres],
+    ["Cours", m.courses],
+    ["Cours publiés", m.published],
+    ["Chapitres", m.chapterCount],
+    ["Inscriptions validées", m.insValidated],
+    ["Inscriptions en attente", m.insPending],
+    ["Inscriptions rejetées", m.insRejected],
+    ["Examens", m.exams],
+    ["Copies soumises", m.copiesSubmitted],
+    ["Copies corrigées", m.copiesGraded],
+    ["Copies à corriger", m.toCorrect],
+    ["Note moyenne /20", m.avgNote20.toFixed(2)],
+    ["Taux de réussite (%)", m.successRate],
+    ["Présence live (%)", m.avgPresence],
+    ["Note moyenne cours /5", m.avgCourseRating.toFixed(2)],
+    ["Avis étudiants", m.feedbackCount],
+    ["Lives tenus", m.livesHeld],
+    ["TP programmés", m.tps],
+    ["Cours avec Prof IA", m.profIa],
+  ];
+  m.filiereBoard.forEach((f) => rows.push([`Filière — ${f.title}`, `${f.students} étudiants (${f.pct}%)`]));
+  const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(";")).join("\n");
+  const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `statistiques-cama-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 function StatusBadge({ status }: { status: InscriptionWithUser["status"] }) {
