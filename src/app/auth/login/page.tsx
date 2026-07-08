@@ -40,8 +40,29 @@ export default function LoginPage() {
   const [otpErr,   setOtpErr]   = useState("");
   const [otpMsg,   setOtpMsg]   = useState("");
   const [otpLoading, setOtpLoading] = useState(false);
-  const [code, setCode] = useState<string[]>(["", "", "", "", "", ""]);
+  // Code reçu par e-mail : jusqu'à 8 cases (validé dès 6 chiffres)
+  const CODE_LEN = 8;
+  const [code, setCode] = useState<string[]>(Array(CODE_LEN).fill(""));
   const cellRefs = useRef<(HTMLInputElement | null)[]>([]);
+
+  const setDigit = (i: number, v: string) => {
+    const digit = v.replace(/\D/g, "").slice(-1);
+    setCode((prev) => { const next = [...prev]; next[i] = digit; return next; });
+    setOtpErr("");
+    if (digit && i < CODE_LEN - 1) cellRefs.current[i + 1]?.focus();
+  };
+  const onKeyDown = (i: number, e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Backspace" && !code[i] && i > 0) cellRefs.current[i - 1]?.focus();
+  };
+  const onPaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    e.preventDefault();
+    const digits = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, CODE_LEN).split("");
+    if (!digits.length) return;
+    const next = Array(CODE_LEN).fill("");
+    digits.forEach((dgt, idx) => { next[idx] = dgt; });
+    setCode(next); setOtpErr("");
+    cellRefs.current[Math.min(digits.length, CODE_LEN - 1)]?.focus();
+  };
 
   const sendCode = async (e?: React.FormEvent) => {
     e?.preventDefault();
@@ -98,46 +119,17 @@ export default function LoginPage() {
       }
       return;
     }
-    setCode(["", "", "", "", "", ""]);
+    setCode(Array(CODE_LEN).fill(""));
     setOtpStep(2);
-    setOtpMsg("Un code à 6 chiffres a été envoyé à votre email.");
+    setOtpMsg("Un code de vérification a été envoyé à votre email.");
     setTimeout(() => cellRefs.current[0]?.focus(), 50);
-  };
-
-  const setDigit = (i: number, v: string) => {
-    const digit = v.replace(/\D/g, "").slice(-1);
-    setCode((prev) => {
-      const next = [...prev];
-      next[i] = digit;
-      return next;
-    });
-    setOtpErr("");
-    if (digit && i < 5) cellRefs.current[i + 1]?.focus();
-  };
-
-  const onKeyDown = (i: number, e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Backspace" && !code[i] && i > 0) {
-      cellRefs.current[i - 1]?.focus();
-    }
-  };
-
-  const onPaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
-    e.preventDefault();
-    const digits = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6).split("");
-    if (digits.length === 0) return;
-    const next = ["", "", "", "", "", ""];
-    digits.forEach((d, idx) => { next[idx] = d; });
-    setCode(next);
-    setOtpErr("");
-    const focusIdx = Math.min(digits.length, 5);
-    cellRefs.current[focusIdx]?.focus();
   };
 
   const verifyCode = async (e?: React.FormEvent) => {
     e?.preventDefault();
     setOtpErr(""); setOtpMsg("");
-    const token = code.join("");
-    if (token.length !== 6) { setOtpErr("Saisissez les 6 chiffres du code."); return; }
+    const token = code.join("").replace(/\D/g, "");
+    if (token.length < 6) { setOtpErr("Saisissez le code complet (au moins 6 chiffres)."); return; }
     setOtpLoading(true);
     const { error: err } = await supabase.auth.verifyOtp({
       email: otpEmail.trim().toLowerCase(),
@@ -326,10 +318,10 @@ export default function LoginPage() {
                   <form onSubmit={verifyCode}>
                     <p className="text-[10px] font-black uppercase tracking-widest text-muted mb-1.5">Code de vérification</p>
                     <p className="text-sm text-muted mb-5">
-                      Saisissez le code à 6 chiffres envoyé à <span className="font-bold text-ink">{otpEmail}</span>.
+                      Saisissez le code reçu à <span className="font-bold text-ink">{otpEmail}</span>.
                     </p>
 
-                    <div className="flex gap-2 justify-between mb-4" onPaste={onPaste}>
+                    <div className="flex gap-1.5 justify-between mb-4" onPaste={onPaste}>
                       {code.map((d, i) => (
                         <input
                           key={i}
@@ -339,7 +331,7 @@ export default function LoginPage() {
                           onKeyDown={(e) => onKeyDown(i, e)}
                           inputMode="numeric"
                           maxLength={1}
-                          className="w-12 h-14 text-center text-xl font-black text-ink bg-white border-2 border-border outline-none focus:border-cama transition-colors"
+                          className="w-10 h-14 text-center text-xl font-black text-ink bg-white border-2 border-border outline-none focus:border-cama transition-colors"
                         />
                       ))}
                     </div>

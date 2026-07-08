@@ -19,6 +19,14 @@ export const metadata: Metadata = {
     "Plateforme LMS sécurisée et optimisée bas-débit pour la gestion complète du parcours académique de l'Institut JFN.",
   keywords: ["LMS", "JFN", "académique", "Cameroun", "cours", "examens"],
   manifest: "/manifest.json",
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/icon-192.png", type: "image/png", sizes: "192x192" },
+      { url: "/icon-512.png", type: "image/png", sizes: "512x512" },
+    ],
+    apple: "/apple-touch-icon.png",
+  },
 };
 
 export const viewport = {
