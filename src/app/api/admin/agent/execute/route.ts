@@ -23,7 +23,8 @@ interface Step {
   id: string;
   label: string;
   action: "valider_inscription" | "relance_documents" | "relance_paiement"
-    | "relance_saisie_notes" | "signaler_conflit_salle" | "preparer_deliberation" | "notifier_passage";
+    | "relance_saisie_notes" | "signaler_conflit_salle" | "preparer_deliberation" | "notifier_passage"
+    | "rappel_echeance" | "message_bienvenue";
   target_id: string;
   params: Record<string, unknown>;
   selected: boolean;
@@ -101,6 +102,30 @@ async function runStep(admin: SupabaseClient, step: Step): Promise<Step> {
           `Le dossier de ${who} est prêt à être examiné en délibération.`, "/dashboard");
       }
       return { ...step, status: "ok", result: `Jury informé (${juryIds.length} membre(s)).` };
+    }
+
+    if (step.action === "rappel_echeance") {
+      const userId = String(step.params.user_id ?? "");
+      const label = String(step.params.label ?? "Scolarité");
+      const montant = String(step.params.montant ?? "");
+      const due = String(step.params.due_date ?? "");
+      if (userId) {
+        await notify(admin, userId, "paiement", "Échéance de paiement à venir",
+          `Votre paiement « ${label} » (${montant} FCFA) arrive à échéance le ${due}. Pensez à régler à temps.`,
+          "/etudiant/paiements");
+      }
+      return { ...step, status: "ok", result: `Rappel d'échéance envoyé (${due}).` };
+    }
+
+    if (step.action === "message_bienvenue") {
+      const userId = String(step.params.user_id ?? "");
+      const parcours = String(step.params.parcours_title ?? "votre parcours");
+      if (userId) {
+        await notify(admin, userId, "systeme", "Bienvenue à l'Institut JFN",
+          `Bienvenue dans le parcours ${parcours} ! Votre espace CAMA est prêt : cours, notes, scolarité et documents.`,
+          "/dashboard");
+      }
+      return { ...step, status: "ok", result: "Message de bienvenue envoyé." };
     }
 
     if (step.action === "notifier_passage") {

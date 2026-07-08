@@ -24,14 +24,19 @@ import { buildAdminContext, askAdminAgent, type AgentTurn } from "@/lib/adminAge
 import {
   planRentreeInscriptions, planRelanceImpayes, planRelanceSaisieNotes,
   planConflitsSalles, planPreparationDeliberation, planPassageNiveau,
+  planRappelEcheances, planBienvenueNouveaux,
   createTask, fetchTasks, subscribeTasks,
   type PlanPreview, type AgentTask, type AgentStep,
 } from "@/lib/agentTasks";
 
-const SUGGESTIONS = [
+/* Exemples d'instructions en langage naturel (l'agent comprend l'intention). */
+const EXAMPLES = [
+  "Traite les dossiers de rentrée",
+  "Relance les étudiants qui n'ont pas payé",
+  "Rappelle les échéances de paiement",
+  "Relance les enseignants qui n'ont pas saisi les notes",
+  "Souhaite la bienvenue aux nouveaux inscrits",
   "Combien de dossiers sont en attente ?",
-  "Quel est le montant des impayés ?",
-  "Que dois-je traiter en priorité ?",
 ];
 
 /* Libellé court par type d'action (badge du plan). */
@@ -43,17 +48,42 @@ const ACTION_LABEL: Record<string, string> = {
   signaler_conflit_salle: "Conflit salle",
   preparer_deliberation: "Délibération",
   notifier_passage: "Passage",
+  rappel_echeance: "Rappel échéance",
+  message_bienvenue: "Bienvenue",
 };
 
-/* Catalogue des tâches automatisées (flux semi-autonomes). */
-const FLOWS: { id: string; label: string; desc: string; planner: () => Promise<PlanPreview> }[] = [
-  { id: "rentree", label: "Traitement des dossiers de rentrée", desc: "Valider les dossiers complets, relancer les incomplets", planner: planRentreeInscriptions },
-  { id: "impayes", label: "Relance des impayés", desc: "Rappeler les factures échues aux étudiants concernés", planner: planRelanceImpayes },
-  { id: "notes", label: "Relance de la saisie des notes", desc: "Relancer les enseignants dont les cours n'ont pas de notes", planner: planRelanceSaisieNotes },
-  { id: "salles", label: "Détection des conflits de salles", desc: "Repérer et signaler les chevauchements d'emploi du temps", planner: planConflitsSalles },
-  { id: "delib", label: "Préparation des délibérations", desc: "Préparer les dossiers du jury (préparation seule)", planner: planPreparationDeliberation },
-  { id: "passage", label: "Passage de niveau", desc: "Notifier les étudiants admis (action sensible)", planner: planPassageNiveau },
+/* Catalogue des flux semi-autonomes + mots-clés pour la détection d'intention. */
+const FLOWS: { id: string; label: string; planner: () => Promise<PlanPreview>; keywords: string[] }[] = [
+  { id: "rentree", label: "Traitement des dossiers de rentrée", planner: planRentreeInscriptions,
+    keywords: ["dossier", "rentree", "inscription", "admission", "valider les dossier", "valide les dossier"] },
+  { id: "echeances", label: "Rappel des échéances de paiement", planner: planRappelEcheances,
+    keywords: ["echeance", "rappel", "avant echeance", "paiement a venir", "rappelle"] },
+  { id: "impayes", label: "Relance des impayés", planner: planRelanceImpayes,
+    keywords: ["impaye", "recouvrement", "pas paye", "n'ont pas paye", "ont pas paye", "relance paiement", "relance le paiement", "facture echue"] },
+  { id: "notes", label: "Relance de la saisie des notes", planner: planRelanceSaisieNotes,
+    keywords: ["note", "saisie", "saisi les note", "relance enseignant", "relance les enseignant", "bulletin manquant"] },
+  { id: "salles", label: "Détection des conflits de salles", planner: planConflitsSalles,
+    keywords: ["salle", "conflit", "emploi du temps", "planning", "chevauchement"] },
+  { id: "delib", label: "Préparation des délibérations", planner: planPreparationDeliberation,
+    keywords: ["deliberation", "delibere", "jury", "releve a statuer"] },
+  { id: "passage", label: "Passage de niveau", planner: planPassageNiveau,
+    keywords: ["passage", "admis", "niveau superieur", "promotion", "faire passer"] },
+  { id: "bienvenue", label: "Message de bienvenue aux nouveaux", planner: planBienvenueNouveaux,
+    keywords: ["bienvenue", "nouveaux", "accueil", "accueillir", "souhaite la bienvenue"] },
 ];
+
+/** Normalise (minuscules, sans accents) pour la détection d'intention. */
+function norm(s: string) {
+  return s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+}
+/** Retourne le flux correspondant à l'intention du message, ou null. */
+function matchIntent(text: string) {
+  const t = norm(text);
+  for (const f of FLOWS) {
+    if (f.keywords.some((k) => t.includes(norm(k)))) return f;
+  }
+  return null;
+}
 
 function renderMarkdownLite(text: string) {
   const parts = text.split(/(\*\*[^*]+\*\*)/g);
@@ -110,8 +140,15 @@ export default function AdminAgent() {
 
   async function send(text?: string) {
     const q = (text ?? input).trim();
-    if (!q || busy) return;
-    setInput(""); setView("chat"); setPlan(null);
+    if (!q || busy || planning) return;
+    setInput("");
+
+    // 1) L'agent comprend l'intention : si le message correspond à un flux,
+    //    il prépare directement le plan (à approuver). Sinon → questions/réponses.
+    const flow = matchIntent(q);
+    if (flow) { await startFlow(flow.id, q); return; }
+
+    setView("chat"); setPlan(null);
     const history = turns.slice(-8);
     setTurns((t) => [...t, { role: "user", content: q }]);
     setBusy(true);
@@ -124,11 +161,15 @@ export default function AdminAgent() {
     } finally { setBusy(false); }
   }
 
-  // ── Flux semi-autonome : construire un plan ──
-  async function startFlow(flowId: string) {
+  // ── Flux semi-autonome : construire un plan (depuis une intention détectée) ──
+  async function startFlow(flowId: string, fromMessage?: string) {
     const flow = FLOWS.find((f) => f.id === flowId);
     if (!flow) return;
-    setPlanning(flowId); setView("chat"); setTurns([]);
+    setPlanning(flowId); setView("chat");
+    setTurns(fromMessage ? [
+      { role: "user", content: fromMessage },
+      { role: "assistant", content: `Compris. J'ai préparé un plan pour « ${flow.label} » — vérifiez les étapes ci-dessous puis approuvez.` },
+    ] : []);
     try {
       setPlan(await flow.planner());
     } catch {
@@ -301,29 +342,16 @@ export default function AdminAgent() {
                     <div className="w-12 h-12 rounded-2xl bg-cama-50 flex items-center justify-center mb-3">
                       <Sparkles className="w-6 h-6 text-cama" />
                     </div>
-                    <p className="text-sm font-semibold text-ink">Comment puis-je vous aider ?</p>
-                    <p className="text-xs text-text-subtle mt-1 max-w-[280px]">
-                      Interrogez vos données, ou lancez une tâche automatisée que vous validez avant exécution.
+                    <p className="text-sm font-semibold text-ink">Dites-moi ce qu'il faut faire</p>
+                    <p className="text-xs text-text-subtle mt-1 max-w-[290px]">
+                      Écrivez votre demande en langage naturel : je comprends l'intention,
+                      je prépare le plan et je l'exécute après votre validation.
                     </p>
 
-                    {/* Tâches automatisées (flux semi-autonomes) */}
-                    <div className="mt-4 w-full max-w-[320px] space-y-1.5">
-                      {FLOWS.map((f) => (
-                        <button key={f.id} onClick={() => startFlow(f.id)} disabled={planning !== null}
-                          className="w-full text-left px-3 py-3 rounded-xl border border-cama/30 bg-cama-50 hover:bg-cama-50/70 disabled:opacity-50 flex items-center gap-2.5 transition-colors">
-                          {planning === f.id ? <Loader2 className="w-5 h-5 text-cama animate-spin flex-shrink-0" /> : <Zap className="w-5 h-5 text-cama flex-shrink-0" />}
-                          <span className="min-w-0">
-                            <span className="block text-xs font-bold text-ink">{f.label}</span>
-                            <span className="block text-[10px] text-text-muted">{f.desc}</span>
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-
                     <div className="mt-4 grid gap-1.5 w-full max-w-[320px]">
-                      {SUGGESTIONS.map((s) => (
-                        <button key={s} onClick={() => send(s)}
-                          className="text-left text-xs px-3 py-2 rounded-lg border border-border hover:border-cama hover:bg-cama-50 text-text-muted hover:text-cama transition-colors">
+                      {EXAMPLES.map((s) => (
+                        <button key={s} onClick={() => send(s)} disabled={planning !== null}
+                          className="text-left text-xs px-3 py-2 rounded-lg border border-border hover:border-cama hover:bg-cama-50 text-text-muted hover:text-cama disabled:opacity-50 transition-colors">
                           {s}
                         </button>
                       ))}

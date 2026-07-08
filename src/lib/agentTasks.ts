@@ -20,7 +20,9 @@ export type StepAction =
   | "relance_saisie_notes"
   | "signaler_conflit_salle"
   | "preparer_deliberation"
-  | "notifier_passage";
+  | "notifier_passage"
+  | "rappel_echeance"
+  | "message_bienvenue";
 export type StepStatus = "attente" | "ok" | "echec" | "ignore";
 export type TaskStatus = "planifie" | "en_cours" | "termine" | "echoue" | "annule";
 
@@ -367,6 +369,69 @@ export async function planPassageNiveau(): Promise<PlanPreview> {
     kind: "passage_niveau",
     steps,
     note: `${admis.length} étudiant(s) admis. Action sensible : cochez explicitement chaque passage à notifier.`,
+  };
+}
+
+/**
+ * FLUX — Rappel des échéances de paiement (préventif).
+ * Factures dues/partielles dont l'échéance tombe dans les 7 prochains jours.
+ */
+export async function planRappelEcheances(): Promise<PlanPreview> {
+  const invoices = await fetchAllInvoices();
+  const now = Date.now();
+  const in7 = now + 7 * 24 * 3600 * 1000;
+  const rows = invoices.filter((i) =>
+    (i.status === "du" || i.status === "partiel") && i.due_date &&
+    new Date(i.due_date).getTime() >= now && new Date(i.due_date).getTime() <= in7);
+
+  const steps: AgentStep[] = rows.map((inv) => {
+    const montant = Number(inv.amount_fcfa ?? 0).toLocaleString("fr-FR");
+    const dstr = inv.due_date ? new Date(inv.due_date).toLocaleDateString("fr-FR") : "";
+    return {
+      id: inv.id,
+      label: `Rappel « ${inv.label ?? "Scolarité"} » — ${montant} FCFA, échéance ${dstr}`,
+      action: "rappel_echeance",
+      target_id: inv.id,
+      params: { user_id: inv.student_id, label: inv.label ?? "Scolarité", montant, due_date: dstr },
+      selected: true,
+      status: "attente",
+    };
+  });
+  return {
+    title: "Rappel des échéances de paiement",
+    kind: "rappel_echeances",
+    steps,
+    note: `${rows.length} facture(s) arrivant à échéance sous 7 jours.`,
+  };
+}
+
+/**
+ * FLUX — Message de bienvenue aux nouveaux (inscriptions validées récentes).
+ */
+export async function planBienvenueNouveaux(): Promise<PlanPreview> {
+  const val = await fetchInscriptions("validee");
+  const cut = Date.now() - 30 * 24 * 3600 * 1000;
+  const rows = val.filter((i) => new Date(i.enrolled_at).getTime() >= cut);
+
+  const steps: AgentStep[] = rows.map((ins) => {
+    const who = ins.user
+      ? `${ins.user.first_name ?? ""} ${ins.user.last_name ?? ""}`.trim() || ins.user.email
+      : "Étudiant";
+    return {
+      id: ins.id,
+      label: `Souhaiter la bienvenue à ${who} — ${ins.parcours_title}`,
+      action: "message_bienvenue",
+      target_id: ins.id,
+      params: { user_id: ins.user_id, parcours_title: ins.parcours_title },
+      selected: true,
+      status: "attente",
+    };
+  });
+  return {
+    title: "Message de bienvenue aux nouveaux",
+    kind: "bienvenue",
+    steps,
+    note: `${rows.length} inscription(s) validée(s) sur les 30 derniers jours.`,
   };
 }
 
