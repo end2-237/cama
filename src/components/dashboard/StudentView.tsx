@@ -16,6 +16,7 @@ import { fetchDeliberations } from "@/lib/exams";
 import { fetchLivesForCourses, subscribeLives } from "@/lib/lives";
 import { fetchExtraCourses, fetchMyEnrollments, MODE_LABEL } from "@/lib/extra";
 import { fetchJournal, type DBJournalArticle } from "@/lib/journal";
+import WeekSchedule from "@/components/dashboard/WeekSchedule";
 import type { DBProgramCourse, DBChapter, DBExam, DBExtraCourse, DBExtraEnrollment } from "@/lib/supabase";
 import type { DelibWithMeta } from "@/lib/exams";
 
@@ -500,20 +501,9 @@ function CoursesTab() {
           </div>
         </div>
 
-        <div className="px-4 py-3 border-b border-border">
-          <h2 className="text-[10px] font-black text-ink uppercase tracking-widest mb-2">Agenda</h2>
-          <div className="space-y-2">
-            {([] as { date: string; label: string; color: string }[]).map((a, i) => (
-              <div key={i} className="flex items-center gap-2.5">
-                <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${a.color}`} />
-                <div>
-                  <p className="text-[10px] font-bold text-cama leading-none">{a.date}</p>
-                  <p className="text-xs text-ink">{a.label}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-          <Link href="/calendrier" className="block text-[10px] font-bold text-cama hover:underline mt-2">
+        <WeekSchedule />
+        <div className="px-4 py-2.5 border-b border-border">
+          <Link href="/calendrier" className="block text-[10px] font-bold text-cama hover:underline">
             Calendrier académique →
           </Link>
         </div>
