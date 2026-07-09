@@ -94,7 +94,7 @@ export default function Footer() {
       <div className="relative z-10 border-t border-white/10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col sm:flex-row justify-between items-center gap-3">
           <p className="text-xs text-white/35">
-            © {new Date().getFullYear()} Institut JFN · CAMA. Tous droits réservés. Yaoundé, Cameroun.
+            © {new Date().getFullYear()} Institut JFN · CAMA. Tous droits réservés. Bonamoussadi, Douala, Cameroun.
           </p>
           <div className="flex flex-wrap gap-4">
             {legal.map((l) => (

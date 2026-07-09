@@ -59,12 +59,12 @@ export default function CampusView({ parcours: p }: { parcours: Parcours }) {
               Cycle {cycleLabel}
             </span>
             <h1 className="text-4xl md:text-5xl font-light mb-4">
-              {isOnline ? "Votre campus numérique" : "Campus JFN Yaoundé"}
+              {isOnline ? "Votre campus numérique" : "Campus JFN — Bonamoussadi, Douala"}
             </h1>
             <p className="text-white/70 text-lg max-w-2xl">
               {isOnline
                 ? "Tout votre parcours accessible en ligne, où que vous soyez, optimisé pour le bas-débit."
-                : "Un cadre d'apprentissage moderne au cœur de Yaoundé, pensé pour la réussite académique."}
+                : "Le Jacky Felly Nafack Hightech University Institute (JFN-HUI), pôle d'excellence universitaire à Santa Barbara, Bonamoussadi (Douala). « Innovation for a better world »."}
             </p>
           </div>
         </section>
@@ -98,30 +98,72 @@ export default function CampusView({ parcours: p }: { parcours: Parcours }) {
             <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
               <div className="grid lg:grid-cols-2 gap-10 items-center">
                 <div className="rounded-3xl overflow-hidden shadow-xl" style={{ borderBottomLeftRadius: "5rem" }}>
-                  <img src="https://images.unsplash.com/photo-1562774053-701939374585?w=900&q=80" alt="Campus JFN" className="w-full h-80 object-cover" />
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src="/campus/Cycle-bachelor.jpg" alt="Étudiant JFN-HUI" className="w-full h-80 object-cover" />
                 </div>
                 <div>
-                  <span className="badge bg-cama-50 text-cama mb-4"><MapPin className="w-3.5 h-3.5" /> Localisation</span>
-                  <h2 className="text-3xl font-light text-ink mb-4">Institut JFN — Yaoundé</h2>
+                  <span className="badge bg-cama-50 text-cama mb-4"><MapPin className="w-3.5 h-3.5" /> Santa Barbara · Bonamoussadi · Douala</span>
+                  <h2 className="text-3xl font-light text-ink mb-4">Institut JFN — Bonamoussadi, Douala</h2>
                   <p className="text-muted leading-relaxed mb-6">
-                    Situé au quartier Bastos, le campus offre amphithéâtres modernes, laboratoires équipés,
-                    espaces de coworking et une bibliothèque numérique. Un environnement propice à l&apos;excellence.
+                    Le Jacky Felly Nafack Hightech University Institute (JFN-HUI) est un établissement supérieur privé
+                    situé à Santa Barbara, quartier Bonamoussadi à Douala. Reconnu Institut Universitaire par le MINESUP
+                    (accréditation N°22-02948, 2022), il forme à travers trois écoles :
+                    l&apos;École Supérieure d&apos;Ingénieurs (ESI), l&apos;École de Management et de l&apos;Entrepreneuriat (EME)
+                    et l&apos;École du Numérique et de l&apos;Innovation (ENI).
                   </p>
                   <div className="grid grid-cols-2 gap-3">
                     {[
-                      { icon: FlaskConical, label: "Laboratoires équipés" },
+                      { icon: FlaskConical, label: "Laboratoires & innovation" },
                       { icon: BookOpen,     label: "Bibliothèque & médiathèque" },
-                      { icon: Wifi,         label: "Wifi haut-débit campus" },
-                      { icon: Coffee,       label: "Cafétéria & espaces détente" },
-                      { icon: Bus,          label: "Navette & accès transport" },
-                      { icon: Dumbbell,     label: "Activités sportives" },
+                      { icon: Wifi,         label: "Campus connecté" },
+                      { icon: Coffee,       label: "Espaces de vie étudiante" },
+                      { icon: Bus,          label: "Accès Bonamoussadi" },
+                      { icon: Dumbbell,     label: "Activités & clubs" },
                     ].map(({ icon: Icon, label }) => (
                       <div key={label} className="flex items-center gap-2 text-sm text-ink">
                         <Icon className="w-4 h-4 text-cama flex-shrink-0" /> {label}
                       </div>
                     ))}
                   </div>
+
+                  {/* Contacts officiels */}
+                  <div className="mt-6 grid sm:grid-cols-2 gap-2 text-sm">
+                    <a href="tel:+237680066015" className="flex items-center gap-2 text-ink hover:text-cama transition-colors">
+                      <MapPin className="w-4 h-4 text-cama flex-shrink-0" /> +237 680 06 60 15 / 694 00 56 70
+                    </a>
+                    <a href="mailto:info@jfn-univ.com" className="flex items-center gap-2 text-ink hover:text-cama transition-colors">
+                      <BookOpen className="w-4 h-4 text-cama flex-shrink-0" /> info@jfn-univ.com
+                    </a>
+                    <a href="https://jfn-univ.com" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-ink hover:text-cama transition-colors sm:col-span-2">
+                      <Building2 className="w-4 h-4 text-cama flex-shrink-0" /> jfn-univ.com
+                    </a>
+                  </div>
                 </div>
+              </div>
+
+              {/* Les trois écoles */}
+              <div className="grid sm:grid-cols-3 gap-4 mt-12">
+                {[
+                  { code: "ESI", name: "École Supérieure d'Ingénieurs", icon: FlaskConical },
+                  { code: "EME", name: "École de Management et de l'Entrepreneuriat", icon: Users },
+                  { code: "ENI", name: "École du Numérique et de l'Innovation", icon: Laptop },
+                ].map(({ code, name, icon: Icon }) => (
+                  <div key={code} className="bg-white rounded-2xl border border-border p-5">
+                    <div className="w-10 h-10 rounded-xl bg-cama-50 flex items-center justify-center mb-3">
+                      <Icon className="w-5 h-5 text-cama" />
+                    </div>
+                    <p className="text-lg font-black text-ink">{code}</p>
+                    <p className="text-sm text-muted leading-snug mt-0.5">{name}</p>
+                  </div>
+                ))}
+              </div>
+
+              {/* Partenaires (officiels) */}
+              <div className="mt-10 text-center">
+                <p className="text-[11px] font-black uppercase tracking-widest text-subtle mb-2">Partenaires académiques & technologiques</p>
+                <p className="text-sm text-muted">
+                  Google Cloud · Cisco · Dassault Systèmes · Alibaba · Qwasar · EMLV · ESSEC Douala · Université de Buea · Polytechnique de Tunis
+                </p>
               </div>
             </section>
 

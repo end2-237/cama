@@ -5,7 +5,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 
 const testimonials = [
   {
-    quote: "Avec CAMA, je peux suivre mes cours même quand ma connexion est mauvaise. Le mode texte change vraiment la donne pour nous à Yaoundé.",
+    quote: "Avec CAMA, je peux suivre mes cours même quand ma connexion est mauvaise. Le mode texte change vraiment la donne pour nous à Douala.",
     name:  "Fatima N.",
     role:  "Étudiante L2 Informatique",
     school:"École d'Informatique · JFN",

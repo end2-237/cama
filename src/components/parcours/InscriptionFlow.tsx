@@ -187,7 +187,7 @@ export default function InscriptionFlow({ parcours: p }: { parcours: Parcours })
                 <div>
                   <p className="text-sm font-bold text-ink mb-1">Cycle sur le campus</p>
                   <p className="text-sm text-muted leading-relaxed">
-                    Ce cycle inclut des cours sur le campus de Yaoundé. Consultez les{" "}
+                    Ce cycle inclut des cours sur le campus de Bonamoussadi (Douala). Consultez les{" "}
                     <Link href={`/parcours/${p.slug}/campus`} className="text-cama font-semibold hover:underline">détails du campus</Link>{" "}
                     et le{" "}
                     <Link href={`/parcours/${p.slug}/reglement`} className="text-cama font-semibold hover:underline">règlement intérieur</Link>{" "}
