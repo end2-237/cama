@@ -239,3 +239,29 @@ MAIS elle révèle une fuite INTRA-établissement :
   étudiant = ses propres lignes (`student_id = auth.uid()`),
   enseignant = lignes de ses cours,
   admin/jury = tout l'org. Garder `org_id = current_org_id()` comme garde de base.
+
+---
+
+## ✅ VERDICT — Test parcours utilisateur complet (2026-09-17)
+Simulation d'une année, 2 établissements en parallèle (JFN académique + LinguaPro langues),
+sous les VRAIS rôles avec RLS active (mêmes requêtes/policies que l'app).
+
+Cycle complet validé, action par action :
+1. Admin crée un cours ✅   2. Enseignant ajoute un chapitre ✅   3. Étudiant suit le chapitre ✅
+4. Enseignant crée l'examen + note ✅   5. Admin délibère ✅   6. Étudiant lit SON résultat ✅
+
+Sécurité & intégrité (corrigées via 033 + 034) :
+- Isolation inter-établissements : parfaite (aucune fuite entre orgs).
+- Un étudiant ne voit QUE ses copies/notes/factures/documents (plus les autres).
+- Un étudiant ne peut PAS modifier sa note, ni créer délibération/facture (personnel uniquement).
+- Enseignant/admin/jury : accès complet à leur établissement. Super-admin : transverse.
+- Planning hebdomadaire : récurrent, se met à jour seul chaque semaine (prouvé).
+
+CONCLUSION : oui, un étudiant peut suivre toute sa formation ici sans problème fonctionnel
+ni de confidentialité, et plusieurs établissements coexistent en parfaite étanchéité.
+
+### Reste (cosmétique white-label, non bloquant)
+- Remplacer « Institut JFN » / « Yaoundé » / « 2025-2026 » codés en dur par `org.name` /
+  données de l'org dans les DOCUMENTS (bulletins, dossier, diplôme, relevés) et libellés
+  (journal, forum, PersonalCalendarDrawer). N'empêche pas le fonctionnement ; à faire en lot.
+- `campus: "Yaoundé"` figé à l'inscription → à rendre paramétrable par org.
