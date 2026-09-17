@@ -222,3 +222,20 @@ Externaliser filières & niveaux (codés en dur dans `PARCOURS`) vers des donné
 - `PAWAPAY_API_TOKEN` (+ `PAWAPAY_ENV=sandbox|production`), `SUPABASE_SERVICE_ROLE_KEY` en prod.
 - URL du webhook à déclarer dans le tableau de bord PawaPay → `/api/billing/webhook`.
 - Pays/opérateurs à activer (Cameroun MTN/Orange par défaut).
+
+---
+
+## ⚠️ PROBLÈME PRIORITAIRE identifié (simulation multi-établissements, 2026-09-17)
+La simulation d'une année complète sur 2 établissements (JFN + LinguaPro) confirme :
+- Isolation INTER-établissements PARFAITE : ADMIN JFN voit 3 étudiants / LinguaPro 2 ; totaux exacts, aucune fuite entre orgs.
+
+MAIS elle révèle une fuite INTRA-établissement :
+- **Un ÉTUDIANT voit les copies/notes des AUTRES étudiants de son org.**
+  Preuve : l'étudiant Ali (JFN) a 1 copie à lui mais `copies_visibles=3` (toutes les copies JFN).
+- Cause : la policy `tenant_isolation` filtre par `org_id` uniquement, sans restriction par utilisateur/rôle.
+  Les tables sensibles (`exam_attempts`, `deliberations`, `invoices`, `student_documents`, `payments`,
+  `chapter_progress`, `tp_grades`, `transcripts`…) sont donc lisibles par tout membre de l'org.
+- Correctif à faire (Étape 7 · sécurité fine) : policies par rôle —
+  étudiant = ses propres lignes (`student_id = auth.uid()`),
+  enseignant = lignes de ses cours,
+  admin/jury = tout l'org. Garder `org_id = current_org_id()` comme garde de base.
