@@ -3,6 +3,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 import { applyTheme } from "@/lib/theme";
 import { hasFeature, type FeatureKey } from "@/lib/features";
+import { termsFor, type Terms } from "@/lib/terminology";
 import {
   DBOrganization, FALLBACK_ORGS, DEFAULT_ORG_SLUG,
   resolveOrgSlug, fetchOrgBySlug,
@@ -13,6 +14,7 @@ interface OrgCtx {
   loading: boolean;
   reload: () => void;
   has: (key: FeatureKey) => boolean;
+  terms: Terms;
 }
 
 const OrgContext = createContext<OrgCtx | undefined>(undefined);
@@ -42,7 +44,7 @@ export function OrgProvider({ children }: { children: ReactNode }) {
   }, [tick]);
 
   return (
-    <OrgContext.Provider value={{ org, loading, reload: () => setTick((t) => t + 1), has: (k) => hasFeature(org, k) }}>
+    <OrgContext.Provider value={{ org, loading, reload: () => setTick((t) => t + 1), has: (k) => hasFeature(org, k), terms: termsFor(org.vertical) }}>
       {children}
     </OrgContext.Provider>
   );

@@ -155,7 +155,31 @@ Activer/désactiver des modules par établissement ; démonstration sur TP/VM (p
 
 ---
 
-## Étape 5 — Programme paramétrable par vertical (langues A1→C2, pro)
-**Statut : EN COURS** (prérequis : Étape 4 terminée ✅)
-Prochaine action : sortir le programme du code (`PARCOURS`) vers des données par org + pack terminologique par vertical (académique/langues/pro).
+## Étape 5 — Programme paramétrable par vertical (terminologie)
+**Statut : TERMINÉE ✅ (couche terminologie — testée, capturée)**
+
+### Objectif
+Adapter l'interface au métier de chaque établissement (académique / langues / pro) sans dupliquer de composants.
+
+### Livrables
+- [x] `src/lib/terminology.ts` — packs par vertical (platformLabel, accroche héro, levelWord/groupWord/unitWord/creditWord/programWord).
+- [x] `src/context/OrgContext.tsx` — expose `terms` (selon `org.vertical`).
+- [x] `src/components/auth/AuthPanel.tsx` — sur-titre + accroche pilotés par la terminologie (corrige le texte « académique » figé signalé précédemment).
+
+### Tests réalisés
+- [x] `tsc --noEmit` propre.
+- [x] Capture : `?org=jfn` → « Plateforme Académique / avenir académique » ; `?org=demo` → « École de langues / Maîtrisez une nouvelle langue ». Même écran, sémantique adaptée.
+
+### Journal
+- 2026-09-17 : Étape 5 (terminologie par vertical) livrée. Les libellés métier (`terms`) sont disponibles partout via `useOrg()` pour les prochaines pages.
+
+---
+
+## Étape 6 (recommandée) — Constructeur de programme en base
+**Statut : NON COMMENCÉE**
+La terminologie est en place (Étape 5). Reste à externaliser le programme lui-même :
+`PARCOURS` (codé en dur, `src/lib/parcours.ts`) → tables par org (`program_levels`, `program_modules`)
++ page admin de création + bascule du register/programme sur les données de l'org (fallback JFN).
+Chantier large et transverse (register, /admin/programme, /etudiant/programme…) : à faire avec
+validation UI étape par étape pour ne pas casser JFN. Les `terms` de l'Étape 5 y seront réutilisés.
 

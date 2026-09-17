@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useOrg } from "@/context/OrgContext";
 
 export default function AuthPanel() {
-  const { org } = useOrg();
+  const { org, terms } = useOrg();
   return (
     <div
       className="relative flex flex-col justify-between h-full p-10 overflow-hidden"
@@ -120,14 +120,14 @@ export default function AuthPanel() {
       {/* Tagline — fade up */}
       <div className="relative z-10 animate-fade-up delay-200">
         <p className="text-white/40 text-xs font-semibold uppercase tracking-widest mb-3">
-          Plateforme Académique
+          {terms.platformLabel}
         </p>
         <h2 className="text-4xl font-light text-white leading-tight mb-4">
-          Construisez votre
+          {terms.heroLine1}
           <br />
-          <span className="text-gold font-semibold">avenir académique</span>
+          <span className="text-gold font-semibold">{terms.heroLine2}</span>
           <br />
-          au Cameroun.
+          {terms.heroTail}
         </h2>
         <p className="text-white/60 text-sm leading-relaxed max-w-xs">
           Cours, examens sécurisés, suivi de progression — conçu pour les réalités du terrain.
