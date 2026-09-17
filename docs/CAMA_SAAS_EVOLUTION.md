@@ -104,6 +104,31 @@ Chaque établissement ne voit et ne modifie que ses propres données, garanti c�
 ---
 
 ## Étape 3 — Pages d'enregistrement d'établissement (/signup, /onboarding)
-**Statut : NON COMMENCÉE** (prérequis : Étape 2 terminée ✅)
-Prochaine action : flux public de création d'org + admin initial + application du branding/vertical.
+**Statut : TERMINÉE ✅ (logique testée sur Postgres réel, UI capturée)**
+
+### Objectif
+Créer un établissement + son admin depuis l'interface, puis arriver sur un espace marqué.
+
+### Livrables
+- [x] `029_org_admin.sql` — policies : l'admin d'un org peut modifier SON org ; suppression réservée au super-admin plateforme.
+- [x] `src/app/api/org/signup/route.ts` — API service-role : valide (slug/réservés/mot de passe), crée `organizations` + compte Auth admin + profil `users` (org_id), rollback si échec.
+- [x] `src/app/signup/page.tsx` — formulaire public « Créer votre établissement » (nom, sous-domaine, vertical, couleur de marque, admin).
+- [x] `src/app/onboarding/page.tsx` — écran de bienvenue post-création, branding appliqué, lien vers l'espace.
+
+### Tests réalisés
+- [x] `tsc --noEmit` propre.
+- [x] Simulation du flux signup sur Postgres réel : création org « Test School » + admin → le nouvel admin ne voit QUE son org (isolation confirmée, aucune donnée JFN/LinguaPro).
+- [x] Rendu UI capturé : `/signup` (formulaire complet) et `/onboarding?org=demo` (branding teal appliqué).
+- [x] Chaîne complète (schema + 28 migrations) rejouée sans erreur.
+
+### Journal
+- 2026-09-17 : Étape 3 implémentée. Flux de création d'établissement côté serveur (service-role) + pages publiques. Isolation du tenant créé validée sur base réelle.
+- NB : l'exécution end-to-end réelle de l'API nécessite `SUPABASE_SERVICE_ROLE_KEY` (déjà utilisée par les routes admin existantes) ; non disponible en local, mais la logique SQL (org+admin+isolation) est prouvée sur Postgres.
+- À prévoir : provisioning DNS réel des sous-domaines (hors code) ; page de réglages d'org (édition branding) — la policy d'update est déjà en place.
+
+---
+
+## Étape 4 — Entitlements / modules à la carte (TP/VM affiché ou non)
+**Statut : NON COMMENCÉE** (prérequis : Étape 3 terminée ✅)
+Prochaine action : table/champ `features` par org + affichage conditionnel des modules (TP/VM, Prof IA, jury…), pilotés par vertical + plan.
 
