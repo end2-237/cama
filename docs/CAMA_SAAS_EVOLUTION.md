@@ -8,6 +8,7 @@
 
 ## Décisions de design validées
 - White-label = branding + config par org, MÊMES composants ; thème via variables CSS ; résolution par sous-domaine.
+- **RÈGLE DESIGN (impérative) : toute nouvelle page reprend le design actuel comme référence — landing + surtout la page de connexion. JAMAIS de formulaire nu centré au milieu avec du vide : toujours un composant latéral (panneau `AuthPanel` à gauche via `grid lg:grid-cols-[42%_58%]`, ou équivalent illustratif) pour remplir l'espace. Réutiliser les classes existantes (btn-primary, border-border, text-ink/muted, animate-fade-*).**
 - Interface de cours = même UX pour tous ; programme, vocabulaire et modules paramétrables par org/vertical.
 - TP/VM = entitlement (premium + par vertical) ; machines hébergées PAR l'institut, isolées par `org_id`.
 - Enregistrement d'org = flux dédié `/signup` + `/onboarding`, puis login/register tenant-scopés, + `/super-admin`.
