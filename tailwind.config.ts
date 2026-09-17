@@ -9,24 +9,26 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        /* — Indigo profond : couleur principale CAMA — */
+        /* — Indigo profond : couleur principale CAMA (thémable par établissement) —
+           Définie en canaux "R G B" via variables CSS pour préserver les opacités
+           Tailwind (ex. bg-cama/20). Valeurs par défaut dans globals.css (:root). */
         cama: {
-          50:  "#EEF2FF",
-          100: "#E0E7FF",
-          200: "#C7D2FE",
-          300: "#A5B4FC",
-          400: "#818CF8",
-          500: "#6366F1",
-          DEFAULT: "#4F46E5",   /* indigo */
-          700: "#4338CA",
-          800: "#3730A3",
-          900: "#1E1B4B",
+          50:  "rgb(var(--cama-50) / <alpha-value>)",
+          100: "rgb(var(--cama-100) / <alpha-value>)",
+          200: "rgb(var(--cama-200) / <alpha-value>)",
+          300: "rgb(var(--cama-300) / <alpha-value>)",
+          400: "rgb(var(--cama-400) / <alpha-value>)",
+          500: "rgb(var(--cama-500) / <alpha-value>)",
+          DEFAULT: "rgb(var(--cama-DEFAULT) / <alpha-value>)",
+          700: "rgb(var(--cama-700) / <alpha-value>)",
+          800: "rgb(var(--cama-800) / <alpha-value>)",
+          900: "rgb(var(--cama-900) / <alpha-value>)",
         },
-        /* — Or chaud : accent africain — */
+        /* — Or chaud : accent (thémable) — */
         gold: {
-          light:   "#FEF3C7",
-          DEFAULT: "#F59E0B",
-          dark:    "#D97706",
+          light:   "rgb(var(--gold-light) / <alpha-value>)",
+          DEFAULT: "rgb(var(--gold) / <alpha-value>)",
+          dark:    "rgb(var(--gold-dark) / <alpha-value>)",
         },
         /* — Neutres — */
         ink:     "#111827",

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/context/AuthContext";
+import { OrgProvider } from "@/context/OrgContext";
 import StudentGate from "@/components/StudentGate";
 import NotificationsBridge from "@/components/NotificationsBridge";
 
@@ -42,11 +43,13 @@ export default function RootLayout({
   return (
     <html lang="fr" className={inter.variable}>
       <body className="font-sans text-slate-900 bg-white antialiased">
-        <AuthProvider>
-          <StudentGate />
-          <NotificationsBridge />
-          {children}
-        </AuthProvider>
+        <OrgProvider>
+          <AuthProvider>
+            <StudentGate />
+            <NotificationsBridge />
+            {children}
+          </AuthProvider>
+        </OrgProvider>
       </body>
     </html>
   );

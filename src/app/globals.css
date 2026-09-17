@@ -5,6 +5,23 @@
 @tailwind utilities;
 
 @layer base {
+  /* ─── Palette CAMA par défaut (Institut JFN) — canaux R G B ───
+     Un établissement peut les surcharger à chaud (voir src/lib/theme.ts). */
+  :root {
+    --cama-50: 238 242 255;
+    --cama-100: 224 231 255;
+    --cama-200: 199 210 254;
+    --cama-300: 165 180 252;
+    --cama-400: 129 140 248;
+    --cama-500: 99 102 241;
+    --cama-DEFAULT: 79 70 229;
+    --cama-700: 67 56 202;
+    --cama-800: 55 48 163;
+    --cama-900: 30 27 75;
+    --gold-light: 254 243 199;
+    --gold: 245 158 11;
+    --gold-dark: 217 121 6;
+  }
   * { box-sizing: border-box; }
   html { scroll-behavior: smooth; }
   body { @apply font-sans text-ink bg-white antialiased; }

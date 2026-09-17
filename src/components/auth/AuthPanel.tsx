@@ -1,6 +1,10 @@
+"use client";
+
 import Link from "next/link";
+import { useOrg } from "@/context/OrgContext";
 
 export default function AuthPanel() {
+  const { org } = useOrg();
   return (
     <div
       className="relative flex flex-col justify-between h-full p-10 overflow-hidden"
@@ -105,9 +109,9 @@ export default function AuthPanel() {
         <Link href="/" className="flex items-center gap-3">
           <div className="w-1.5 h-8 rounded-full bg-gradient-to-b from-cama-300 to-gold" />
           <div>
-            <p className="text-white/50 text-[10px] font-semibold uppercase tracking-widest">Institut</p>
+            <p className="text-white/50 text-[10px] font-semibold uppercase tracking-widest">Établissement</p>
             <p className="text-white font-bold text-xl leading-none">
-              JFN · <span className="text-cama-300">CAMA</span>
+              {org.name} · <span className="text-cama-300">CAMA</span>
             </p>
           </div>
         </Link>
