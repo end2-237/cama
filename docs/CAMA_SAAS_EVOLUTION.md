@@ -9,6 +9,8 @@
 ## Décisions de design validées
 - White-label = branding + config par org, MÊMES composants ; thème via variables CSS ; résolution par sous-domaine.
 - **RÈGLE DESIGN (impérative) : toute nouvelle page reprend le design actuel comme référence — landing + surtout la page de connexion. JAMAIS de formulaire nu centré au milieu avec du vide : toujours un composant latéral (panneau `AuthPanel` à gauche via `grid lg:grid-cols-[42%_58%]`, ou équivalent illustratif) pour remplir l'espace. Réutiliser les classes existantes (btn-primary, border-border, text-ink/muted, animate-fade-*).**
+- **RÈGLE DESIGN 2 (pages internes/app) : toute page interne (super-admin, facturation, programme…) utilise `PageShell` (src/components/dashboard/PageShell.tsx) = fil d'Ariane + barre `DashNav` + en-tête avec tuiles de statistiques (`PageStat[]`) + contenu. Doit correspondre EXACTEMENT au dashboard admin (navbar + métriques), sans laisser d'espace vide.**
+- **FACTURATION : passerelle = PawaPay (Mobile Money agrégé Afrique — MTN MoMo, Orange Money, Airtel…). Décision utilisateur 2026-09-17.**
 - Interface de cours = même UX pour tous ; programme, vocabulaire et modules paramétrables par org/vertical.
 - TP/VM = entitlement (premium + par vertical) ; machines hébergées PAR l'institut, isolées par `org_id`.
 - **Décisions utilisateur (2026-09-17) : (1) les 3 verticaux dès le départ (académique, langues, pro) ; (2) TP/VM = vertical pro/IT ET palier Business/Enterprise (sinon masqué), avec override par org (JFN académique le garde car déjà utilisé) ; (3) enchaîner Étapes 4 et 5 sans s'arrêter ; (4) adressage : garder `?org=` (pas de DNS réel pour l'instant).**
