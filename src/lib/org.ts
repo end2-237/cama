@@ -22,6 +22,7 @@ export interface DBOrganization {
   custom_domain: string | null;
   vertical: OrgVertical;
   plan_id: string | null;
+  features: string[];              // overrides explicites de modules
   status: OrgStatus;
   created_at?: string;
 }
@@ -40,7 +41,8 @@ export const FALLBACK_ORGS: Record<string, DBOrganization> = {
     subdomain: "jfn",
     custom_domain: null,
     vertical: "academique",
-    plan_id: null,
+    plan_id: "business",
+    features: ["tp_vm"],
     status: "active",
   },
   demo: {
@@ -54,7 +56,8 @@ export const FALLBACK_ORGS: Record<string, DBOrganization> = {
     subdomain: "demo",
     custom_domain: null,
     vertical: "langues",
-    plan_id: null,
+    plan_id: "starter",
+    features: [],
     status: "trial",
   },
 };

@@ -11,6 +11,7 @@
 - **RÈGLE DESIGN (impérative) : toute nouvelle page reprend le design actuel comme référence — landing + surtout la page de connexion. JAMAIS de formulaire nu centré au milieu avec du vide : toujours un composant latéral (panneau `AuthPanel` à gauche via `grid lg:grid-cols-[42%_58%]`, ou équivalent illustratif) pour remplir l'espace. Réutiliser les classes existantes (btn-primary, border-border, text-ink/muted, animate-fade-*).**
 - Interface de cours = même UX pour tous ; programme, vocabulaire et modules paramétrables par org/vertical.
 - TP/VM = entitlement (premium + par vertical) ; machines hébergées PAR l'institut, isolées par `org_id`.
+- **Décisions utilisateur (2026-09-17) : (1) les 3 verticaux dès le départ (académique, langues, pro) ; (2) TP/VM = vertical pro/IT ET palier Business/Enterprise (sinon masqué), avec override par org (JFN académique le garde car déjà utilisé) ; (3) enchaîner Étapes 4 et 5 sans s'arrêter ; (4) adressage : garder `?org=` (pas de DNS réel pour l'instant).**
 - Enregistrement d'org = flux dédié `/signup` + `/onboarding`, puis login/register tenant-scopés, + `/super-admin`.
 - En attente de décision utilisateur : (1) 3 verticaux d'emblée ou académique+langues d'abord ; (2) TP/VM = Business/Enterprise ou option payante.
 
@@ -130,6 +131,31 @@ Créer un établissement + son admin depuis l'interface, puis arriver sur un esp
 ---
 
 ## Étape 4 — Entitlements / modules à la carte (TP/VM affiché ou non)
-**Statut : NON COMMENCÉE** (prérequis : Étape 3 terminée ✅)
-Prochaine action : table/champ `features` par org + affichage conditionnel des modules (TP/VM, Prof IA, jury…), pilotés par vertical + plan.
+**Statut : TERMINÉE ✅ (logique testée, migration validée)**
+
+### Objectif
+Activer/désactiver des modules par établissement ; démonstration sur TP/VM (pro/IT + palier).
+
+### Livrables
+- [x] `030_org_features.sql` — colonne `features text[]` + paliers par défaut (JFN business + override `tp_vm`, demo starter).
+- [x] `src/lib/features.ts` — `orgFeatures(org)`/`hasFeature()` : socle commun + TP/VM si (vertical=pro ET plan Business/Enterprise) + overrides explicites par org.
+- [x] `src/lib/org.ts` — `DBOrganization.features` ; fallbacks JFN(business, tp_vm) / demo(starter).
+- [x] `src/context/OrgContext.tsx` — expose `has(key)`.
+- [x] `src/components/dashboard/DashNav.tsx` — masque les entrées `/tp` si pas de `tp_vm`.
+- [x] `src/app/tp/page.tsx` — garde d'accès : message « module non activé » si pas de `tp_vm`.
+
+### Tests réalisés
+- [x] Logique features : JFN → tp_vm OUI ; demo(langues/starter) → NON ; pro+business → OUI ; pro+starter → NON.
+- [x] Migration 030 appliquée : `jfn {tp_vm}`, `demo {}`.
+- [x] `tsc --noEmit` propre.
+
+### Journal
+- 2026-09-17 : Étape 4 — modules à la carte. TP/VM gaté par vertical(pro) + palier(business/enterprise), override par org (JFN le garde). Nav + page /tp gardées.
+- Règle appliquée : styles de formulaire = référence login (input-auth + bouton login) ; icône bâtiment retirée du /signup.
+
+---
+
+## Étape 5 — Programme paramétrable par vertical (langues A1→C2, pro)
+**Statut : EN COURS** (prérequis : Étape 4 terminée ✅)
+Prochaine action : sortir le programme du code (`PARCOURS`) vers des données par org + pack terminologique par vertical (académique/langues/pro).
 

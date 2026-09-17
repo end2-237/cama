@@ -9,6 +9,7 @@ import {
   ExternalLink, Maximize2, Wifi, Code2, BookOpen, Copy, Check, FlaskConical,
 } from "lucide-react";
 import { useAuth, type AppUser } from "@/context/AuthContext";
+import { useOrg } from "@/context/OrgContext";
 import { fetchRuntimes, executeCode, versionFor, LANGS, type Runtime } from "@/lib/piston";
 import { fetchMachines, addMachine, deleteMachine, setMachineAvailable, fetchTpsForCourses, type DBCourseTp } from "@/lib/tp";
 import { fetchTeacherCourses, fetchProgram, fetchStudentProgram } from "@/lib/program";
@@ -28,7 +29,29 @@ const EMPTY_MACHINE: Partial<DBRemoteMachine> = {
 
 export default function TPPage() {
   const { user } = useAuth();
+  const { has } = useOrg();
   const [mode, setMode] = useState<"remote" | "sandbox">("remote");
+
+  // Module à la carte : TP/VM peut être désactivé pour l'établissement.
+  if (!has("tp_vm")) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-surface px-6">
+        <div className="max-w-md w-full bg-white border border-border rounded-2xl p-8 text-center">
+          <div className="w-14 h-14 rounded-full bg-cama/10 flex items-center justify-center mx-auto mb-4">
+            <Cpu className="w-7 h-7 text-cama" />
+          </div>
+          <h1 className="text-xl font-bold text-ink mb-1">Module TP &amp; Machines non activé</h1>
+          <p className="text-sm text-muted mb-6">
+            Les travaux pratiques sur machines distantes ne sont pas inclus dans le plan de votre établissement.
+            Contactez votre administration pour l&apos;activer.
+          </p>
+          <Link href="/dashboard" className="btn-primary w-full">
+            <ArrowLeft className="w-4 h-4" /> Retour au tableau de bord
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="h-screen flex flex-col bg-[#1e1e1e]">

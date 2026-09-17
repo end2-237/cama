@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 import { applyTheme } from "@/lib/theme";
+import { hasFeature, type FeatureKey } from "@/lib/features";
 import {
   DBOrganization, FALLBACK_ORGS, DEFAULT_ORG_SLUG,
   resolveOrgSlug, fetchOrgBySlug,
@@ -11,6 +12,7 @@ interface OrgCtx {
   org: DBOrganization;
   loading: boolean;
   reload: () => void;
+  has: (key: FeatureKey) => boolean;
 }
 
 const OrgContext = createContext<OrgCtx | undefined>(undefined);
@@ -40,7 +42,7 @@ export function OrgProvider({ children }: { children: ReactNode }) {
   }, [tick]);
 
   return (
-    <OrgContext.Provider value={{ org, loading, reload: () => setTick((t) => t + 1) }}>
+    <OrgContext.Provider value={{ org, loading, reload: () => setTick((t) => t + 1), has: (k) => hasFeature(org, k) }}>
       {children}
     </OrgContext.Provider>
   );

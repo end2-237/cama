@@ -10,6 +10,7 @@ import {
   Library, BarChart2, GraduationCap, MessagesSquare, Users, Wallet, Menu, LayoutDashboard,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { useOrg } from "@/context/OrgContext";
 import PersonalCalendarDrawer from "@/components/PersonalCalendarDrawer";
 import {
   fetchNotifs, markRead, markAllRead, subscribeNotifs, timeAgo,
@@ -24,6 +25,7 @@ interface DashNavProps {
 
 export default function DashNav({ activeTab, onTab, tabs }: DashNavProps) {
   const { user, logout } = useAuth();
+  const { has } = useOrg();
   const router = useRouter();
   const [profileOpen, setProfileOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
@@ -90,6 +92,9 @@ export default function DashNav({ activeTab, onTab, tabs }: DashNavProps) {
 
   if (!user) return null;
 
+  // Modules à la carte : masque TP/VM si l'établissement n'y a pas droit.
+  const tpVm = has("tp_vm");
+
   // Liens du menu mobile selon le rôle (réutilise les mêmes destinations que la nav desktop)
   const mobileLinks: { href: string; icon: typeof BookOpen; label: string }[] =
     user.role === "admin" ? [
@@ -133,7 +138,7 @@ export default function DashNav({ activeTab, onTab, tabs }: DashNavProps) {
       { href: "/etudiant/finance",    icon: Wallet,         label: "Ma scolarité" },
       { href: "/messagerie",          icon: Megaphone,      label: "Messagerie" },
       { href: "/forum",               icon: MessagesSquare, label: "Forum & Communauté" },
-    ];
+    ].filter((l) => l.href !== "/tp" || tpVm);
 
   return (
     <>
@@ -328,7 +333,7 @@ export default function DashNav({ activeTab, onTab, tabs }: DashNavProps) {
                         { href: "/etudiant/finance",       icon: Wallet,        label: "Ma scolarité" },
                         { href: "/messagerie",             icon: Megaphone,     label: "Messagerie" },
                         { href: "/forum",                  icon: MessagesSquare, label: "Forum & Communauté" },
-                      ].map((l) => (
+                      ].filter((l) => l.href !== "/tp" || tpVm).map((l) => (
                         <Link key={l.href} href={l.href} onClick={() => setMoreOpen(false)}
                           className="flex items-center gap-3 px-4 py-3 text-sm text-ink hover:bg-surface transition-colors">
                           <l.icon className="w-4 h-4 text-cama" /> {l.label}
