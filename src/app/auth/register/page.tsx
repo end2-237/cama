@@ -29,10 +29,11 @@ function currentAcademicYear(): string {
   return `${start}–${start + 1}`;
 }
 
-function generateMatricule(): string {
+function generateMatricule(prefix: string): string {
   const year = new Date().getFullYear();
   const n = Math.floor(1000 + Math.random() * 9000);
-  return `JFN-${year}-${n}`;
+  const p = (prefix || "CAMA").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6) || "CAMA";
+  return `${p}-${year}-${n}`;
 }
 
 export default function RegisterPage() {
@@ -120,7 +121,7 @@ export default function RegisterPage() {
     }
 
     const userId = authData.user.id;
-    const matricule = studentCard.trim() || generateMatricule();
+    const matricule = studentCard.trim() || generateMatricule(org.slug);
 
     // 2. Profil complet dans public.users
     const avatarColor = AVATAR_COLORS[Math.floor(Math.random() * AVATAR_COLORS.length)];
