@@ -17,7 +17,8 @@
 - Enregistrement d'org = flux dédié `/signup` + `/onboarding`, puis login/register tenant-scopés, + `/super-admin`.
 - En attente de décision utilisateur : (1) 3 verticaux d'emblée ou académique+langues d'abord ; (2) TP/VM = Business/Enterprise ou option payante.
 
-## Ordre des étapes (résultats visibles)1. Socle organisation + thème dynamique + 2ᵉ institut démo  ← **EN COURS**
+## Ordre des étapes (résultats visibles)
+1. Socle organisation + thème dynamique + 2ᵉ institut démo  ← **EN COURS**
 2. Isolation des données (org_id partout + RLS réelle)
 3. Pages d'enregistrement d'établissement (/signup, /onboarding)
 4. Entitlements / modules à la carte (TP/VM affiché ou non)
@@ -176,13 +177,26 @@ Adapter l'interface au métier de chaque établissement (académique / langues /
 
 ---
 
-## Étape 6 (recommandée) — Constructeur de programme en base
-**Statut : NON COMMENCÉE**
-La terminologie est en place (Étape 5). Reste à externaliser le programme lui-même :
-`PARCOURS` (codé en dur, `src/lib/parcours.ts`) → tables par org (`program_levels`, `program_modules`)
-+ page admin de création + bascule du register/programme sur les données de l'org (fallback JFN).
-Chantier large et transverse (register, /admin/programme, /etudiant/programme…) : à faire avec
-validation UI étape par étape pour ne pas casser JFN. Les `terms` de l'Étape 5 y seront réutilisés.
+## Étape 6 — Constructeur de programme en base
+**Statut : TERMINÉE ✅ (testée sur Postgres réel)**
+
+### Objectif
+Externaliser filières & niveaux (codés en dur dans `PARCOURS`) vers des données par org, pour que langues/pro définissent leur propre cursus — sans casser JFN.
+
+### Livrables
+- [x] `032_program_structure.sql` — tables `program_tracks` (filières) & `program_levels` (niveaux) par org + RLS tenant ; seed demo (langues) : Anglais/Français/Espagnol + A1→C2.
+- [x] `src/lib/program.ts` — `fetchTracks/fetchLevels`, `createTrack/deleteTrack`, `createLevel/deleteLevel`, `effectiveTracks/effectiveLevels` (repli PARCOURS/L1..M2 si org sans données).
+- [x] `src/app/admin/cursus/page.tsx` — constructeur en `PageShell` (métriques + gestion filières/niveaux), style dashboard.
+- [x] `src/app/auth/register/page.tsx` — filière & niveau pilotés par l'org (repli PARCOURS si vide) ; redirection étudiant → /dashboard.
+- [x] `DashNav` — entrée admin « Cursus & niveaux ».
+
+### Tests réalisés
+- [x] Chaîne complète (schema + 31 migrations) rejouée sans erreur.
+- [x] Isolation : admin JFN → 0 filière en DB (⇒ repli PARCOURS, JFN inchangé) ; admin demo → 3 filières + A1→C2, isolées.
+- [x] `tsc --noEmit` propre.
+
+### Journal
+- 2026-09-17 : Étape 6 — constructeur de programme. Filières/niveaux en base par org, consommés par register + gérés dans /admin/cursus. JFN conserve sa structure codée en dur (fallback). Reste (Étape 7 éventuelle) : brancher /admin/programme et /etudiant/programme sur les filières/niveaux DB, upload logo par org, panneau super-admin.
 
 
 ---

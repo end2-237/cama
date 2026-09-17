@@ -98,6 +98,7 @@ export default function DashNav({ activeTab, onTab, tabs }: DashNavProps) {
   const mobileLinks: { href: string; icon: typeof BookOpen; label: string }[] =
     user.role === "admin" ? [
       { href: "/admin/programme",    icon: BookOpen,      label: "Programme" },
+      { href: "/admin/cursus",       icon: GraduationCap, label: "Cursus & niveaux" },
       { href: "/admin/utilisateurs", icon: Users,         label: "Utilisateurs" },
       { href: "/admin/statistiques", icon: BarChart2,     label: "Statistiques" },
       { href: "/admin/suivi",        icon: BarChart2,     label: "Suivi & Qualité" },

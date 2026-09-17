@@ -216,3 +216,44 @@ export async function fetchAnalytics(slug: string): Promise<ProgramAnalytics> {
   };
 }
 
+
+// ════════════════════════════════════════════════════════════
+// Étape 6 — Structure de programme par établissement (tracks/levels)
+// ════════════════════════════════════════════════════════════
+
+export interface DBTrack { id: string; org_id: string; slug: string; title: string; cycle_type: string; ordre: number; }
+export interface DBLevel { id: string; org_id: string; code: string; title: string; ordre: number; }
+
+export async function fetchTracks(): Promise<DBTrack[]> {
+  const { data } = await supabase.from("program_tracks").select("*").order("ordre");
+  return (data as DBTrack[]) ?? [];
+}
+export async function fetchLevels(): Promise<DBLevel[]> {
+  const { data } = await supabase.from("program_levels").select("*").order("ordre");
+  return (data as DBLevel[]) ?? [];
+}
+export async function createTrack(t: { slug: string; title: string; cycle_type?: string; ordre?: number }) {
+  return supabase.from("program_tracks").insert({
+    slug: t.slug, title: t.title, cycle_type: t.cycle_type ?? "Licence", ordre: t.ordre ?? 0,
+  });
+}
+export async function deleteTrack(id: string) {
+  return supabase.from("program_tracks").delete().eq("id", id);
+}
+export async function createLevel(l: { code: string; title: string; ordre?: number }) {
+  return supabase.from("program_levels").insert({ code: l.code, title: l.title, ordre: l.ordre ?? 0 });
+}
+export async function deleteLevel(id: string) {
+  return supabase.from("program_levels").delete().eq("id", id);
+}
+
+/** Filières effectives : DB de l'org si définies, sinon repli PARCOURS (JFN). */
+export function effectiveTracks(dbTracks: DBTrack[]): { slug: string; title: string; cycle_type: string }[] {
+  if (dbTracks.length) return dbTracks.map((t) => ({ slug: t.slug, title: t.title, cycle_type: t.cycle_type }));
+  return PARCOURS.map((p) => ({ slug: p.slug, title: p.title, cycle_type: p.cycleType }));
+}
+/** Niveaux effectifs : DB de l'org si définis, sinon repli L1…M2 (JFN). */
+export function effectiveLevels(dbLevels: DBLevel[]): { code: string; title: string }[] {
+  if (dbLevels.length) return dbLevels.map((l) => ({ code: l.code, title: l.title }));
+  return ["L1", "L2", "L3", "M1", "M2"].map((c) => ({ code: c, title: c }));
+}

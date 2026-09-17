@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Eye, EyeOff, Globe, ChevronRight, Check, AlertCircle, Loader2 } from "lucide-react";
@@ -8,6 +8,7 @@ import AuthPanel from "@/components/auth/AuthPanel";
 import { supabase } from "@/lib/supabase";
 import { useOrg } from "@/context/OrgContext";
 import { PARCOURS, CYCLES } from "@/lib/parcours";
+import { fetchTracks, fetchLevels, type DBTrack, type DBLevel } from "@/lib/program";
 
 const niveaux = ["L1", "L2", "L3", "M1", "M2"];
 
@@ -58,6 +59,22 @@ export default function RegisterPage() {
 
   const parcours = PARCOURS.find((p) => p.slug === parcoursSlug);
 
+  // Étape 6 — filières/niveaux pilotés par l'org (repli PARCOURS si vide)
+  const [dbTracks, setDbTracks] = useState<DBTrack[]>([]);
+  const [dbLevels, setDbLevels] = useState<DBLevel[]>([]);
+  useEffect(() => {
+    (async () => {
+      const [t, l] = await Promise.all([fetchTracks(), fetchLevels()]);
+      setDbTracks(t); setDbLevels(l);
+    })();
+  }, []);
+  const levelOptions = dbLevels.length ? dbLevels.map((l) => l.code) : niveaux;
+  const dbTrack = dbTracks.find((t) => t.slug === parcoursSlug);
+  // Filière effective (objet normalisé pour la soumission).
+  const track = dbTracks.length
+    ? (dbTrack ? { slug: dbTrack.slug, title: dbTrack.title, school: org.name, cycleType: dbTrack.cycle_type, totalEcts: 0, diplome: dbTrack.cycle_type } : undefined)
+    : (parcours ? { slug: parcours.slug, title: parcours.title, school: parcours.school, cycleType: parcours.cycleType, totalEcts: parcours.totalEcts, diplome: parcours.diplome } : undefined);
+
   const [error,   setError]   = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -74,7 +91,7 @@ export default function RegisterPage() {
 
   const handleRegister = async () => {
     setError("");
-    if (!parcours)  { setError("Sélectionnez votre filière."); return; }
+    if (!track)     { setError("Sélectionnez votre filière."); return; }
     if (role === "etudiant" && !niveau) { setError("Sélectionnez votre niveau."); return; }
     if (!accepted)  { setError("Vous devez accepter les conditions d'utilisation."); return; }
 
@@ -115,7 +132,7 @@ export default function RegisterPage() {
       last_name:    lastName,
       role,
       avatar_color: avatarColor,
-      school:       parcours.school,
+      school:       track.school,
       level:        role === "etudiant" ? niveau : null,
       student_card: role === "etudiant" ? matricule : null,
       phone:        phone || null,
@@ -134,16 +151,16 @@ export default function RegisterPage() {
         user_id:        userId,
         org_id:         org.id,
         matricule,
-        parcours_slug:  parcours.slug,
-        parcours_title: parcours.title,
-        school:         parcours.school,
-        cycle_type:     parcours.cycleType,
+        parcours_slug:  track.slug,
+        parcours_title: track.title,
+        school:         track.school,
+        cycle_type:     track.cycleType,
         level:          niveau,
         mode,
         campus:         "Yaoundé",
         academic_year:  currentAcademicYear(),
         semester:       1,
-        total_ects:     parcours.totalEcts,
+        total_ects:     track.totalEcts,
         status:         "en_attente",
       });
 
@@ -156,9 +173,9 @@ export default function RegisterPage() {
 
     setLoading(false);
 
-    // 3. Si la session est active (confirmation email désactivée) → onboarding
+    // 3. Si la session est active (confirmation email désactivée) → dashboard
     if (authData.session) {
-      router.push("/onboarding");
+      router.push("/dashboard");
     } else {
       router.push("/auth/login?registered=1");
     }
@@ -340,17 +357,23 @@ export default function RegisterPage() {
                       className="input-auth bg-white cursor-pointer"
                     >
                       <option value="">Sélectionner une filière</option>
-                      {Object.entries(PARCOURS_BY_SCHOOL).map(([school, list]) => (
-                        <optgroup key={school} label={school}>
-                          {list.map((p) => (
-                            <option key={p.slug} value={p.slug}>{p.title}</option>
-                          ))}
-                        </optgroup>
-                      ))}
+                      {dbTracks.length ? (
+                        dbTracks.map((t) => (
+                          <option key={t.slug} value={t.slug}>{t.title}</option>
+                        ))
+                      ) : (
+                        Object.entries(PARCOURS_BY_SCHOOL).map(([school, list]) => (
+                          <optgroup key={school} label={school}>
+                            {list.map((p) => (
+                              <option key={p.slug} value={p.slug}>{p.title}</option>
+                            ))}
+                          </optgroup>
+                        ))
+                      )}
                     </select>
-                    {parcours && (
+                    {track && (
                       <p className="text-[11px] text-muted mt-1">
-                        {parcours.school} · {parcours.diplome}
+                        {track.school} · {track.diplome}
                       </p>
                     )}
                   </div>
@@ -382,7 +405,7 @@ export default function RegisterPage() {
                       <div>
                         <label className="block text-sm font-medium text-ink mb-1.5">Niveau</label>
                         <div className="grid grid-cols-5 gap-2">
-                          {niveaux.map((n) => (
+                          {levelOptions.map((n) => (
                             <button
                               key={n}
                               onClick={() => { setNiveau(n); setError(""); }}
