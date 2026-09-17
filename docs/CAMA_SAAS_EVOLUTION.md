@@ -17,8 +17,7 @@
 - Enregistrement d'org = flux dédié `/signup` + `/onboarding`, puis login/register tenant-scopés, + `/super-admin`.
 - En attente de décision utilisateur : (1) 3 verticaux d'emblée ou académique+langues d'abord ; (2) TP/VM = Business/Enterprise ou option payante.
 
-## Ordre des étapes (résultats visibles)
-1. Socle organisation + thème dynamique + 2ᵉ institut démo  ← **EN COURS**
+## Ordre des étapes (résultats visibles)1. Socle organisation + thème dynamique + 2ᵉ institut démo  ← **EN COURS**
 2. Isolation des données (org_id partout + RLS réelle)
 3. Pages d'enregistrement d'établissement (/signup, /onboarding)
 4. Entitlements / modules à la carte (TP/VM affiché ou non)
@@ -185,3 +184,27 @@ La terminologie est en place (Étape 5). Reste à externaliser le programme lui-
 Chantier large et transverse (register, /admin/programme, /etudiant/programme…) : à faire avec
 validation UI étape par étape pour ne pas casser JFN. Les `terms` de l'Étape 5 y seront réutilisés.
 
+
+---
+
+## Facturation — PawaPay (Mobile Money)
+**Statut : TERMINÉE ✅ au niveau code + logique (encaissement réel = clés à fournir)**
+
+### Livrables
+- [x] `031_billing.sql` — `plans` (catalogue global, lecture publique), `subscriptions` & `subscription_payments` (org_id + RLS tenant) ; seed plans (Starter/Pro/Business/Enterprise) + abonnements JFN(business/active), demo(starter/trial).
+- [x] `src/lib/pawapay.ts` (serveur) — `initiateDeposit()` (POST /deposits), `getDepositStatus()`, correspondents MTN_MOMO_CMR / ORANGE_CMR ; jeton lu côté serveur uniquement.
+- [x] `src/lib/billing.ts` (client) — plans, abonnement, paiements, quota étudiants, `formatFcfa`.
+- [x] `src/app/api/billing/checkout/route.ts` — service-role : vérifie l'admin, crée le paiement (pending), lance le dépôt PawaPay.
+- [x] `src/app/api/billing/webhook/route.ts` — revérifie l'état auprès de PawaPay puis active l'abonnement si COMPLETED.
+- [x] `src/app/admin/facturation/page.tsx` — page en `PageShell` (métriques : plan, statut, étudiants/quota, échéance) + cartes de plans + formulaire Mobile Money + historique. Style dashboard admin, sans vide.
+- [x] `DashNav` — entrée admin « Abonnement ».
+
+### Tests réalisés
+- [x] Migration 031 appliquée ; chaîne complète (schema + 30 migrations) rejouée sans erreur.
+- [x] Flux simulé sur Postgres réel : paiement pending → webhook COMPLETED → abonnement demo passe **starter/trial → pro/active**, paiement marqué payé.
+- [x] `tsc --noEmit` propre.
+
+### À fournir pour encaisser réellement (hors code)
+- `PAWAPAY_API_TOKEN` (+ `PAWAPAY_ENV=sandbox|production`), `SUPABASE_SERVICE_ROLE_KEY` en prod.
+- URL du webhook à déclarer dans le tableau de bord PawaPay → `/api/billing/webhook`.
+- Pays/opérateurs à activer (Cameroun MTN/Orange par défaut).
