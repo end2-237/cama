@@ -73,6 +73,37 @@ Deux instituts sur la même app, chacun avec son logo et ses couleurs, résolus 
 ---
 
 ## Étape 2 — Isolation des données (org_id + RLS réelle)
-**Statut : NON COMMENCÉE** (prérequis : Étape 1 terminée ✅)
-Prochaine action : migration d'ajout de `org_id` sur toutes les tables métier + backfill JFN + réécriture des 78 policies (`org_id + auth.uid() + rôle`).
+**Statut : TERMINÉE ✅ (testée sur Postgres réel)**
+
+### Objectif
+Chaque établissement ne voit et ne modifie que ses propres données, garanti côté base.
+
+### Livrables
+- [x] `027_tenant_org_id.sql` — `org_id` ajouté à 61 tables métier + backfill JFN + index ;
+      fonctions `current_org_id()`, `current_user_role()` ; défaut auto `org_id = current_org_id()`
+      à l'insertion (sauf `users`, peuplé par l'app).
+- [x] `028_tenant_rls.sql` — RLS activée sur toutes les tables ; policy `tenant_isolation`
+      (`org_id = current_org_id()`), règles spécifiques `users` (profil propre + membres du tenant),
+      `is_platform_admin()` (super-admin transverse).
+- [x] `src/app/auth/register/page.tsx` — insertion `users` et `inscriptions` avec `org_id` du tenant courant (via `useOrg`).
+- [x] `src/lib/supabase.ts` — `DBUser.org_id` ajouté.
+
+### Tests réalisés (Postgres 16 local, rôle `authenticated`, JWT simulé)
+- [x] Chaîne complète rejouée depuis zéro : schema + 27 migrations → 0 table sans `org_id` (hors `organizations`), 0 table tenant sans RLS.
+- [x] Isolation lecture : Alice (JFN) ne voit que les données JFN ; Bob (LinguaPro) que celles de LinguaPro. Données de l'autre org invisibles (0 ligne).
+- [x] Auto-remplissage : insertion sans `org_id` → prend le tenant courant automatiquement.
+- [x] Anti-fuite écriture : Bob tentant d'insérer dans l'org JFN → **refusé** (`new row violates row-level security policy`).
+- [x] Super-admin plateforme (`admin_level='super_admin'`) → voit les 2 orgs.
+- [x] `tsc --noEmit` propre.
+
+### Journal
+- 2026-09-17 : Étape 2 (2a colonnes+backfill, 2b RLS, 2c câblage register) implémentée et validée sur une reproduction Postgres réelle de la base (stubs auth/storage/realtime). Isolation lecture + écriture confirmée avec 2 tenants.
+- NB : les routes API service-role continuent de contourner la RLS (normal). Les pages publiques (landing) ne touchent pas la base ; le journal est derrière login. Aucun impact public.
+- À prévoir Étape 3 : quand un visiteur non connecté doit voir un catalogue public par sous-domaine, prévoir une lecture publique filtrée par org (passage de l'org au serveur).
+
+---
+
+## Étape 3 — Pages d'enregistrement d'établissement (/signup, /onboarding)
+**Statut : NON COMMENCÉE** (prérequis : Étape 2 terminée ✅)
+Prochaine action : flux public de création d'org + admin initial + application du branding/vertical.
 

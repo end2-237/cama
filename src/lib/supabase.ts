@@ -15,6 +15,7 @@ export type SlotStatus = "propose" | "valide" | "rejete";
 export interface DBUser {
   id: string;
   email: string;
+  org_id: string | null;
   first_name: string;
   last_name: string;
   role: UserRole;

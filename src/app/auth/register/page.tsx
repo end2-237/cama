@@ -6,6 +6,7 @@ import Link from "next/link";
 import { ArrowLeft, Eye, EyeOff, Globe, ChevronRight, Check, AlertCircle, Loader2 } from "lucide-react";
 import AuthPanel from "@/components/auth/AuthPanel";
 import { supabase } from "@/lib/supabase";
+import { useOrg } from "@/context/OrgContext";
 import { PARCOURS, CYCLES } from "@/lib/parcours";
 
 const niveaux = ["L1", "L2", "L3", "M1", "M2"];
@@ -35,6 +36,7 @@ function generateMatricule(): string {
 
 export default function RegisterPage() {
   const router = useRouter();
+  const { org } = useOrg();
 
   const [showPwd,   setShowPwd]   = useState(false);
   const [step,      setStep]      = useState<1|2>(1);
@@ -108,6 +110,7 @@ export default function RegisterPage() {
     const { error: profileError } = await supabase.from("users").insert({
       id:           userId,
       email,
+      org_id:       org.id,
       first_name:   firstName,
       last_name:    lastName,
       role,
@@ -129,6 +132,7 @@ export default function RegisterPage() {
     if (role === "etudiant") {
       const { error: dossierError } = await supabase.from("inscriptions").insert({
         user_id:        userId,
+        org_id:         org.id,
         matricule,
         parcours_slug:  parcours.slug,
         parcours_title: parcours.title,
