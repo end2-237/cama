@@ -61,6 +61,7 @@ declare
   pol record;
 begin
   foreach t in array tbls loop
+    if to_regclass('public.' || t) is null then continue; end if;  -- table absente : on ignore
     execute format('alter table public.%I enable row level security', t);
     -- retire toutes les policies existantes (souvent permissives)
     for pol in select policyname from pg_policies where schemaname='public' and tablename=t loop

@@ -27,6 +27,7 @@ declare
   ];
 begin
   foreach t in array tbls loop
+    if to_regclass('public.' || t) is null then continue; end if;  -- table absente : on ignore
     execute format(
       'alter table public.%I add column if not exists org_id uuid references public.organizations(id)', t);
     execute format('update public.%I set org_id = %L where org_id is null', t, jfn);
@@ -67,6 +68,7 @@ declare
   ];
 begin
   foreach t in array tbls loop
+    if to_regclass('public.' || t) is null then continue; end if;  -- table absente : on ignore
     execute format(
       'alter table public.%I alter column org_id set default public.current_org_id()', t);
   end loop;

@@ -27,6 +27,7 @@ declare
   pol record;
 begin
   foreach t in array tbls loop
+    if to_regclass('public.' || t) is null then continue; end if;
     for pol in select policyname from pg_policies where schemaname='public' and tablename=t loop
       execute format('drop policy if exists %I on public.%I', pol.policyname, t);
     end loop;
@@ -50,39 +51,48 @@ end $$;
 do $$
 declare pol record;
 begin
+  if to_regclass('public.notifications') is null then return; end if;
   for pol in select policyname from pg_policies where schemaname='public' and tablename='notifications' loop
     execute format('drop policy if exists %I on public.notifications', pol.policyname);
   end loop;
+  execute $p$
+    create policy "fine_owner" on public.notifications for all
+      using (org_id = public.current_org_id() and (public.is_org_staff() or public.is_platform_admin() or user_id = auth.uid()))
+      with check (org_id = public.current_org_id() and (public.is_org_staff() or public.is_platform_admin() or user_id = auth.uid()))
+  $p$;
 end $$;
-create policy "fine_owner" on public.notifications for all
-  using (org_id = public.current_org_id() and (public.is_org_staff() or public.is_platform_admin() or user_id = auth.uid()))
-  with check (org_id = public.current_org_id() and (public.is_org_staff() or public.is_platform_admin() or user_id = auth.uid()));
 
 -- ── teacher_reviews : propriété via created_by (l'étudiant auteur) ──
 do $$
 declare pol record;
 begin
+  if to_regclass('public.teacher_reviews') is null then return; end if;
   for pol in select policyname from pg_policies where schemaname='public' and tablename='teacher_reviews' loop
     execute format('drop policy if exists %I on public.teacher_reviews', pol.policyname);
   end loop;
+  execute $p$
+    create policy "fine_owner" on public.teacher_reviews for all
+      using (org_id = public.current_org_id() and (public.is_org_staff() or public.is_platform_admin() or created_by = auth.uid()))
+      with check (org_id = public.current_org_id() and (public.is_org_staff() or public.is_platform_admin() or created_by = auth.uid()))
+  $p$;
 end $$;
-create policy "fine_owner" on public.teacher_reviews for all
-  using (org_id = public.current_org_id() and (public.is_org_staff() or public.is_platform_admin() or created_by = auth.uid()))
-  with check (org_id = public.current_org_id() and (public.is_org_staff() or public.is_platform_admin() or created_by = auth.uid()));
 
 -- ── transcript_lines : propriété via le relevé parent ──
 do $$
 declare pol record;
 begin
+  if to_regclass('public.transcript_lines') is null then return; end if;
   for pol in select policyname from pg_policies where schemaname='public' and tablename='transcript_lines' loop
     execute format('drop policy if exists %I on public.transcript_lines', pol.policyname);
   end loop;
+  execute $p$
+    create policy "fine_owner" on public.transcript_lines for all
+      using (
+        org_id = public.current_org_id() and (
+          public.is_org_staff() or public.is_platform_admin()
+          or transcript_id in (select id from public.transcripts where student_id = auth.uid())
+        )
+      )
+      with check (org_id = public.current_org_id() and (public.is_org_staff() or public.is_platform_admin()))
+  $p$;
 end $$;
-create policy "fine_owner" on public.transcript_lines for all
-  using (
-    org_id = public.current_org_id() and (
-      public.is_org_staff() or public.is_platform_admin()
-      or transcript_id in (select id from public.transcripts where student_id = auth.uid())
-    )
-  )
-  with check (org_id = public.current_org_id() and (public.is_org_staff() or public.is_platform_admin()));

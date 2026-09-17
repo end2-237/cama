@@ -18,6 +18,7 @@ declare
   pol record;
 begin
   foreach t in array tbls loop
+    if to_regclass('public.' || t) is null then continue; end if;
     for pol in select policyname from pg_policies where schemaname='public' and tablename=t loop
       execute format('drop policy if exists %I on public.%I', pol.policyname, t);
     end loop;
@@ -57,7 +58,12 @@ begin
   return new;
 end $$;
 
-drop trigger if exists trg_guard_attempt_grade on public.exam_attempts;
-create trigger trg_guard_attempt_grade
-  before update on public.exam_attempts
-  for each row execute function public.guard_attempt_grade();
+do $$
+begin
+  if to_regclass('public.exam_attempts') is not null then
+    drop trigger if exists trg_guard_attempt_grade on public.exam_attempts;
+    create trigger trg_guard_attempt_grade
+      before update on public.exam_attempts
+      for each row execute function public.guard_attempt_grade();
+  end if;
+end $$;
