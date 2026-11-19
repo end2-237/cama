@@ -4,7 +4,7 @@
    avec possibilité d'override explicite par org (colonne features[]).
 ════════════════════════════════════════════════════════════ */
 
-import type { DBOrganization } from "@/lib/org";
+import { familleDe, type DBOrganization } from "@/lib/org";
 
 export type FeatureKey =
   | "courses" | "exams" | "messaging" | "library" | "forum"
@@ -23,14 +23,16 @@ const PREMIUM_PLANS = new Set(["business", "enterprise"]);
 /** TP/VM : réservé au vertical pro/IT ET à un palier Business/Enterprise. */
 function tpVmEligible(org: DBOrganization): boolean {
   const plan = (org.plan_id ?? "").toLowerCase();
-  return org.vertical === "pro" && PREMIUM_PLANS.has(plan);
+  return familleDe(org) === "pro" && PREMIUM_PLANS.has(plan);
 }
 
 /** Ensemble effectif des modules actifs pour un établissement. */
 export function orgFeatures(org: DBOrganization): Set<FeatureKey> {
   const set = new Set<FeatureKey>(BASE);
   if (tpVmEligible(org)) set.add("tp_vm");
-  // Overrides explicites (ex. JFN académique qui utilise déjà les TP).
+  // Modules d'office de la catégorie, puis overrides explicites de l'org
+  // (ex. JFN académique qui utilise déjà les TP).
+  for (const f of org.category?.features ?? []) set.add(f as FeatureKey);
   for (const f of org.features ?? []) set.add(f as FeatureKey);
   return set;
 }

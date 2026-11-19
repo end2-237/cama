@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import {
-  STATUTS, adminPlateforme, clientService, creerEtablissement, type NouvelEtablissement,
+  STATUTS, adminPlateforme, categorieValide, clientService, creerEtablissement, type NouvelEtablissement,
 } from "@/lib/server/organizations";
 
 export const dynamic = "force-dynamic";
@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
  *
  * GET   /api/platform/orgs            → établissements, comptes, plans
  * POST  /api/platform/orgs            → crée un établissement + son admin
- * PATCH /api/platform/orgs            → { id, status?, planId? }
+ * PATCH /api/platform/orgs            → { id, status?, planId?, vertical? }
  */
 
 async function garde(req: Request) {
@@ -28,12 +28,13 @@ export async function GET(req: Request) {
   if ("erreur" in g) return g.erreur;
   const { admin } = g;
 
-  const [orgs, plans, membres] = await Promise.all([
+  const [orgs, plans, membres, categories] = await Promise.all([
     admin.from("organizations")
       .select("id, slug, name, subdomain, custom_domain, vertical, plan_id, status, primary_color, logo_url, created_at")
       .order("created_at", { ascending: false }),
     admin.from("plans").select("id, name, price_fcfa, max_students").order("sort"),
     admin.from("users").select("org_id, role, email, first_name, last_name").not("org_id", "is", null).limit(100000),
+    admin.from("org_categories").select("*").order("sort"),
   ]);
   if (orgs.error) return NextResponse.json({ error: "Lecture impossible.", detail: orgs.error.message.slice(0, 200) }, { status: 500 });
 
@@ -49,6 +50,8 @@ export async function GET(req: Request) {
 
   return NextResponse.json({
     plans: plans.data ?? [],
+    // Avant la migration 037, le catalogue n'existe pas : null → l'écran garde les trois historiques.
+    categories: categories.error ? null : categories.data ?? [],
     etablissements: (orgs.data ?? []).map((o) => ({
       ...o,
       ...(stats.get(o.id) ?? { etudiants: 0, enseignants: 0, admins: [] }),
@@ -63,7 +66,7 @@ export async function POST(req: Request) {
   let b: NouvelEtablissement;
   try { b = await req.json(); } catch { return NextResponse.json({ error: "JSON invalide" }, { status: 400 }); }
 
-  const r = await creerEtablissement(g.admin, b, { genererMotDePasse: true, statutsPermis: ["trial", "active"] });
+  const r = await creerEtablissement(g.admin, b, { genererMotDePasse: true, statutsPermis: ["trial", "active"], categoriesInactives: true });
   if (!r.ok) return NextResponse.json({ error: r.error, detail: r.detail }, { status: r.status });
 
   // Trace dans le journal de l'établissement créé.
@@ -79,7 +82,7 @@ export async function PATCH(req: Request) {
   const g = await garde(req);
   if ("erreur" in g) return g.erreur;
 
-  let b: { id?: string; status?: string; planId?: string | null };
+  let b: { id?: string; status?: string; planId?: string | null; vertical?: string };
   try { b = await req.json(); } catch { return NextResponse.json({ error: "JSON invalide" }, { status: 400 }); }
   if (!b.id) return NextResponse.json({ error: "Établissement manquant." }, { status: 400 });
 
@@ -94,6 +97,11 @@ export async function PATCH(req: Request) {
       if (!plan) return NextResponse.json({ error: "Plan inconnu." }, { status: 400 });
     }
     maj.plan_id = b.planId || null;
+  }
+  if (b.vertical !== undefined) {
+    // Changer l'orientation : n'importe quelle catégorie du catalogue, même retirée de l'inscription.
+    if (!(await categorieValide(g.admin, b.vertical, false))) return NextResponse.json({ error: "Catégorie inconnue." }, { status: 400 });
+    maj.vertical = b.vertical;
   }
   if (!Object.keys(maj).length) return NextResponse.json({ error: "Rien à modifier." }, { status: 400 });
 

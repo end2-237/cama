@@ -5,7 +5,7 @@
    métier de chaque établissement, sans dupliquer de composants.
 ════════════════════════════════════════════════════════════ */
 
-import type { OrgVertical } from "@/lib/org";
+import type { DBCategory, OrgFamily } from "@/lib/org";
 
 export interface Terms {
   platformLabel: string;   // sur-titre de marque
@@ -19,7 +19,7 @@ export interface Terms {
   programWord: string;     // « Cursus » | « Programme » | « Parcours »
 }
 
-const PACKS: Record<OrgVertical, Terms> = {
+const PACKS: Record<OrgFamily, Terms> = {
   academique: {
     platformLabel: "Plateforme Académique",
     heroLine1: "Construisez votre",
@@ -55,6 +55,14 @@ const PACKS: Record<OrgVertical, Terms> = {
   },
 };
 
-export function termsFor(vertical: OrgVertical): Terms {
-  return PACKS[vertical] ?? PACKS.academique;
+/**
+ * Le vocabulaire d'un établissement : celui de son modèle (famille), puis
+ * celui de sa catégorie par-dessus (« Atelier », « Leçon », « Classe »…).
+ */
+export function termsFor(famille: OrgFamily | string, categorie?: Pick<DBCategory, "terms"> | null): Terms {
+  const base = PACKS[famille as OrgFamily] ?? PACKS.academique;
+  const propres = Object.fromEntries(
+    Object.entries(categorie?.terms ?? {}).filter(([k, v]) => k in base && typeof v === "string" && v.trim()),
+  );
+  return { ...base, ...propres };
 }

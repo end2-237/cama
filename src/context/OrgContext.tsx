@@ -6,7 +6,7 @@ import { hasFeature, type FeatureKey } from "@/lib/features";
 import { termsFor, type Terms } from "@/lib/terminology";
 import {
   DBOrganization, FALLBACK_ORGS, DEFAULT_ORG_SLUG,
-  resolveOrgSlug, fetchOrgBySlug,
+  resolveOrgSlug, fetchOrgBySlug, familleDe,
 } from "@/lib/org";
 
 interface OrgCtx {
@@ -44,7 +44,7 @@ export function OrgProvider({ children }: { children: ReactNode }) {
   }, [tick]);
 
   return (
-    <OrgContext.Provider value={{ org, loading, reload: () => setTick((t) => t + 1), has: (k) => hasFeature(org, k), terms: termsFor(org.vertical) }}>
+    <OrgContext.Provider value={{ org, loading, reload: () => setTick((t) => t + 1), has: (k) => hasFeature(org, k), terms: termsFor(familleDe(org), org.category) }}>
       {children}
     </OrgContext.Provider>
   );

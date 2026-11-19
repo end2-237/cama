@@ -1,16 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, ArrowRight, Loader2, AlertCircle, Check } from "lucide-react";
 import AuthPanel from "@/components/auth/AuthPanel";
+import { CATEGORIES_DE_BASE, fetchCategories, type DBCategory } from "@/lib/org";
 
-const VERTICALS = [
-  { id: "academique", label: "Académique", desc: "Université, institut, cursus & ECTS" },
-  { id: "langues", label: "Langues", desc: "École de langues, niveaux A1→C2" },
-  { id: "pro", label: "Formation pro", desc: "Centre pro, modules & certifications" },
-] as const;
 
 const PRESETS = ["#4F46E5", "#0EA5A4", "#2563EB", "#DB2777", "#F59E0B", "#16A34A", "#7C3AED", "#DC2626"];
 
@@ -19,6 +15,9 @@ export default function OrgSignupPage() {
   const [orgName, setOrgName] = useState("");
   const [subdomain, setSubdomain] = useState("");
   const [vertical, setVertical] = useState<string>("academique");
+  // Le catalogue des catégories (bureautique, auto-école…), géré depuis /plateforme.
+  const [categories, setCategories] = useState<DBCategory[]>(CATEGORIES_DE_BASE);
+  useEffect(() => { void fetchCategories().then(setCategories); }, []);
   const [primaryColor, setPrimaryColor] = useState("#4F46E5");
   const [adminFirstName, setAdminFirstName] = useState("");
   const [adminLastName, setAdminLastName] = useState("");
@@ -94,12 +93,12 @@ export default function OrgSignupPage() {
             </div>
 
             <label className="block text-xs font-semibold text-muted mb-1">Type d'établissement</label>
-            <div className="grid grid-cols-3 gap-2 mb-4">
-              {VERTICALS.map((v) => (
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-4 max-h-64 overflow-y-auto pr-1">
+              {categories.map((v) => (
                 <button type="button" key={v.id} onClick={() => setVertical(v.id)}
                   className={`text-left border-2 rounded-xl px-3 py-2 transition-all ${vertical === v.id ? "border-cama bg-cama/5" : "border-border hover:border-cama/40"}`}>
                   <p className="text-sm font-semibold text-ink">{v.label}</p>
-                  <p className="text-[10px] text-muted leading-tight mt-0.5">{v.desc}</p>
+                  <p className="text-[10px] text-muted leading-tight mt-0.5">{v.description}</p>
                 </button>
               ))}
             </div>

@@ -8,7 +8,19 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
    La clé service ne quitte jamais le serveur.
 ════════════════════════════════════════════════════════════ */
 
+/** Repli tant que le catalogue (migration 037) n'existe pas. */
 export const VERTICALS = ["academique", "langues", "pro"] as const;
+
+/**
+ * La catégorie existe-t-elle (et, pour l'inscription publique, est-elle
+ * proposée) ? Lit le catalogue org_categories ; avant la migration 037,
+ * retombe sur les trois catégories historiques.
+ */
+export async function categorieValide(admin: SupabaseClient, id: string, seulementActives = true): Promise<boolean> {
+  const { data, error } = await admin.from("org_categories").select("id, active").eq("id", id).maybeSingle();
+  if (error) return (VERTICALS as readonly string[]).includes(id);
+  return Boolean(data && (data.active || !seulementActives));
+}
 export const STATUTS = ["trial", "active", "suspended"] as const;
 const RESERVED = new Set(["www", "app", "api", "admin", "cama", "signup", "onboarding", "dashboard", "auth", "super-admin", "plateforme"]);
 const SUBDOMAIN_RE = /^[a-z0-9](?:[a-z0-9-]{1,30}[a-z0-9])$/;
@@ -41,7 +53,7 @@ export type Resultat =
 export async function creerEtablissement(
   admin: SupabaseClient,
   b: NouvelEtablissement,
-  options: { genererMotDePasse?: boolean; statutsPermis?: readonly string[] } = {},
+  options: { genererMotDePasse?: boolean; statutsPermis?: readonly string[]; categoriesInactives?: boolean } = {},
 ): Promise<Resultat> {
   const orgName = (b.orgName ?? "").trim().slice(0, 120);
   const subdomain = (b.subdomain ?? "").trim().toLowerCase();
@@ -66,8 +78,8 @@ export async function creerEtablissement(
   if (!SUBDOMAIN_RE.test(subdomain) || RESERVED.has(subdomain)) {
     return { ok: false, status: 400, error: "Sous-domaine invalide ou réservé (a-z, 0-9, tirets)." };
   }
-  if (!VERTICALS.includes(vertical as (typeof VERTICALS)[number])) {
-    return { ok: false, status: 400, error: "Vertical inconnu." };
+  if (!(await categorieValide(admin, vertical, !options.categoriesInactives))) {
+    return { ok: false, status: 400, error: "Catégorie d'établissement inconnue." };
   }
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(adminEmail)) {
     return { ok: false, status: 400, error: "Email de l'administrateur invalide." };

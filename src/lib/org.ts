@@ -7,7 +7,55 @@
 
 import { supabase } from "@/lib/supabase";
 
-export type OrgVertical = "academique" | "langues" | "pro";
+/** Les trois modèles de fonctionnement que l'application sait faire tourner. */
+export type OrgFamily = "academique" | "langues" | "pro";
+/** Catégorie d'établissement : un identifiant du catalogue org_categories
+    (academique, langues, pro, bureautique, auto-ecole…). */
+export type OrgVertical = string;
+
+export interface DBCategory {
+  id: string;
+  label: string;
+  description: string;
+  family: OrgFamily;
+  terms: Record<string, string>;
+  features: string[];
+  icon: string | null;
+  active: boolean;
+  sort: number;
+}
+
+/** Les trois catégories historiques : repli tant que la migration 037 n'est pas passée. */
+export const CATEGORIES_DE_BASE: DBCategory[] = [
+  { id: "academique", label: "Académique", description: "Université, institut, cursus & ECTS", family: "academique", terms: {}, features: [], icon: null, active: true, sort: 10 },
+  { id: "langues", label: "Langues", description: "École de langues, niveaux A1→C2", family: "langues", terms: {}, features: [], icon: null, active: true, sort: 20 },
+  { id: "pro", label: "Formation pro", description: "Centre pro, modules & certifications", family: "pro", terms: {}, features: [], icon: null, active: true, sort: 30 },
+];
+
+/** Le modèle de fonctionnement d'un établissement. */
+export function familleDe(org: Pick<DBOrganization, "vertical" | "category">): OrgFamily {
+  const f = org.category?.family ?? org.vertical;
+  return f === "langues" || f === "pro" ? f : "academique";
+}
+
+/** Catalogue des catégories proposées (actives), triées. */
+export async function fetchCategories(toutes = false): Promise<DBCategory[]> {
+  try {
+    let req = supabase.from("org_categories").select("*").order("sort");
+    if (!toutes) req = req.eq("active", true);
+    const { data, error } = await req;
+    if (!error && data?.length) return data as DBCategory[];
+  } catch { /* table absente → repli */ }
+  return CATEGORIES_DE_BASE;
+}
+
+async function avecCategorie(org: DBOrganization): Promise<DBOrganization> {
+  try {
+    const { data } = await supabase.from("org_categories").select("*").eq("id", org.vertical).maybeSingle();
+    if (data) return { ...org, category: data as DBCategory };
+  } catch { /* ignore */ }
+  return { ...org, category: CATEGORIES_DE_BASE.find((c) => c.id === org.vertical) ?? null };
+}
 export type OrgStatus = "active" | "trial" | "suspended";
 
 export interface DBOrganization {
@@ -25,6 +73,8 @@ export interface DBOrganization {
   features: string[];              // overrides explicites de modules
   status: OrgStatus;
   created_at?: string;
+  /** La catégorie chargée avec l'établissement (vocabulaire, modèle). */
+  category?: DBCategory | null;
 }
 
 /* Fallback local : garantit un rendu cohérent tant que la table n'est pas
@@ -94,7 +144,7 @@ export async function fetchOrgBySlug(slug: string): Promise<DBOrganization> {
       .select("*")
       .eq("slug", slug)
       .maybeSingle();
-    if (data) return data as DBOrganization;
+    if (data) return avecCategorie(data as DBOrganization);
   } catch { /* DB absente/hors-ligne → fallback */ }
   return FALLBACK_ORGS[slug] ?? FALLBACK_ORGS[DEFAULT_ORG_SLUG];
 }
@@ -106,7 +156,7 @@ export async function fetchOrgById(id: string): Promise<DBOrganization | null> {
       .select("*")
       .eq("id", id)
       .maybeSingle();
-    if (data) return data as DBOrganization;
+    if (data) return avecCategorie(data as DBOrganization);
   } catch { /* ignore */ }
   return Object.values(FALLBACK_ORGS).find((o) => o.id === id) ?? null;
 }

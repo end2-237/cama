@@ -63,7 +63,7 @@ export default function CursusPage() {
       stats={[
         { label: "Filières", value: tracks.length, accent: "cama" },
         { label: terms.levelWord, value: levels.length, accent: "ink" },
-        { label: "Type", value: org.vertical, accent: "gold" },
+        { label: "Type", value: org.category?.label ?? org.vertical, accent: "gold" },
       ]}
     >
       {err && (
